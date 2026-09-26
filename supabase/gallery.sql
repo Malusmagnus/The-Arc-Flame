@@ -1,5 +1,6 @@
 -- The Arc Flame: Galerie.
--- Voraussetzung: public.is_officer() aus schema.sql (Rolle officer oder admin).
+-- Voraussetzung: public.is_officer() und public.is_approved() aus schema.sql
+-- oder approval.sql (Rolle officer oder admin gilt als freigeschaltet).
 -- Erneut ausführbar. Dieselben Anweisungen stehen auch in schema.sql.
 --
 -- psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/gallery.sql
@@ -27,6 +28,15 @@ set
 where id = 'gallery';
 
 -- storage.objects hat in Supabase bereits RLS. Nicht abschalten.
+-- Bricht ab, bevor Richtlinien gelöscht werden, falls die Freischaltung fehlt.
+do $need_approved$
+begin
+  if to_regprocedure('public.is_approved()') is null then
+    raise exception 'public.is_approved() fehlt. Zuerst supabase/approval.sql oder schema.sql ausführen.';
+  end if;
+end
+$need_approved$;
+
 drop policy if exists gallery_objects_select on storage.objects;
 create policy gallery_objects_select on storage.objects
   for select to anon, authenticated
@@ -35,12 +45,12 @@ create policy gallery_objects_select on storage.objects
 drop policy if exists gallery_objects_insert on storage.objects;
 create policy gallery_objects_insert on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'gallery' and public.is_officer());
+  with check (bucket_id = 'gallery' and public.is_officer() and public.is_approved());
 
 drop policy if exists gallery_objects_delete on storage.objects;
 create policy gallery_objects_delete on storage.objects
   for delete to authenticated
-  using (bucket_id = 'gallery' and public.is_officer());
+  using (bucket_id = 'gallery' and public.is_officer() and public.is_approved());
 
 create table if not exists public.gallery_images (
   id uuid primary key default gen_random_uuid(),
@@ -82,6 +92,9 @@ begin
     return new;
   end if;
   if auth.uid() is not null then
+    if not public.is_approved() then
+      raise exception 'Dein Konto ist noch nicht freigeschaltet.';
+    end if;
     new.uploaded_by := auth.uid();
   elsif session_user not in ('postgres', 'supabase_admin') then
     raise exception 'Anmeldung erforderlich.';
@@ -113,12 +126,12 @@ create policy gallery_images_select on public.gallery_images
 drop policy if exists gallery_images_insert on public.gallery_images;
 create policy gallery_images_insert on public.gallery_images
   for insert to authenticated
-  with check (public.is_officer());
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists gallery_images_delete on public.gallery_images;
 create policy gallery_images_delete on public.gallery_images
   for delete to authenticated
-  using (public.is_officer());
+  using (public.is_officer() and public.is_approved());
 
 revoke all on table public.gallery_images from public, anon, authenticated;
 grant select on table public.gallery_images to anon, authenticated;

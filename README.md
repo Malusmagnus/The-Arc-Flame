@@ -6,13 +6,13 @@ Sie wird über GitHub Pages unter [https://thearcflame.github.io/](https://thear
 
 ## Gildendaten
 
-Mitglieder, Raidkader (Retail und Forever), Gildenleitung, M+-Gruppen, Classic-Runs, Status & Vision und der Gilden-Chat liegen in **Supabase**. Alle Besucher sehen denselben Stand. Die Anmeldung läuft über E-Mail und Passwort. Neue Konten sind Mitglieder. Offiziere pflegen Kader, Mitglieder, Leitung und die Statustexte. Administratoren vergeben zusätzlich die Rollen. Die eigene Rolle kann niemand selbst anheben.
+Mitglieder, Raidkader (Retail und Forever), Gildenleitung, M+-Gruppen, Classic-Runs, Status & Vision und der Gilden-Chat liegen in **Supabase**. Alle Besucher sehen denselben Stand, außer den Gilden-Chat: den lesen nur freigeschaltete Konten. Die Anmeldung läuft über E-Mail und Passwort. Neue Konten sind Mitglieder und warten auf Freischaltung. Offiziere und Administratoren schalten frei und pflegen Kader, Mitglieder, Leitung und die Statustexte. Administratoren vergeben zusätzlich die Rollen. Die eigene Rolle und den eigenen Status kann niemand selbst ändern.
 
 Ältere Einträge im localStorage dieses Browsers werden nicht mehr gelesen und nicht in die Datenbank kopiert.
 
 Ist Supabase nicht erreichbar, zeigt die Seite die Startwerte aus `js/defaults.js` und einen Hinweis auf Deutsch. Änderungen werden dann nicht gespeichert.
 
-Einmalig `supabase/schema.sql` im SQL-Editor des Projekts ausführen und die Auth-Einstellungen aus `supabase/README.md` setzen. Projekt-URL und der öffentliche Schlüssel stehen in `js/config.js`.
+Einmalig `supabase/schema.sql` im SQL-Editor des Projekts ausführen. Liegt das Schema schon, zusätzlich `supabase/approval.sql` (Freischaltung). Die Auth-Einstellungen stehen in `supabase/README.md`. Projekt-URL und der öffentliche Schlüssel stehen in `js/config.js`.
 
 Im Browser bleibt nur noch `arc_application_at`: der Abstand von 60 Sekunden zwischen zwei Bewerbungen auf diesem Gerät. Die Bewerbung selbst geht weiter an den Discord-Webhook. Eine Kopie erscheint im gemeinsamen Chat.
 
@@ -37,10 +37,10 @@ Auf der Seite ändern Offiziere die Statustexte über **Informationen bearbeiten
 
 Einladungslink und Bewerbungs-Webhook stehen in `js/config.js`:
 
-- `discordInviteUrl` — Ziel der Buttons **Discord beitreten** (Kopfzeile und Bewerbung)
-- `applicationWebhookUrl` — Adresse, an die das Bewerbungsformular ein Embed schickt
+- `discordInviteUrl` — Ziel des Buttons **Discord beitreten**. Der Link steht nicht im HTML. Die Seite setzt ihn nur für freigeschaltete Konten. Alle anderen sehen den Hinweis „Discord-Zugang gibt es nach der Freischaltung“ mit Links zum Bewerben und Registrieren.
+- `applicationWebhookUrl` — Adresse, an die das Bewerbungsformular ein Embed schickt. Dieselbe Adresse erhält nach einer Registrierung die Nachricht zur Freischaltung.
 
-Zum Austauschen die beiden Werte in `js/config.js` ersetzen und die Seite neu veröffentlichen (Push auf `main`). Die Buttons lesen den Einladungslink beim Laden aus dieser Datei.
+Zum Austauschen die beiden Werte in `js/config.js` ersetzen und die Seite neu veröffentlichen (Push auf `main`).
 
 Die Webhook-URL liegt im öffentlichen JavaScript und ist für jeden Besucher sichtbar. Wenn sie missbraucht wird, den Webhook in Discord löschen und in `js/config.js` durch einen neuen ersetzen.
 
@@ -110,7 +110,8 @@ css/styles.css      fertiges Stylesheet
 js/config.js        Discord, Supabase, statische Galerie und YouTube
 js/defaults.js      Startwerte, falls Supabase nicht erreichbar ist
 js/app.js           Verhalten
-supabase/schema.sql Tabellen, Rechte, Startdaten und Galerie
+supabase/schema.sql Tabellen, Rechte, Startdaten, Galerie und Freischaltung
+supabase/approval.sql Freischaltung (erneut ausführbar, auch in schema.sql)
 supabase/gallery.sql Galerie-Bucket, Tabelle und Rechte (erneut ausführbar)
 supabase/README.md  Einstellungen im Supabase-Dashboard
 assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
