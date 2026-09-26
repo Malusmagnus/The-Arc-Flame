@@ -583,6 +583,61 @@ button.gallery-tile {
   color: #f4c343;
 }
 
+.gallery-item {
+  position: relative;
+  min-width: 0;
+}
+
+.gallery-pick {
+  position: relative;
+  overflow: hidden;
+}
+
+.gallery-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.gallery-delete {
+  position: absolute;
+  z-index: 2;
+  top: 0.45rem;
+  right: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(244, 195, 67, 0.45);
+  background: rgba(90, 12, 18, 0.92);
+  color: #ffe7c2;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.gallery-delete:hover,
+.gallery-delete:focus-visible {
+  background: #b91c1c;
+  color: #fff;
+  border-color: rgba(244, 195, 67, 0.85);
+}
+
+#gallery-upload-form.is-busy {
+  opacity: 0.65;
+}
+
+#gallery-upload-form.is-busy .gallery-pick {
+  pointer-events: none;
+}
+
 .yt-facade,
 .yt-frame {
   width: 100%;
