@@ -1,6 +1,5 @@
-/* Startwerte für Besucher ohne lokale Einträge.
-   Sobald dieser Browser einen localStorage-Schlüssel gesetzt hat,
-   gilt der gespeicherte Stand — nicht mehr diese Datei.
+/* Fallback, wenn die Gildendatenbank nicht erreichbar ist.
+   Dieselben Werte stehen als Startinhalt in supabase/schema.sql.
    Es gibt absichtlich keine vorgegebenen Konten oder Passwörter. */
 window.ARC_DEFAULTS = {
   "retailMembers": [
@@ -314,5 +313,27 @@ window.ARC_DEFAULTS = {
     "col1": "The Arc Flame steht für eine ehrgeizige, aber entspannte Horde-Gemeinschaft. Wir ziehen gemeinsam in den Raid, üben an den Bossen und lassen den Abend freundlich bleiben.",
     "col2": "Retail: Samstag von 20:00 bis 22:00 Uhr, zusammen im Raid. Classic: Aufbau von 10er- und 20er-Gruppen und das Ziel, den 40er-Raid zum Beben zu bringen.",
     "col3": "Ob Retail-Veteran oder Classic-Liebhaber ab dem 5. November: Über unseren gemeinsamen Gilden-Chat halten wir alle Fäden zusammen unter der roten Flagge."
-  }
+  },
+  "leadership": [
+    {
+      "name": "Malusiamanu",
+      "subtitle": "Gildenmeister • Holy Priest",
+      "accent": "amber"
+    },
+    {
+      "name": "Lexxtra",
+      "subtitle": "Flammenrat • Monk Heal",
+      "accent": "red"
+    },
+    {
+      "name": "Lückog",
+      "subtitle": "Flammenrat • Jäger",
+      "accent": "red"
+    },
+    {
+      "name": "Tuhan",
+      "subtitle": "Flammenrat • Paladin",
+      "accent": "red"
+    }
+  ]
 };

@@ -145,7 +145,7 @@
           </h2>
           <p class="mt-1 text-sm text-slate-400">Wie es um The Arc Flame steht – Unsere Mission für Retail &amp; Classic.</p>
         </div>
-        <button type="button" id="edit-info-btn" data-action="toggle-info-edit" aria-expanded="false" aria-controls="info-edit-mode" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-amber-400 transition hover:bg-slate-700">
+        <button type="button" id="edit-info-btn" data-action="toggle-info-edit" data-perm="officer" hidden aria-expanded="false" aria-controls="info-edit-mode" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-amber-400 transition hover:bg-slate-700">
           <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Informationen bearbeiten
         </button>
       </div>
@@ -194,12 +194,17 @@
             <span class="text-xs font-bold uppercase tracking-widest text-amber-400">WoW Retail • Gildenleitung &amp; Flammenrat</span>
             <h2 class="mt-1 text-3xl font-black text-white">Die Gildenleitung von The Arc Flame</h2>
           </div>
-          <div class="text-left md:text-right">
-            <span class="block text-xs text-slate-400">Raid-Zeit</span>
-            <span class="text-sm font-bold text-amber-400"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i> Samstag 20:00 - 22:00 Uhr</span>
+          <div class="flex flex-col items-start gap-3 md:items-end">
+            <div class="text-left md:text-right">
+              <span class="block text-xs text-slate-400">Raid-Zeit</span>
+              <span class="text-sm font-bold text-amber-400"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i> Samstag 20:00 - 22:00 Uhr</span>
+            </div>
+            <button type="button" id="leadership-add-btn" data-action="open-leadership-modal" data-perm="officer" hidden class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-amber-400 transition hover:bg-slate-700">
+              <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Leitung bearbeiten
+            </button>
           </div>
         </div>
-        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ul id="leadership-list" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <li class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
             <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-xl font-bold text-amber-400" aria-hidden="true"><i class="fa-solid fa-crown"></i></div>
             <div class="min-w-0">
@@ -237,14 +242,14 @@
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
               <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> Retail Raidkader (15 Spieler)
             </h2>
-            <p class="text-sm text-slate-400">Nur für den Flammenrat &amp; berechtigte Raidplaner bearbeitbar.</p>
+            <p class="text-sm text-slate-400">Nur für Offiziere und Administratoren bearbeitbar.</p>
           </div>
           <div class="flex w-full flex-wrap items-center justify-between gap-4 md:w-auto">
             <div class="text-left md:text-right">
               <span class="block text-xs text-slate-400">Kader Status</span>
               <span id="retail-roster-count" class="text-sm font-black text-amber-400" aria-live="polite">0/15</span>
             </div>
-            <button type="button" id="retail-raid-add-btn" data-action="open-raid-modal" data-front="retail" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-500">
+            <button type="button" id="retail-raid-add-btn" data-action="open-raid-modal" data-front="retail" data-perm="officer" hidden class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-500">
               <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Spieler eintragen
             </button>
           </div>
@@ -258,9 +263,9 @@
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
               <i class="fa-solid fa-stopwatch text-amber-400" aria-hidden="true"></i> M+ Dungeon &amp; Keystone-Planer
             </h2>
-            <p class="text-sm text-slate-400">Für alle angemeldeten Mitglieder zugänglich.</p>
+            <p class="text-sm text-slate-400">Angemeldete Mitglieder können eine Gruppe erstellen oder einer Gruppe beitreten.</p>
           </div>
-          <button type="button" id="mplus-add-btn" data-action="open-mplus-modal" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
+          <button type="button" id="mplus-add-btn" data-action="open-mplus-modal" data-perm="member" hidden class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
             <i class="fa-solid fa-plus" aria-hidden="true"></i> M+ Gruppe erstellen
           </button>
         </div>
@@ -278,7 +283,7 @@
           <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center md:w-auto">
             <label for="retail-search" class="sr-only">Mitglied suchen</label>
             <input type="search" id="retail-search" placeholder="Mitglied suchen..." class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500 sm:w-64">
-            <button type="button" data-action="open-member-modal" data-front="retail" class="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">
+            <button type="button" id="retail-member-add-btn" data-action="open-member-modal" data-front="retail" data-perm="officer" hidden class="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">
               <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hinzufügen
             </button>
           </div>
@@ -313,9 +318,9 @@
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
               <i class="fa-solid fa-skull text-amber-400" aria-hidden="true"></i> Classic Dungeon &amp; Raid Planer (10/20/40)
             </h2>
-            <p class="text-sm text-slate-400">Nur für berechtigte Raidplaner bearbeitbar.</p>
+            <p class="text-sm text-slate-400">Nur für Offiziere und Administratoren bearbeitbar.</p>
           </div>
-          <button type="button" id="classic-run-add-btn" data-action="open-classic-modal" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
+          <button type="button" id="classic-run-add-btn" data-action="open-classic-modal" data-perm="officer" hidden class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
             <i class="fa-solid fa-plus" aria-hidden="true"></i> Classic Run ansetzen
           </button>
         </div>
@@ -328,9 +333,9 @@
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
               <i class="fa-solid fa-shield-cat text-amber-400" aria-hidden="true"></i> Classic Raidkader (Ziel: 40 Spieler)
             </h2>
-            <p class="text-sm text-slate-400">Eingetragene Member für die Classic-Front (Nur für berechtigte Raidplaner).</p>
+            <p class="text-sm text-slate-400">Eingetragene Member für die Classic-Front. Nur Offiziere und Administratoren bearbeiten den Kader.</p>
           </div>
-          <button type="button" id="forever-raid-add-btn" data-action="open-raid-modal" data-front="forever" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
+          <button type="button" id="forever-raid-add-btn" data-action="open-raid-modal" data-front="forever" data-perm="officer" hidden class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
             <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Spieler hinzufügen
           </button>
         </div>
@@ -348,7 +353,7 @@
           <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center md:w-auto">
             <label for="forever-search" class="sr-only">Classic-Mitglied suchen</label>
             <input type="search" id="forever-search" placeholder="Classic Mitglied suchen..." class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500 sm:w-64">
-            <button type="button" data-action="open-member-modal" data-front="forever" class="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">
+            <button type="button" id="forever-member-add-btn" data-action="open-member-modal" data-front="forever" data-perm="officer" hidden class="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">
               <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hinzufügen
             </button>
           </div>
@@ -407,7 +412,7 @@
             <i class="fa-solid fa-scroll text-amber-400" aria-hidden="true"></i> Gilden-Bewerbung bei The Arc Flame
           </h2>
           <p class="mt-1 text-sm text-slate-400">Egal ob Retail-Raid oder Classic 40er-Raid: Bewirb dich hier unkompliziert ohne Account!</p>
-          <p class="mt-1 text-xs text-amber-200/80">Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie bleibt im Gilden-Chat dieses Browsers.</p>
+          <p class="mt-1 text-xs text-amber-200/80">Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie erscheint im gemeinsamen Gilden-Chat.</p>
         </div>
         <a data-discord-invite href="https://discord.gg/g6TP8sBZQ" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">
           <i class="fa-brands fa-discord" aria-hidden="true"></i> Discord beitreten
@@ -470,7 +475,7 @@
             <i class="fa-solid fa-comments text-emerald-500" aria-hidden="true"></i> Gemeinsamer Gilden-Chat (Retail &amp; Forever)
           </h2>
           <p class="text-sm text-slate-400">Hier schlägt das gemeinsame Herz von The Arc Flame.</p>
-          <p class="mt-1 text-xs text-amber-200/80">Nachrichten bleiben nur in diesem Browser gespeichert.</p>
+          <p class="mt-1 text-xs text-amber-200/80">Nachrichten sind für alle Besucher sichtbar. Zum Schreiben bitte anmelden.</p>
         </div>
         <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400">
           <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-500" aria-hidden="true"></span> Gildenchat aktiv
@@ -491,8 +496,7 @@
   </main>
 
   <footer id="site-footer" class="mt-20 border-t border-slate-800 bg-slate-900 py-8 text-center text-sm text-slate-500">
-    <p class="mx-auto max-w-3xl px-4 text-slate-400">Mitglieder, Kader, Planer, Chat und Konten bleiben nur in diesem Browser (localStorage). Bewerbungen gehen an die Gilde auf Discord; eine Kopie liegt zusätzlich lokal.</p>
-    <button type="button" id="reset-local-btn" data-action="reset-local" class="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 px-4 py-2 font-semibold text-slate-300 hover:border-red-500 hover:text-red-400">Lokale Daten löschen</button>
+    <p class="mx-auto max-w-3xl px-4 text-slate-400">Mitglieder, Kader, Leitung, Planer und Chat gelten für die ganze Gilde. Bewerbungen gehen an Discord; eine Kopie erscheint im Gilden-Chat.</p>
     <p class="mt-6">&copy; 2026 The Arc Flame • World of Warcraft Horde Guild. All rights reserved.</p>
   </footer>
 
@@ -528,30 +532,26 @@
       <h2 id="auth-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
         <i class="fa-solid fa-user-lock text-amber-400" aria-hidden="true"></i> Gilden-Login / Registrierung
       </h2>
-      <p class="mt-2 text-xs text-slate-400">Erstelle einen Account oder logge dich ein, um Aktionen auf der Seite auszuführen.</p>
-      <p class="mt-2 text-xs text-amber-200/80">Konten gelten nur in diesem Browser. Das Passwort liegt unverschlüsselt im lokalen Speicher und ist kein echter Zugriffsschutz.</p>
+      <p class="mt-2 text-xs text-slate-400">Melde dich mit E-Mail und Passwort an. Neue Konten starten als Mitglied.</p>
       <form id="auth-form" class="mt-4 space-y-4">
         <div>
-          <label for="auth-username" class="mb-1 block text-xs font-semibold text-slate-400">Benutzername</label>
-          <input type="text" id="auth-username" name="username" autocomplete="username" placeholder="Dein Benutzername" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          <label for="auth-email" class="mb-1 block text-xs font-semibold text-slate-400">E-Mail</label>
+          <input type="email" id="auth-email" name="email" autocomplete="username" placeholder="deine@email.de" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
         </div>
         <div>
           <label for="auth-password" class="mb-1 block text-xs font-semibold text-slate-400">Passwort</label>
-          <input type="password" id="auth-password" name="password" autocomplete="current-password" placeholder="••••••••" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          <input type="password" id="auth-password" name="password" autocomplete="current-password" placeholder="Mindestens 6 Zeichen" minlength="6" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
         </div>
         <div>
           <label for="auth-mode" class="mb-1 block text-xs font-semibold text-slate-400">Modus</label>
           <select id="auth-mode" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
-            <option value="login">Anmelden (Login)</option>
-            <option value="register">Neu Registrieren</option>
+            <option value="login">Anmelden</option>
+            <option value="register">Neu registrieren</option>
           </select>
         </div>
-        <div id="auth-role-wrap" hidden>
-          <label for="auth-role" class="mb-1 block text-xs font-semibold text-slate-400">Rolle (nur in diesem Browser)</label>
-          <select id="auth-role" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
-            <option value="member">Mitglied</option>
-            <option value="raidplanner">Raidplaner</option>
-          </select>
+        <div id="auth-name-wrap" hidden>
+          <label for="auth-display-name" class="mb-1 block text-xs font-semibold text-slate-400">Anzeigename</label>
+          <input type="text" id="auth-display-name" name="display-name" autocomplete="nickname" maxlength="40" placeholder="Wie du im Chat heißen willst" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
         </div>
         <div class="flex justify-end gap-3 pt-2">
           <button type="button" data-action="close-modal" data-modal="auth-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
@@ -597,7 +597,7 @@
     <div class="modal-backdrop" data-action="close-modal" data-modal="raid-modal"></div>
     <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="raid-modal-title">
       <h2 id="raid-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
-        <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> In den Raidkader eintragen (Nur Raidplaner)
+        <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> In den Raidkader eintragen
       </h2>
       <form id="raid-form" class="mt-4 space-y-4">
         <input type="hidden" id="modal-raid-front" value="retail">
@@ -626,9 +626,10 @@
     <div class="modal-backdrop" data-action="close-modal" data-modal="mplus-modal"></div>
     <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="mplus-modal-title">
       <h2 id="mplus-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
-        <i class="fa-solid fa-stopwatch text-amber-400" aria-hidden="true"></i> M+ Gruppe erstellen (Für alle angemeldeten Member)
+        <i class="fa-solid fa-stopwatch text-amber-400" aria-hidden="true"></i> <span id="mplus-modal-label">M+ Gruppe erstellen</span>
       </h2>
       <form id="mplus-form" class="mt-4 space-y-4">
+        <input type="hidden" id="mp-id" value="">
         <div>
           <label for="mp-group-name" class="mb-1 block text-xs font-semibold text-slate-400">Gruppenname</label>
           <input type="text" id="mp-group-name" placeholder="z.B. Abendgruppe" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
@@ -667,7 +668,7 @@
     <div class="modal-backdrop" data-action="close-modal" data-modal="classic-raid-modal"></div>
     <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="classic-modal-title">
       <h2 id="classic-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
-        <i class="fa-solid fa-skull text-amber-400" aria-hidden="true"></i> Classic Run ansetzen (Nur Raidplaner)
+        <i class="fa-solid fa-skull text-amber-400" aria-hidden="true"></i> Classic Run ansetzen
       </h2>
       <form id="classic-form" class="mt-4 space-y-4">
         <div>
@@ -694,6 +695,52 @@
     </div>
   </div>
 
+  <div id="leadership-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="leadership-modal"></div>
+    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="leadership-modal-title">
+      <h2 id="leadership-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-crown text-amber-400" aria-hidden="true"></i> <span id="leadership-modal-label">Zur Leitung hinzufügen</span>
+      </h2>
+      <form id="leadership-form" class="mt-4 space-y-4">
+        <input type="hidden" id="leadership-id" value="">
+        <div>
+          <label for="leadership-name" class="mb-1 block text-xs font-semibold text-slate-400">Name</label>
+          <input type="text" id="leadership-name" maxlength="80" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="leadership-subtitle" class="mb-1 block text-xs font-semibold text-slate-400">Rolle</label>
+          <input type="text" id="leadership-subtitle" maxlength="80" placeholder="z.B. Flammenrat • Paladin" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="leadership-accent" class="mb-1 block text-xs font-semibold text-slate-400">Farbe</label>
+          <select id="leadership-accent" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+            <option value="amber">Gold</option>
+            <option value="red">Rot</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="leadership-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-amber-500 px-5 py-2 text-sm font-extrabold text-slate-950 shadow-lg hover:bg-amber-400">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="roles-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="roles-modal"></div>
+    <div class="modal-panel max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="roles-modal-title">
+      <h2 id="roles-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-user-shield text-amber-400" aria-hidden="true"></i> Rollen
+      </h2>
+      <p class="mt-2 text-xs text-slate-400">Nur Administratoren ändern Rollen. Die eigene Rolle bleibt unverändert.</p>
+      <div id="roles-list" class="mt-4 max-h-[500px] space-y-3 overflow-y-auto"></div>
+      <div class="mt-4 flex justify-end">
+        <button type="button" data-action="close-modal" data-modal="roles-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
   <script src="js/config.js" defer></script>
   <script src="js/defaults.js" defer></script>
   <script src="js/app.js" defer></script>

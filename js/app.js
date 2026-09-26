@@ -1,8 +1,6 @@
 /* The Arc Flame
-   Alle veränderlichen Daten bleiben in localStorage dieses Browsers.
-   Schlüssel: arc_users, arc_current_user, arc_retail_members, arc_forever_members,
-   arc_retail_raid, arc_forever_raid, arc_mplus_groups, arc_classic_runs,
-   arc_guild_chat, arc_guild_info, arc_application_at. */
+   Gildendaten kommen aus Supabase. localStorage bleibt nur für die
+   Bewerbungs-Pause in diesem Browser (arc_application_at). */
 (function () {
   "use strict";
 
@@ -15,7 +13,11 @@
     classicRuns: [],
     chatMessages: [],
     guildInfo: { col1: "", col2: "", col3: "" },
+    leadership: [],
   };
+
+  const OFFLINE_MSG = "Die Gildendaten konnten nicht geladen werden. Es werden die Standardwerte angezeigt.";
+  const SAVE_FAIL = "Speichern ist gerade nicht möglich. Die Änderung wurde nicht übernommen.";
 
   const FOREVER_IDS = new Set([
     "content-forever",
@@ -69,25 +71,26 @@
   let activeFront = "retail";
   let lastFocus = null;
   let noticeTimer = 0;
-  let resetArmed = false;
   let gallery = [];
   let galleryIndex = 0;
   let revealObserver = null;
-  const LEGACY_GUILD_INFO = {
-    col1: "The Arc Flame steht für ehrgeizige, aber entspannte Horde-Gemeinschaft. Unser klares Ziel ist es, den mythischen Raid-Content zu meistern und Bosse im höchsten Schwierigkeitsgrad zu bezwingen.",
-    col2: "Retail: Samstag von 20:00 bis 22:00 Uhr mit vollem Fokus auf den Mythic-Progress. Classic: Aufbau von 10er, 20er und dem ultimativen Ziel, den 40er-Raid zum Beben zu bringen!",
-  };
+  let remote = null;
+  let remoteReady = false;
+  let liveChannel = null;
+  let authReady = false;
+  let chatRefreshTimer = 0;
+  let rosterRefreshTimer = 0;
 
-  const users = loadUsers();
-  const retailMembers = loadArray("arc_retail_members", DEFAULTS.retailMembers);
-  const foreverMembers = loadArray("arc_forever_members", DEFAULTS.foreverMembers);
-  const retailRaid = loadArray("arc_retail_raid", DEFAULTS.retailRaid);
-  const foreverRaid = loadArray("arc_forever_raid", DEFAULTS.foreverRaid);
-  const mplusGroups = loadArray("arc_mplus_groups", DEFAULTS.mplusGroups);
-  const classicRuns = loadArray("arc_classic_runs", DEFAULTS.classicRuns);
-  const chatMessages = loadArray("arc_guild_chat", DEFAULTS.chatMessages);
-  const guildInfo = loadGuildInfo();
-  let currentUser = readCurrentUser();
+  const retailMembers = clone(DEFAULTS.retailMembers || []);
+  const foreverMembers = clone(DEFAULTS.foreverMembers || []);
+  const retailRaid = clone(DEFAULTS.retailRaid || []);
+  const foreverRaid = clone(DEFAULTS.foreverRaid || []);
+  const mplusGroups = clone(DEFAULTS.mplusGroups || []);
+  const classicRuns = clone(DEFAULTS.classicRuns || []);
+  const chatMessages = clone(DEFAULTS.chatMessages || []);
+  const leadership = clone(DEFAULTS.leadership || []);
+  const guildInfo = clone(DEFAULTS.guildInfo || { col1: "", col2: "", col3: "" });
+  let currentUser = null;
 
   document.addEventListener("DOMContentLoaded", boot);
 
@@ -108,8 +111,10 @@
     renderMPlusGroups();
     renderClassicRuns();
     renderChat();
+    renderLeadership();
     loadGuildInfoView();
     updateAuthUI();
+    loadRemote();
     const hash = location.hash.replace(/^#/, "");
     if (FOREVER_IDS.has(hash)) switchFront("forever");
     else switchFront("retail");
@@ -170,8 +175,6 @@
   function handleAction(el, event) {
     const action = el.dataset.action;
     const front = el.dataset.front === "forever" ? "forever" : "retail";
-    const index = Number(el.dataset.index);
-
     if (action === "switch-front") {
       switchFront(el.dataset.front, { scroll: true });
       return;
@@ -218,19 +221,47 @@
     }
     if (action === "remove-member") {
       event.stopPropagation();
-      removeMember(front, index);
+      removeMember(front, el.dataset.id);
       return;
     }
     if (action === "remove-raid") {
-      removeRaidMember(front, index);
+      removeRaidMember(front, el.dataset.id);
       return;
     }
     if (action === "remove-mplus") {
-      removeMPlusGroup(index);
+      removeMPlusGroup(el.dataset.id);
+      return;
+    }
+    if (action === "edit-mplus") {
+      openEditMPlus(el.dataset.id);
+      return;
+    }
+    if (action === "join-mplus") {
+      joinMPlus(el.dataset.id);
+      return;
+    }
+    if (action === "leave-mplus") {
+      leaveMPlus(el.dataset.id);
       return;
     }
     if (action === "remove-classic") {
-      removeClassicRun(index);
+      removeClassicRun(el.dataset.id);
+      return;
+    }
+    if (action === "remove-chat") {
+      removeChatMessage(el.dataset.id);
+      return;
+    }
+    if (action === "open-leadership-modal") {
+      openLeadershipModal(el.dataset.id || "");
+      return;
+    }
+    if (action === "remove-leadership") {
+      removeLeadership(el.dataset.id);
+      return;
+    }
+    if (action === "open-roles") {
+      openRolesModal();
       return;
     }
     if (action === "dismiss-notice") {
@@ -251,21 +282,22 @@
     }
     if (action === "play-video") {
       playVideo(el);
-      return;
-    }
-    if (action === "reset-local") {
-      resetLocalData(el);
     }
   }
 
   function onChange(event) {
     const roleInput = event.target.closest('[data-action="raid-role"]');
-    if (!roleInput) return;
-    updateRaidRole(
-      roleInput.dataset.front === "forever" ? "forever" : "retail",
-      Number(roleInput.dataset.index),
-      roleInput.value
-    );
+    if (roleInput) {
+      updateRaidRole(
+        roleInput.dataset.front === "forever" ? "forever" : "retail",
+        roleInput.dataset.id,
+        roleInput.value
+      );
+      return;
+    }
+    const profileRole = event.target.closest('[data-action="set-role"]');
+    if (!profileRole) return;
+    setProfileRole(profileRole.dataset.userId, profileRole.value, profileRole);
   }
 
   function onSubmit(event) {
@@ -292,6 +324,9 @@
     } else if (form.id === "chat-form") {
       event.preventDefault();
       sendChatMessage(form);
+    } else if (form.id === "leadership-form") {
+      event.preventDefault();
+      saveLeadership(form);
     }
   }
 
@@ -409,6 +444,9 @@
 
   function updateAuthUI() {
     const headerAuth = document.getElementById("auth-header-section");
+    if (!headerAuth) return;
+    const editOpen = document.getElementById("info-edit-mode");
+    if (editOpen && !editOpen.hidden && !isOfficer()) cancelInfoEdit();
     headerAuth.replaceChildren();
     if (currentUser) {
       const pill = document.createElement("div");
@@ -420,15 +458,16 @@
       icon.className = "fa-solid fa-user-shield";
       icon.setAttribute("aria-hidden", "true");
       name.appendChild(icon);
-      name.appendChild(
-        document.createTextNode(
-          " " +
-            currentUser.username +
-            " (" +
-            (currentUser.role === "raidplanner" ? "Raidplaner" : "Mitglied") +
-            ")"
-        )
-      );
+      name.appendChild(document.createTextNode(" " + currentUser.displayName + " (" + roleLabel(currentUser.role) + ")"));
+      pill.appendChild(name);
+      if (isAdmin()) {
+        const roles = document.createElement("button");
+        roles.type = "button";
+        roles.dataset.action = "open-roles";
+        roles.className = "inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-amber-400 hover:text-white";
+        roles.textContent = "Rollen";
+        pill.appendChild(roles);
+      }
       const logout = document.createElement("button");
       logout.type = "button";
       logout.dataset.action = "logout";
@@ -436,7 +475,6 @@
       logout.setAttribute("aria-label", "Abmelden");
       logout.title = "Abmelden";
       logout.innerHTML = '<i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>';
-      pill.appendChild(name);
       pill.appendChild(logout);
       headerAuth.appendChild(pill);
     } else {
@@ -448,30 +486,30 @@
         '<i class="fa-solid fa-user-lock" aria-hidden="true"></i> Login / Reg';
       headerAuth.appendChild(button);
     }
-    syncLocks();
+    syncPermissions();
     prefillChatAuthor();
   }
 
-  function syncLocks() {
-    const planner = isRaidPlanner();
-    ["retail-raid-add-btn", "forever-raid-add-btn", "classic-run-add-btn"].forEach(function (id) {
-      const button = document.getElementById(id);
-      if (!button) return;
-      button.classList.toggle("opacity-60", !planner);
-      button.setAttribute("aria-disabled", planner ? "false" : "true");
-      button.title = planner ? "" : "Nur für Raidplaner";
+  function syncPermissions() {
+    document.querySelectorAll("[data-perm]").forEach(function (el) {
+      const perm = el.dataset.perm;
+      const show = perm === "admin" ? isAdmin() : perm === "officer" ? isOfficer() : !!currentUser;
+      el.hidden = !show;
     });
-    const mplus = document.getElementById("mplus-add-btn");
-    if (mplus) {
-      const loggedIn = !!currentUser;
-      mplus.classList.toggle("opacity-60", !loggedIn);
-      mplus.setAttribute("aria-disabled", loggedIn ? "false" : "true");
-      mplus.title = loggedIn ? "" : "Anmeldung erforderlich";
-    }
   }
 
-  function isRaidPlanner() {
-    return !!(currentUser && currentUser.role === "raidplanner");
+  function isOfficer() {
+    return !!(currentUser && (currentUser.role === "officer" || currentUser.role === "admin"));
+  }
+
+  function isAdmin() {
+    return !!(currentUser && currentUser.role === "admin");
+  }
+
+  function roleLabel(role) {
+    if (role === "admin") return "Administrator";
+    if (role === "officer") return "Offizier";
+    return "Mitglied";
   }
 
   function openAuthModal() {
@@ -483,79 +521,117 @@
 
   function syncAuthMode() {
     const register = document.getElementById("auth-mode").value === "register";
-    document.getElementById("auth-role-wrap").hidden = !register;
+    document.getElementById("auth-name-wrap").hidden = !register;
+    const name = document.getElementById("auth-display-name");
+    name.required = register;
     document.getElementById("auth-password").autocomplete = register ? "new-password" : "current-password";
   }
 
+  function authErrorText(error) {
+    const msg = String((error && error.message) || "");
+    if (/invalid login credentials/i.test(msg)) return "E-Mail oder Passwort ist falsch.";
+    if (/already registered|already been registered/i.test(msg)) return "Diese E-Mail ist bereits registriert.";
+    if (/password/i.test(msg)) return "Das Passwort wird nicht akzeptiert. Mindestens 6 Zeichen.";
+    if (/email/i.test(msg)) return "Bitte eine gültige E-Mail-Adresse angeben.";
+    if (/rate limit/i.test(msg)) return "Zu viele Versuche. Bitte warte einen Moment.";
+    return "Anmeldung gerade nicht möglich. Bitte versuche es später noch einmal.";
+  }
+
   function handleAuthSubmit(form) {
-    const username = document.getElementById("auth-username").value.trim();
+    if (!remote) {
+      notify(OFFLINE_MSG, "error");
+      return;
+    }
+    const email = document.getElementById("auth-email").value.trim().toLowerCase();
     const password = document.getElementById("auth-password").value;
     const mode = document.getElementById("auth-mode").value;
-    if (!username || !password) {
-      notify("Bitte Benutzername und Passwort ausfüllen.", "error");
+    const displayName = document.getElementById("auth-display-name").value.trim();
+    if (!email || !password) {
+      notify("Bitte E-Mail und Passwort ausfüllen.", "error");
+      return;
+    }
+    if (password.length < 6) {
+      notify("Das Passwort muss mindestens 6 Zeichen haben.", "error");
       return;
     }
     if (mode === "register") {
-      if (users.some(function (user) { return user.username.toLowerCase() === username.toLowerCase(); })) {
-        notify("Dieser Benutzername ist bereits vergeben!", "error");
+      if (displayName.length < 2 || displayName.length > 40) {
+        notify("Der Anzeigename braucht 2 bis 40 Zeichen.", "error");
         return;
       }
-      const role = document.getElementById("auth-role").value === "raidplanner" ? "raidplanner" : "member";
-      const created = { username: username, password: password, role: role };
-      users.push(created);
-      if (!save("arc_users", users)) {
-        users.pop();
-        return;
-      }
-      currentUser = created;
-      if (!save("arc_current_user", currentUser)) {
-        currentUser = null;
-        return;
-      }
-      notify("Erfolgreich registriert und eingeloggt!", "info");
-    } else {
-      const found = users.find(function (user) {
-        return user.username.toLowerCase() === username.toLowerCase() && user.password === password;
+      remote.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: { display_name: displayName },
+          emailRedirectTo: location.origin + location.pathname,
+        },
+      }).then(function (result) {
+        if (result.error) {
+          notify(authErrorText(result.error), "error");
+          return;
+        }
+        if (result.data && result.data.session) {
+          return adoptSession(result.data.session).then(function () {
+            closeModal("auth-modal");
+            form.reset();
+            syncAuthMode();
+            updateAuthUI();
+            renderPermissionSurfaces();
+            notify("Willkommen, du bist angemeldet.", "info");
+          });
+        }
+        closeModal("auth-modal");
+        form.reset();
+        syncAuthMode();
+        notify("Konto angelegt. Bitte bestätige die E-Mail, danach kannst du dich anmelden.", "info");
+      }).catch(function () {
+        notify("Die Registrierung ist gerade nicht möglich.", "error");
       });
-      if (!found) {
-        notify("Falscher Benutzername oder falsches Passwort!", "error");
-        return;
-      }
-      currentUser = {
-        username: found.username,
-        password: found.password,
-        role: found.role === "raidplanner" ? "raidplanner" : "member",
-      };
-      if (!save("arc_current_user", currentUser)) {
-        currentUser = null;
-        return;
-      }
-      notify("Erfolgreich eingeloggt als " + currentUser.username, "info");
+      return;
     }
-    closeModal("auth-modal");
-    form.reset();
-    updateAuthUI();
-    renderRaidKader("retail");
-    renderRaidKader("forever");
+    remote.auth.signInWithPassword({ email: email, password: password }).then(function (result) {
+      if (result.error || !result.data || !result.data.session) {
+        notify(result.error ? authErrorText(result.error) : "Anmeldung fehlgeschlagen.", "error");
+        return;
+      }
+      return adoptSession(result.data.session).then(function () {
+        closeModal("auth-modal");
+        form.reset();
+        updateAuthUI();
+        renderPermissionSurfaces();
+        notify("Angemeldet als " + currentUser.displayName + ".", "info");
+      });
+    }).catch(function () {
+      notify("Die Anmeldung ist gerade nicht möglich.", "error");
+    });
   }
 
   function logoutUser() {
-    currentUser = null;
-    try {
-      localStorage.removeItem("arc_current_user");
-    } catch (err) {
-      notify("Abmelden ist in diesem Browser gerade nicht möglich.", "error");
+    const finish = function () {
+      currentUser = null;
+      updateAuthUI();
+      renderPermissionSurfaces();
+      notify("Du wurdest abgemeldet.", "info");
+    };
+    if (!remote) {
+      finish();
       return;
     }
-    updateAuthUI();
-    renderRaidKader("retail");
-    renderRaidKader("forever");
-    notify("Du wurdest abgemeldet.", "info");
+    remote.auth.signOut().then(finish).catch(function () {
+      notify("Abmelden ist gerade nicht möglich.", "error");
+    });
   }
 
   function prefillChatAuthor() {
     const input = document.getElementById("chat-author");
-    if (currentUser && input && !input.value) input.value = currentUser.username;
+    if (!input) return;
+    if (currentUser) {
+      input.value = currentUser.displayName;
+      input.readOnly = true;
+    } else {
+      input.readOnly = false;
+    }
   }
 
   function renderMembers(front) {
@@ -583,7 +659,7 @@
       const card = document.createElement("li");
       card.className =
         "flex cursor-grab items-center justify-between gap-2 rounded-xl border border-slate-800/80 bg-slate-950 p-3.5 shadow-sm select-none hover:border-slate-700 active:cursor-grabbing";
-      card.draggable = true;
+      card.draggable = isOfficer();
       card.dataset.memberName = member.name;
       card.dataset.front = front;
       const body = document.createElement("div");
@@ -593,24 +669,27 @@
         '<div class="min-w-0"><p class="truncate text-sm font-bold text-white"></p><p class="truncate text-xs text-slate-400"></p></div>';
       body.querySelector("p").textContent = member.name;
       body.querySelectorAll("p")[1].textContent = member.rank || "";
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.action = "remove-member";
-      button.dataset.front = front;
-      button.dataset.index = String(entry.index);
-      button.className =
-        "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:text-red-500";
-      button.setAttribute("aria-label", member.name + " entfernen");
-      button.title = "Entfernen";
-      button.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
-      button.addEventListener("pointerdown", function (event) {
-        event.stopPropagation();
-        card.draggable = false;
-      });
-      button.addEventListener("pointerup", function () {
-        card.draggable = true;
-      });
-      card.append(body, button);
+      card.appendChild(body);
+      if (isOfficer() && member.id) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.action = "remove-member";
+        button.dataset.front = front;
+        button.dataset.id = member.id;
+        button.className =
+          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:text-red-500";
+        button.setAttribute("aria-label", member.name + " entfernen");
+        button.title = "Entfernen";
+        button.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+        button.addEventListener("pointerdown", function (event) {
+          event.stopPropagation();
+          card.draggable = false;
+        });
+        button.addEventListener("pointerup", function () {
+          card.draggable = true;
+        });
+        card.appendChild(button);
+      }
       listEl.appendChild(card);
     });
   }
@@ -654,7 +733,7 @@
       gridEl.appendChild(empty);
       return;
     }
-    const locked = !isRaidPlanner();
+    const locked = !isOfficer();
     kader.forEach(function (slot, index) {
       if (!slot || typeof slot.name !== "string") return;
       const card = document.createElement("div");
@@ -667,54 +746,70 @@
       input.name = "raid-role-" + front + "-" + index;
       input.autocomplete = "off";
       input.value = slot.role || "";
-      input.readOnly = locked;
+      input.readOnly = locked || !slot.id;
       input.dataset.action = "raid-role";
       input.dataset.front = front;
-      input.dataset.index = String(index);
+      input.dataset.id = slot.id || "";
       input.className =
         "w-28 rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-xs font-bold text-amber-400 focus:border-amber-400";
       input.setAttribute("aria-label", "Rolle von " + slot.name);
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.dataset.action = "remove-raid";
-      remove.dataset.front = front;
-      remove.dataset.index = String(index);
-      remove.className =
-        "inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 hover:text-red-500";
-      remove.setAttribute("aria-label", slot.name + " aus dem Kader entfernen");
-      remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+      row.appendChild(input);
+      if (!locked && slot.id) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.dataset.action = "remove-raid";
+        remove.dataset.front = front;
+        remove.dataset.id = slot.id;
+        remove.className =
+          "inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 hover:text-red-500";
+        remove.setAttribute("aria-label", slot.name + " aus dem Kader entfernen");
+        remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+        row.appendChild(remove);
+      }
       const name = document.createElement("p");
       name.className = "break-words text-base font-black text-white";
       name.textContent = slot.name;
-      row.append(input, remove);
       card.append(row, name);
       gridEl.appendChild(card);
     });
   }
 
-  function updateRaidRole(front, index, newRole) {
-    if (!isRaidPlanner()) {
-      notify("Nur berechtigte Raidplaner dürfen den Raidkader bearbeiten!", "error");
+  function updateRaidRole(front, id, newRole) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen den Raidkader bearbeiten.", "error");
+      renderRaidKader(front);
+      return;
+    }
+    if (!requireRemote()) {
       renderRaidKader(front);
       return;
     }
     const kader = kaderOf(front);
-    if (!kader[index]) return;
-    kader[index].role = newRole.trim() || kader[index].role;
-    save(storageKey(front, "raid"), kader);
-    renderRaidKader(front);
+    const slot = kader.find(function (item) { return item.id === id; });
+    const role = newRole.trim();
+    if (!slot || !role) {
+      renderRaidKader(front);
+      return;
+    }
+    remote.from("roster").update({ role: role }).eq("id", id).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        renderRaidKader(front);
+        return;
+      }
+      slot.role = role;
+      renderRaidKader(front);
+    });
   }
 
   function dropToRaid(event, front) {
     event.preventDefault();
-    if (!isRaidPlanner()) {
-      notify(
-        "Achtung: Nur berechtigte Raidplaner dürfen Mitglieder in den Raidkader verschieben! Bitte logge dich als Raidplaner ein.",
-        "error"
-      );
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Mitglieder in den Raidkader verschieben.", "error");
       if (!currentUser) openAuthModal();
       return;
     }
+    if (!requireRemote()) return;
     const raw = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
     if (!raw) return;
     let data;
@@ -734,15 +829,29 @@
       notify("Dieser Charakter steht schon im Kader.", "info");
       return;
     }
-    kader.push({ name: data.name, role: front === "retail" ? "Melee-DD" : "DD" });
-    if (!save(storageKey(front, "raid"), kader)) {
-      kader.pop();
-      return;
-    }
-    renderRaidKader(front);
+    const role = front === "retail" ? "Melee-DD" : "DD";
+    const sort = nextSort(kader);
+    remote.from("roster").insert({
+      front: front,
+      name: data.name,
+      role: role,
+      sort_order: sort,
+    }).select("id, front, name, role, sort_order").single().then(function (result) {
+      if (result.error || !result.data) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      kader.push(mapRoster(result.data));
+      renderRaidKader(front);
+    });
   }
 
   function openAddMemberModal(front) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Mitglieder bearbeiten.", "error");
+      if (!currentUser) openAuthModal();
+      return;
+    }
     const form = document.getElementById("member-form");
     form.reset();
     document.getElementById("modal-front").value = front;
@@ -750,8 +859,8 @@
   }
 
   function openAddRaidModal(front) {
-    if (!isRaidPlanner()) {
-      notify("Zugriff verwehrt! Nur der Flammenrat bzw. berechtigte Raidplaner dürfen den Raidkader verwalten.", "error");
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen den Raidkader verwalten.", "error");
       if (!currentUser) openAuthModal();
       return;
     }
@@ -763,17 +872,37 @@
 
   function openMPlusModal() {
     if (!currentUser) {
-      notify("Bitte melde dich kurz an, um eine M+ Gruppe zu erstellen.", "error");
+      notify("Bitte melde dich an, um eine M+-Gruppe zu erstellen.", "error");
       openAuthModal();
       return;
     }
-    document.getElementById("mplus-form").reset();
+    const form = document.getElementById("mplus-form");
+    form.reset();
+    document.getElementById("mp-id").value = "";
+    document.getElementById("mplus-modal-label").textContent = "M+ Gruppe erstellen";
+    openModal("mplus-modal");
+  }
+
+  function openEditMPlus(id) {
+    const group = mplusGroups.find(function (item) { return item.id === id; });
+    if (!group || !canEditGroup(group)) {
+      notify("Diese Gruppe darfst du nicht bearbeiten.", "error");
+      return;
+    }
+    document.getElementById("mp-id").value = group.id;
+    document.getElementById("mp-group-name").value = group.name;
+    document.getElementById("mp-dungeon").value = group.dungeon;
+    document.getElementById("mp-time").value = group.time;
+    document.getElementById("mp-tank").value = group.tank;
+    document.getElementById("mp-heal").value = group.heal;
+    document.getElementById("mp-dds").value = asList(group.dds).join(", ");
+    document.getElementById("mplus-modal-label").textContent = "M+ Gruppe bearbeiten";
     openModal("mplus-modal");
   }
 
   function openClassicRaidModal() {
-    if (!isRaidPlanner()) {
-      notify("Zugriff verwehrt! Nur berechtigte Raidplaner dürfen Classic-Runs planen.", "error");
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Classic-Runs planen.", "error");
       if (!currentUser) openAuthModal();
       return;
     }
@@ -821,6 +950,11 @@
   }
 
   function saveMember(form) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Mitglieder bearbeiten.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
     const front = document.getElementById("modal-front").value === "forever" ? "forever" : "retail";
     const name = document.getElementById("modal-char-name").value.trim();
     const rank = document.getElementById("modal-char-rank").value;
@@ -829,25 +963,48 @@
       return;
     }
     const list = membersOf(front);
-    list.push({ name: name, rank: rank });
-    if (!save(storageKey(front, "members"), list)) {
-      list.pop();
-      return;
-    }
-    renderMembers(front);
-    closeModal("member-modal");
-    form.reset();
+    remote.from("members").insert({
+      front: front,
+      name: name,
+      rank: rank,
+      sort_order: nextSort(list),
+    }).select("id, front, name, rank, sort_order").single().then(function (result) {
+      if (result.error || !result.data) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      list.push(mapMember(result.data));
+      renderMembers(front);
+      closeModal("member-modal");
+      form.reset();
+    });
   }
 
-  function removeMember(front, index) {
+  function removeMember(front, id) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Mitglieder entfernen.", "error");
+      return;
+    }
+    if (!requireRemote() || !id) return;
     const list = membersOf(front);
-    if (!list[index]) return;
-    list.splice(index, 1);
-    save(storageKey(front, "members"), list);
-    renderMembers(front);
+    const index = list.findIndex(function (item) { return item.id === id; });
+    if (index < 0) return;
+    remote.from("members").delete().eq("id", id).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      list.splice(index, 1);
+      renderMembers(front);
+    });
   }
 
   function saveRaidMember(form) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen den Raidkader verwalten.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
     const front = document.getElementById("modal-raid-front").value === "forever" ? "forever" : "retail";
     const name = document.getElementById("modal-raid-name").value.trim();
     const role = document.getElementById("modal-raid-role").value;
@@ -856,54 +1013,95 @@
       return;
     }
     const kader = kaderOf(front);
-    kader.push({ name: name, role: role });
-    if (!save(storageKey(front, "raid"), kader)) {
-      kader.pop();
-      return;
-    }
-    renderRaidKader(front);
-    closeModal("raid-modal");
-    form.reset();
+    remote.from("roster").insert({
+      front: front,
+      name: name,
+      role: role,
+      sort_order: nextSort(kader),
+    }).select("id, front, name, role, sort_order").single().then(function (result) {
+      if (result.error || !result.data) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      kader.push(mapRoster(result.data));
+      renderRaidKader(front);
+      closeModal("raid-modal");
+      form.reset();
+    });
   }
 
-  function removeRaidMember(front, index) {
-    if (!isRaidPlanner()) {
-      notify("Nur Raidplaner dürfen Mitglieder aus dem Kader entfernen!", "error");
+  function removeRaidMember(front, id) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Mitglieder aus dem Kader entfernen.", "error");
       return;
     }
+    if (!requireRemote() || !id) return;
     const kader = kaderOf(front);
-    if (!kader[index]) return;
-    kader.splice(index, 1);
-    save(storageKey(front, "raid"), kader);
-    renderRaidKader(front);
+    const index = kader.findIndex(function (item) { return item.id === id; });
+    if (index < 0) return;
+    remote.from("roster").delete().eq("id", id).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      kader.splice(index, 1);
+      renderRaidKader(front);
+    });
   }
 
-  function saveMPlusGroup(form) {
+  function readMPlusForm() {
     const dds = document
       .getElementById("mp-dds")
       .value.split(",")
       .map(function (part) { return part.trim(); })
       .filter(Boolean);
-    const group = {
+    return {
+      id: document.getElementById("mp-id").value,
       name: document.getElementById("mp-group-name").value.trim(),
       dungeon: document.getElementById("mp-dungeon").value.trim(),
-      time: document.getElementById("mp-time").value.trim(),
+      meeting_time: document.getElementById("mp-time").value.trim(),
       tank: document.getElementById("mp-tank").value.trim(),
       heal: document.getElementById("mp-heal").value.trim(),
       dds: dds,
     };
-    if (!group.name || !group.dungeon || !group.time || !group.tank || !group.heal || !dds.length) {
+  }
+
+  function saveMPlusGroup(form) {
+    if (!currentUser) {
+      notify("Bitte melde dich an, um eine M+-Gruppe zu erstellen.", "error");
+      openAuthModal();
+      return;
+    }
+    if (!requireRemote()) return;
+    const group = readMPlusForm();
+    if (!group.name || !group.dungeon || !group.meeting_time || !group.tank || !group.heal || !group.dds.length) {
       notify("Bitte alle Felder der M+-Gruppe ausfüllen.", "error");
       return;
     }
-    mplusGroups.push(group);
-    if (!save("arc_mplus_groups", mplusGroups)) {
-      mplusGroups.pop();
-      return;
-    }
-    renderMPlusGroups();
-    closeModal("mplus-modal");
-    form.reset();
+    const payload = {
+      name: group.name,
+      dungeon: group.dungeon,
+      meeting_time: group.meeting_time,
+      tank: group.tank,
+      heal: group.heal,
+      dds: group.dds,
+    };
+    const request = group.id
+      ? remote.from("mplus_groups").update(payload).eq("id", group.id).select("id, name, dungeon, meeting_time, tank, heal, dds, created_by").single()
+      : remote.from("mplus_groups").insert(payload).select("id, name, dungeon, meeting_time, tank, heal, dds, created_by").single();
+    request.then(function (result) {
+      if (result.error || !result.data) {
+        notify(group.id ? "Diese Gruppe darfst du nicht bearbeiten." : SAVE_FAIL, "error");
+        return;
+      }
+      const mapped = mapGroup(result.data, group.id ? (mplusGroups.find(function (item) { return item.id === group.id; }) || {}).signups : []);
+      const index = mplusGroups.findIndex(function (item) { return item.id === mapped.id; });
+      if (index >= 0) mplusGroups[index] = mapped;
+      else mplusGroups.push(mapped);
+      renderMPlusGroups();
+      closeModal("mplus-modal");
+      form.reset();
+    });
   }
 
   function renderMPlusGroups() {
@@ -919,7 +1117,6 @@
       return;
     }
     groups.forEach(function (group) {
-      const index = mplusGroups.indexOf(group);
       const card = document.createElement("article");
       card.className = "space-y-4 rounded-2xl border border-slate-800 bg-slate-950 p-5 shadow-md";
       const head = document.createElement("div");
@@ -934,15 +1131,31 @@
       title.className = "mt-1 break-words text-lg font-bold text-white";
       title.textContent = group.name;
       titles.append(badge, title);
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.dataset.action = "remove-mplus";
-      remove.dataset.index = String(index);
-      remove.className =
-        "inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-slate-500 hover:text-red-500";
-      remove.setAttribute("aria-label", "M+-Gruppe " + group.name + " entfernen");
-      remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
-      head.append(titles, remove);
+      const actions = document.createElement("div");
+      actions.className = "flex shrink-0 items-center";
+      if (group.id && canEditGroup(group)) {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.dataset.action = "edit-mplus";
+        edit.dataset.id = group.id;
+        edit.className =
+          "inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-slate-500 hover:text-white";
+        edit.setAttribute("aria-label", "M+-Gruppe " + group.name + " bearbeiten");
+        edit.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
+        actions.appendChild(edit);
+      }
+      if (group.id && canDeleteGroup(group)) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.dataset.action = "remove-mplus";
+        remove.dataset.id = group.id;
+        remove.className =
+          "inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-slate-500 hover:text-red-500";
+        remove.setAttribute("aria-label", "M+-Gruppe " + group.name + " entfernen");
+        remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+        actions.appendChild(remove);
+      }
+      head.append(titles, actions);
       const time = document.createElement("p");
       time.className = "flex items-center gap-2 text-xs text-slate-400";
       time.innerHTML = '<i class="fa-solid fa-clock text-amber-400" aria-hidden="true"></i> ';
@@ -960,7 +1173,26 @@
         asList(group.dds).join(", ")
       );
       roles.appendChild(dd);
+      const signups = (group.signups || []).map(function (signup) { return signup.characterName; }).filter(Boolean);
       card.append(head, time, roles);
+      if (signups.length) {
+        card.appendChild(roleChip(
+          "bg-slate-900 border border-slate-800",
+          "text-amber-400",
+          "Dabei:",
+          signups.join(", ")
+        ));
+      }
+      if (currentUser && group.id && remoteReady) {
+        const mine = (group.signups || []).find(function (signup) { return signup.userId === currentUser.id; });
+        const join = document.createElement("button");
+        join.type = "button";
+        join.dataset.action = mine ? "leave-mplus" : "join-mplus";
+        join.dataset.id = mine ? mine.id : group.id;
+        join.className = "inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700";
+        join.textContent = mine ? "Verlassen" : "Beitreten";
+        card.appendChild(join);
+      }
       grid.appendChild(card);
     });
   }
@@ -975,31 +1207,84 @@
     return el;
   }
 
-  function removeMPlusGroup(index) {
-    if (!mplusGroups[index]) return;
-    mplusGroups.splice(index, 1);
-    save("arc_mplus_groups", mplusGroups);
-    renderMPlusGroups();
+  function removeMPlusGroup(id) {
+    const index = mplusGroups.findIndex(function (item) { return item.id === id; });
+    const group = mplusGroups[index];
+    if (!group || !canDeleteGroup(group)) {
+      notify("Diese Gruppe darfst du nicht entfernen.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
+    remote.from("mplus_groups").delete().eq("id", id).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      mplusGroups.splice(index, 1);
+      renderMPlusGroups();
+    });
+  }
+
+  function joinMPlus(groupId) {
+    if (!currentUser) {
+      notify("Bitte melde dich an, um einer Gruppe beizutreten.", "error");
+      openAuthModal();
+      return;
+    }
+    if (!requireRemote()) return;
+    remote.from("mplus_signups").insert({ group_id: groupId }).select("id, group_id, user_id, character_name").single().then(function (result) {
+      if (result.error || !result.data) {
+        notify("Beitreten ist gerade nicht möglich.", "error");
+        return;
+      }
+      const group = mplusGroups.find(function (item) { return item.id === groupId; });
+      if (group) {
+        group.signups = group.signups || [];
+        group.signups.push(mapSignup(result.data));
+      }
+      renderMPlusGroups();
+    });
+  }
+
+  function leaveMPlus(signupId) {
+    if (!currentUser || !requireRemote() || !signupId) return;
+    remote.from("mplus_signups").delete().eq("id", signupId).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      mplusGroups.forEach(function (group) {
+        group.signups = (group.signups || []).filter(function (signup) { return signup.id !== signupId; });
+      });
+      renderMPlusGroups();
+    });
   }
 
   function saveClassicRun(form) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Classic-Runs planen.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
     const run = {
       name: document.getElementById("cr-name").value.trim(),
       size: document.getElementById("cr-size").value,
-      time: document.getElementById("cr-time").value.trim(),
+      meeting_time: document.getElementById("cr-time").value.trim(),
     };
-    if (!run.name || !run.time || !["10", "20", "40"].includes(run.size)) {
+    if (!run.name || !run.meeting_time || !["10", "20", "40"].includes(run.size)) {
       notify("Bitte Instanz und Termin ausfüllen.", "error");
       return;
     }
-    classicRuns.push(run);
-    if (!save("arc_classic_runs", classicRuns)) {
-      classicRuns.pop();
-      return;
-    }
-    renderClassicRuns();
-    closeModal("classic-raid-modal");
-    form.reset();
+    remote.from("classic_runs").insert(run).select("id, name, size, meeting_time").single().then(function (result) {
+      if (result.error || !result.data) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      classicRuns.push(mapRun(result.data));
+      renderClassicRuns();
+      closeModal("classic-raid-modal");
+      form.reset();
+    });
   }
 
   function renderClassicRuns() {
@@ -1015,7 +1300,6 @@
       return;
     }
     runs.forEach(function (run) {
-      const index = classicRuns.indexOf(run);
       const card = document.createElement("article");
       card.className = "space-y-3 rounded-2xl border border-slate-800 bg-slate-950 p-5 shadow-md";
       const head = document.createElement("div");
@@ -1030,15 +1314,18 @@
       title.className = "mt-1 break-words text-lg font-bold text-white";
       title.textContent = run.name;
       titles.append(badge, title);
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.dataset.action = "remove-classic";
-      remove.dataset.index = String(index);
-      remove.className =
-        "inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-slate-500 hover:text-red-500";
-      remove.setAttribute("aria-label", "Classic-Run " + run.name + " entfernen");
-      remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
-      head.append(titles, remove);
+      head.appendChild(titles);
+      if (isOfficer() && run.id) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.dataset.action = "remove-classic";
+        remove.dataset.id = run.id;
+        remove.className =
+          "inline-flex min-h-11 min-w-11 items-center justify-center text-sm text-slate-500 hover:text-red-500";
+        remove.setAttribute("aria-label", "Classic-Run " + run.name + " entfernen");
+        remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+        head.appendChild(remove);
+      }
       const time = document.createElement("p");
       time.className = "flex items-center gap-2 text-xs text-slate-400";
       time.innerHTML = '<i class="fa-solid fa-clock text-amber-400" aria-hidden="true"></i> ';
@@ -1048,15 +1335,22 @@
     });
   }
 
-  function removeClassicRun(index) {
-    if (!isRaidPlanner()) {
-      notify("Nur Raidplaner dürfen Classic-Runs löschen!", "error");
+  function removeClassicRun(id) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Classic-Runs löschen.", "error");
       return;
     }
-    if (!classicRuns[index]) return;
-    classicRuns.splice(index, 1);
-    save("arc_classic_runs", classicRuns);
-    renderClassicRuns();
+    if (!requireRemote() || !id) return;
+    const index = classicRuns.findIndex(function (item) { return item.id === id; });
+    if (index < 0) return;
+    remote.from("classic_runs").delete().eq("id", id).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      classicRuns.splice(index, 1);
+      renderClassicRuns();
+    });
   }
 
   let applicationSending = false;
@@ -1167,15 +1461,23 @@
   }
 
   function rememberApplication(entry) {
-    chatMessages.push(entry);
-    trimChat();
-    try {
-      localStorage.setItem("arc_guild_chat", JSON.stringify(chatMessages));
-      return true;
-    } catch (err) {
-      chatMessages.pop();
-      return false;
+    const author = String(entry.author || "").slice(0, 80);
+    const body = String(entry.text || "").slice(0, 4000);
+    if (!remote || !remoteReady) {
+      chatMessages.push({ author: author, text: body, time: entry.time || clock() });
+      trimChat();
+      renderChat();
+      return;
     }
+    remote.rpc("post_application_note", { author: author, body: body }).then(function (result) {
+      if (result.error) {
+        chatMessages.push({ author: author, text: body, time: entry.time || clock() });
+        trimChat();
+        renderChat();
+        return;
+      }
+      refreshChat();
+    });
   }
 
   function applicationErrorMessage() {
@@ -1256,20 +1558,54 @@
   }
 
   function sendChatMessage(form) {
-    const author = document.getElementById("chat-author").value.trim();
+    if (!currentUser) {
+      notify("Bitte melde dich an, um im Gildenchat zu schreiben.", "error");
+      openAuthModal();
+      return;
+    }
+    if (!requireRemote()) return;
     const text = document.getElementById("chat-text").value.trim();
-    if (!author || !text) {
-      notify("Bitte Name und Nachricht ausfüllen.", "error");
+    if (!text) {
+      notify("Bitte eine Nachricht ausfüllen.", "error");
       return;
     }
-    chatMessages.push({ author: author, text: text, time: clock() });
-    trimChat();
-    if (!save("arc_guild_chat", chatMessages)) {
-      chatMessages.pop();
+    if (text.length > 2000) {
+      notify("Die Nachricht ist zu lang.", "error");
       return;
     }
-    renderChat();
-    document.getElementById("chat-text").value = "";
+    remote.from("chat_messages").insert({
+      body: text,
+      author: currentUser.displayName,
+      user_id: currentUser.id,
+    }).select("id, author, body, user_id, created_at").single().then(function (result) {
+      if (result.error || !result.data) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      chatMessages.push(mapChat(result.data));
+      trimChat();
+      renderChat();
+      document.getElementById("chat-text").value = "";
+    });
+  }
+
+  function removeChatMessage(id) {
+    const message = chatMessages.find(function (item) { return item.id === id; });
+    if (!message || !currentUser) return;
+    if (message.userId !== currentUser.id && !isOfficer()) {
+      notify("Diese Nachricht darfst du nicht löschen.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
+    remote.from("chat_messages").delete().eq("id", id).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      const index = chatMessages.findIndex(function (item) { return item.id === id; });
+      if (index >= 0) chatMessages.splice(index, 1);
+      renderChat();
+    });
   }
 
   function renderChat() {
@@ -1282,7 +1618,7 @@
     if (!messages.length) {
       const empty = document.createElement("p");
       empty.className = "text-slate-500";
-      empty.textContent = "Noch keine Nachrichten in diesem Browser.";
+      empty.textContent = "Noch keine Nachrichten.";
       box.appendChild(empty);
       return;
     }
@@ -1299,6 +1635,16 @@
       text.className = "text-emerald-400";
       text.textContent = " " + message.text;
       line.append(time, author, text);
+      if (message.id && currentUser && (message.userId === currentUser.id || isOfficer())) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.dataset.action = "remove-chat";
+        remove.dataset.id = message.id;
+        remove.className = "ml-2 inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 hover:text-red-500";
+        remove.setAttribute("aria-label", "Nachricht löschen");
+        remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+        line.appendChild(remove);
+      }
       box.appendChild(line);
     });
     box.scrollTop = box.scrollHeight;
@@ -1311,6 +1657,11 @@
   }
 
   function toggleInfoEdit() {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen die Gildeninfo bearbeiten.", "error");
+      if (!currentUser) openAuthModal();
+      return;
+    }
     document.getElementById("edit-col-1").value = guildInfo.col1;
     document.getElementById("edit-col-2").value = guildInfo.col2;
     document.getElementById("edit-col-3").value = guildInfo.col3;
@@ -1330,32 +1681,28 @@
   }
 
   function saveInfoEdit() {
-    guildInfo.col1 = document.getElementById("edit-col-1").value;
-    guildInfo.col2 = document.getElementById("edit-col-2").value;
-    guildInfo.col3 = document.getElementById("edit-col-3").value;
-    if (!save("arc_guild_info", guildInfo)) return;
-    loadGuildInfoView();
-    cancelInfoEdit();
-    notify("Gildeninfo in diesem Browser gespeichert.", "info");
-  }
-
-  function resetLocalData(button) {
-    if (!resetArmed) {
-      resetArmed = true;
-      button.textContent = "Wirklich alle lokalen Daten löschen?";
-      window.setTimeout(function () {
-        resetArmed = false;
-        button.textContent = "Lokale Daten löschen";
-      }, 4000);
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen die Gildeninfo bearbeiten.", "error");
       return;
     }
-    try {
-      localStorage.clear();
-    } catch (err) {
-      notify("Die lokalen Daten konnten nicht gelöscht werden.", "error");
-      return;
-    }
-    location.reload();
+    if (!requireRemote()) return;
+    const next = {
+      col1: document.getElementById("edit-col-1").value,
+      col2: document.getElementById("edit-col-2").value,
+      col3: document.getElementById("edit-col-3").value,
+    };
+    remote.from("guild_info").update(next).eq("id", 1).select("col1, col2, col3").single().then(function (result) {
+      if (result.error || !result.data) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      guildInfo.col1 = result.data.col1;
+      guildInfo.col2 = result.data.col2;
+      guildInfo.col3 = result.data.col3;
+      loadGuildInfoView();
+      cancelInfoEdit();
+      notify("Gildeninfo gespeichert.", "info");
+    });
   }
 
   function notify(message, kind) {
@@ -1382,10 +1729,6 @@
 
   function kaderOf(front) {
     return front === "forever" ? foreverRaid : retailRaid;
-  }
-
-  function storageKey(front, kind) {
-    return "arc_" + front + "_" + kind;
   }
 
   function trimChat() {
@@ -1416,41 +1759,6 @@
       if (el.disabled || el.type === "hidden" || el.tabIndex < 0) return false;
       return !el.closest("[hidden]");
     });
-  }
-
-  function readJSON(key) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw == null) return undefined;
-      return JSON.parse(raw);
-    } catch (err) {
-      return undefined;
-    }
-  }
-
-  function loadArray(key, fallback) {
-    const value = readJSON(key);
-    if (!Array.isArray(value)) return clone(fallback || []);
-    return value.filter(function (item) { return item && typeof item === "object"; });
-  }
-
-  function loadUsers() {
-    return loadArray("arc_users", []).filter(function (user) {
-      return typeof user.username === "string" && typeof user.password === "string";
-    });
-  }
-
-  function loadGuildInfo() {
-    const fallback = clone(DEFAULTS.guildInfo || { col1: "", col2: "", col3: "" });
-    const value = readJSON("arc_guild_info");
-    if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
-    ["col1", "col2", "col3"].forEach(function (key) {
-      if (typeof value[key] === "string") fallback[key] = value[key];
-      if (LEGACY_GUILD_INFO[key] && fallback[key] === LEGACY_GUILD_INFO[key]) {
-        fallback[key] = (DEFAULTS.guildInfo && DEFAULTS.guildInfo[key]) || fallback[key];
-      }
-    });
-    return fallback;
   }
 
   function prefersReducedMotion() {
@@ -1780,24 +2088,479 @@
     });
   }
 
-  function readCurrentUser() {
-    const value = readJSON("arc_current_user");
-    if (!value || typeof value.username !== "string") return null;
+  function requireRemote() {
+    if (remote && remoteReady) return true;
+    notify(SAVE_FAIL, "error");
+    return false;
+  }
+
+  function replaceItems(target, next) {
+    target.length = 0;
+    next.forEach(function (item) { target.push(item); });
+  }
+
+  function nextSort(list) {
+    return list.reduce(function (max, item) {
+      return Math.max(max, Number(item.sortOrder) || 0);
+    }, 0) + 1;
+  }
+
+  function canEditGroup(group) {
+    return !!(currentUser && group && group.createdBy && group.createdBy === currentUser.id);
+  }
+
+  function canDeleteGroup(group) {
+    return canEditGroup(group) || isOfficer();
+  }
+
+  function renderGuild() {
+    renderMembers("retail");
+    renderMembers("forever");
+    renderRaidKader("retail");
+    renderRaidKader("forever");
+    renderMPlusGroups();
+    renderClassicRuns();
+    renderChat();
+    renderLeadership();
+    loadGuildInfoView();
+  }
+
+  function renderPermissionSurfaces() {
+    renderMembers("retail");
+    renderMembers("forever");
+    renderRaidKader("retail");
+    renderRaidKader("forever");
+    renderMPlusGroups();
+    renderClassicRuns();
+    renderChat();
+    renderLeadership();
+  }
+
+  function renderLeadership() {
+    const list = document.getElementById("leadership-list");
+    if (!list) return;
+    list.replaceChildren();
+    const people = leadership.filter(function (person) { return person && typeof person.name === "string"; });
+    if (!people.length) {
+      const empty = document.createElement("li");
+      empty.className = "col-span-full py-8 text-center italic text-slate-500";
+      empty.textContent = "Noch niemand in der Gildenleitung eingetragen.";
+      list.appendChild(empty);
+      return;
+    }
+    people.forEach(function (person) {
+      const amber = person.accent === "amber";
+      const card = document.createElement("li");
+      card.className = "flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-sm";
+      const iconWrap = document.createElement("div");
+      iconWrap.className = amber
+        ? "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-xl font-bold text-amber-400"
+        : "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-xl font-bold text-red-400";
+      iconWrap.setAttribute("aria-hidden", "true");
+      iconWrap.innerHTML = amber
+        ? '<i class="fa-solid fa-crown"></i>'
+        : '<i class="fa-solid fa-shield-halved"></i>';
+      const body = document.createElement("div");
+      body.className = "min-w-0 flex-1";
+      const name = document.createElement("p");
+      name.className = "text-base font-bold text-white";
+      name.textContent = person.name;
+      const subtitle = document.createElement("p");
+      subtitle.className = amber ? "text-xs font-semibold text-amber-400" : "text-xs font-semibold text-red-400";
+      subtitle.textContent = person.subtitle || "";
+      body.append(name, subtitle);
+      card.append(iconWrap, body);
+      if (isOfficer() && person.id) {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.dataset.action = "open-leadership-modal";
+        edit.dataset.id = person.id;
+        edit.className = "inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 hover:text-white";
+        edit.setAttribute("aria-label", person.name + " bearbeiten");
+        edit.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.dataset.action = "remove-leadership";
+        remove.dataset.id = person.id;
+        remove.className = "inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 hover:text-red-500";
+        remove.setAttribute("aria-label", person.name + " aus der Leitung entfernen");
+        remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+        card.append(edit, remove);
+      }
+      list.appendChild(card);
+    });
+  }
+
+  function openLeadershipModal(id) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen die Gildenleitung bearbeiten.", "error");
+      if (!currentUser) openAuthModal();
+      return;
+    }
+    const form = document.getElementById("leadership-form");
+    form.reset();
+    const person = leadership.find(function (item) { return item.id === id; });
+    document.getElementById("leadership-id").value = person ? person.id : "";
+    document.getElementById("leadership-name").value = person ? person.name : "";
+    document.getElementById("leadership-subtitle").value = person ? person.subtitle : "";
+    document.getElementById("leadership-accent").value = person && person.accent === "amber" ? "amber" : "red";
+    document.getElementById("leadership-modal-label").textContent = person ? "Leitung bearbeiten" : "Zur Leitung hinzufügen";
+    openModal("leadership-modal");
+  }
+
+  function saveLeadership(form) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen die Gildenleitung bearbeiten.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
+    const id = document.getElementById("leadership-id").value;
+    const payload = {
+      name: document.getElementById("leadership-name").value.trim(),
+      subtitle: document.getElementById("leadership-subtitle").value.trim(),
+      accent: document.getElementById("leadership-accent").value === "amber" ? "amber" : "red",
+    };
+    if (!payload.name || !payload.subtitle) {
+      notify("Bitte Name und Rolle ausfüllen.", "error");
+      return;
+    }
+    const request = id
+      ? remote.from("leadership").update(payload).eq("id", id).select("id, name, subtitle, accent, sort_order").single()
+      : remote.from("leadership").insert(Object.assign({ sort_order: nextSort(leadership) }, payload)).select("id, name, subtitle, accent, sort_order").single();
+    request.then(function (result) {
+      if (result.error || !result.data) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      const mapped = mapLeader(result.data);
+      const index = leadership.findIndex(function (item) { return item.id === mapped.id; });
+      if (index >= 0) leadership[index] = mapped;
+      else leadership.push(mapped);
+      renderLeadership();
+      closeModal("leadership-modal");
+      form.reset();
+    });
+  }
+
+  function removeLeadership(id) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen die Gildenleitung bearbeiten.", "error");
+      return;
+    }
+    if (!requireRemote() || !id) return;
+    remote.from("leadership").delete().eq("id", id).then(function (result) {
+      if (result.error) {
+        notify(SAVE_FAIL, "error");
+        return;
+      }
+      const index = leadership.findIndex(function (item) { return item.id === id; });
+      if (index >= 0) leadership.splice(index, 1);
+      renderLeadership();
+    });
+  }
+
+  function openRolesModal() {
+    if (!isAdmin() || !remote || !remoteReady) {
+      notify("Nur Administratoren dürfen Rollen ändern.", "error");
+      return;
+    }
+    remote.from("profiles").select("id, display_name, email, role").order("display_name").then(function (result) {
+      if (result.error) {
+        notify("Die Rollenliste konnte nicht geladen werden.", "error");
+        return;
+      }
+      const list = document.getElementById("roles-list");
+      list.replaceChildren();
+      (result.data || []).forEach(function (profile) {
+        const row = document.createElement("div");
+        row.className = "flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3";
+        const label = document.createElement("div");
+        label.className = "min-w-0";
+        const name = document.createElement("p");
+        name.className = "truncate text-sm font-bold text-white";
+        name.textContent = profile.display_name || "Mitglied";
+        const email = document.createElement("p");
+        email.className = "truncate text-xs text-slate-400";
+        email.textContent = profile.id === currentUser.id ? "Das bist du" : (profile.email || "");
+        label.append(name, email);
+        row.appendChild(label);
+        if (profile.id === currentUser.id) {
+          const self = document.createElement("span");
+          self.className = "text-xs font-semibold text-amber-400";
+          self.textContent = roleLabel(profile.role);
+          row.appendChild(self);
+        } else {
+          const select = document.createElement("select");
+          select.className = "rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-amber-500";
+          select.dataset.action = "set-role";
+          select.dataset.userId = profile.id;
+          select.setAttribute("aria-label", "Rolle von " + (profile.display_name || "Mitglied"));
+          ["member", "officer", "admin"].forEach(function (role) {
+            const option = document.createElement("option");
+            option.value = role;
+            option.textContent = roleLabel(role);
+            if (profile.role === role) option.selected = true;
+            select.appendChild(option);
+          });
+          row.appendChild(select);
+        }
+        list.appendChild(row);
+      });
+      if (!list.children.length) {
+        const empty = document.createElement("p");
+        empty.className = "text-sm text-slate-400";
+        empty.textContent = "Noch keine Konten.";
+        list.appendChild(empty);
+      }
+      openModal("roles-modal");
+    });
+  }
+
+  function setProfileRole(userId, role, select) {
+    if (!isAdmin()) {
+      notify("Nur Administratoren dürfen Rollen ändern.", "error");
+      return;
+    }
+    if (!userId || userId === currentUser.id) {
+      notify("Die eigene Rolle kann nicht geändert werden.", "error");
+      return;
+    }
+    if (role !== "member" && role !== "officer" && role !== "admin") return;
+    if (!requireRemote()) return;
+    remote.from("profiles").update({ role: role }).eq("id", userId).then(function (result) {
+      if (result.error) {
+        notify("Die Rolle konnte nicht geändert werden.", "error");
+        if (select) openRolesModal();
+        return;
+      }
+      notify("Rolle gespeichert.", "info");
+    });
+  }
+
+  function createRemote() {
+    const lib = window.supabase;
+    const config = arcConfig();
+    const url = typeof config.supabaseUrl === "string" ? config.supabaseUrl.trim() : "";
+    const key = typeof config.supabaseAnonKey === "string" ? config.supabaseAnonKey.trim() : "";
+    if (!lib || typeof lib.createClient !== "function") return null;
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || key.length < 20) return null;
+    try {
+      return lib.createClient(url, key, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      });
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function adoptSession(session) {
+    const user = session && session.user;
+    if (!user || !remote) {
+      currentUser = null;
+      return Promise.resolve();
+    }
+    return remote.from("profiles").select("display_name, role").eq("id", user.id).maybeSingle().then(function (result) {
+      const profile = result && result.data;
+      const meta = user.user_metadata || {};
+      let role = "member";
+      if (profile && (profile.role === "officer" || profile.role === "admin")) role = profile.role;
+      currentUser = {
+        id: user.id,
+        email: user.email || "",
+        displayName: (profile && profile.display_name) || meta.display_name || user.email || "Mitglied",
+        role: role,
+      };
+    });
+  }
+
+  function loadRemote() {
+    remote = createRemote();
+    if (!remote) {
+      notify(OFFLINE_MSG, "error");
+      return;
+    }
+    if (!authReady) {
+      authReady = true;
+      remote.auth.onAuthStateChange(function (event, session) {
+        if (event === "SIGNED_OUT") {
+          currentUser = null;
+          updateAuthUI();
+          renderPermissionSurfaces();
+          return;
+        }
+        if (!session || (event !== "SIGNED_IN" && event !== "INITIAL_SESSION" && event !== "TOKEN_REFRESHED")) return;
+        adoptSession(session).then(function () {
+          updateAuthUI();
+          renderPermissionSurfaces();
+        }).catch(function () {
+          updateAuthUI();
+        });
+      });
+    }
+    remote.auth.getSession().then(function (result) {
+      if (result.error) throw result.error;
+      if (result.data && result.data.session) return adoptSession(result.data.session);
+      return null;
+    }).catch(function () {
+      currentUser = null;
+    }).then(function () {
+      return fetchAll();
+    }).then(function () {
+      remoteReady = true;
+      renderGuild();
+      updateAuthUI();
+      subscribeLive();
+    }).catch(function () {
+      remoteReady = false;
+      notify(OFFLINE_MSG, "error");
+      updateAuthUI();
+    });
+  }
+
+  function fetchRows(table, columns, orderColumn, ascending) {
+    let query = remote.from(table).select(columns);
+    if (orderColumn) query = query.order(orderColumn, { ascending: ascending !== false });
+    return query.then(function (result) {
+      if (result.error) throw result.error;
+      return result.data || [];
+    });
+  }
+
+  function fetchAll() {
+    return Promise.all([
+      fetchRows("members", "id, front, name, rank, sort_order", "sort_order", true),
+      fetchRows("roster", "id, front, name, role, sort_order", "sort_order", true),
+      fetchRows("leadership", "id, name, subtitle, accent, sort_order", "sort_order", true),
+      fetchRows("guild_info", "id, col1, col2, col3", null, true),
+      fetchRows("mplus_groups", "id, name, dungeon, meeting_time, tank, heal, dds, created_by", "created_at", true),
+      fetchRows("mplus_signups", "id, group_id, user_id, character_name", "created_at", true),
+      fetchRows("classic_runs", "id, name, size, meeting_time", "created_at", true),
+      remote.from("chat_messages").select("id, author, body, user_id, created_at").order("created_at", { ascending: false }).limit(200),
+    ]).then(function (rows) {
+      const chatResult = rows[7];
+      if (chatResult.error) throw chatResult.error;
+      replaceItems(retailMembers, rows[0].filter(function (row) { return row.front === "retail"; }).map(mapMember));
+      replaceItems(foreverMembers, rows[0].filter(function (row) { return row.front === "forever"; }).map(mapMember));
+      replaceItems(retailRaid, rows[1].filter(function (row) { return row.front === "retail"; }).map(mapRoster));
+      replaceItems(foreverRaid, rows[1].filter(function (row) { return row.front === "forever"; }).map(mapRoster));
+      replaceItems(leadership, rows[2].map(mapLeader));
+      const info = rows[3][0];
+      if (info) {
+        guildInfo.col1 = info.col1 || "";
+        guildInfo.col2 = info.col2 || "";
+        guildInfo.col3 = info.col3 || "";
+      }
+      const signups = rows[5].map(mapSignup);
+      replaceItems(mplusGroups, rows[4].map(function (row) {
+        return mapGroup(row, signups.filter(function (signup) { return signup.groupId === row.id; }));
+      }));
+      replaceItems(classicRuns, rows[6].map(mapRun));
+      const messages = (chatResult.data || []).slice().reverse().map(mapChat);
+      replaceItems(chatMessages, messages);
+    });
+  }
+
+  function mapMember(row) {
+    return { id: row.id, name: row.name, rank: row.rank, sortOrder: row.sort_order };
+  }
+
+  function mapRoster(row) {
+    return { id: row.id, name: row.name, role: row.role, sortOrder: row.sort_order };
+  }
+
+  function mapLeader(row) {
     return {
-      username: value.username,
-      password: typeof value.password === "string" ? value.password : "",
-      role: value.role === "raidplanner" ? "raidplanner" : "member",
+      id: row.id,
+      name: row.name,
+      subtitle: row.subtitle,
+      accent: row.accent === "amber" ? "amber" : "red",
+      sortOrder: row.sort_order,
     };
   }
 
-  function save(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (err) {
-      notify("Speichern fehlgeschlagen. Der lokale Speicher dieses Browsers ist voll oder blockiert.", "error");
-      return false;
-    }
+  function mapSignup(row) {
+    return {
+      id: row.id,
+      groupId: row.group_id,
+      userId: row.user_id,
+      characterName: row.character_name,
+    };
+  }
+
+  function mapGroup(row, signups) {
+    return {
+      id: row.id,
+      name: row.name,
+      dungeon: row.dungeon,
+      time: row.meeting_time,
+      tank: row.tank,
+      heal: row.heal,
+      dds: Array.isArray(row.dds) ? row.dds : [],
+      createdBy: row.created_by || null,
+      signups: signups || [],
+    };
+  }
+
+  function mapRun(row) {
+    return { id: row.id, name: row.name, size: row.size, time: row.meeting_time };
+  }
+
+  function mapChat(row) {
+    return {
+      id: row.id,
+      author: row.author,
+      text: row.body,
+      userId: row.user_id || null,
+      time: formatStamp(row.created_at),
+    };
+  }
+
+  function formatStamp(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function refreshChat() {
+    if (!remote || !remoteReady) return;
+    remote.from("chat_messages").select("id, author, body, user_id, created_at").order("created_at", { ascending: false }).limit(200).then(function (result) {
+      if (result.error || !result.data) return;
+      replaceItems(chatMessages, result.data.slice().reverse().map(mapChat));
+      renderChat();
+    });
+  }
+
+  function refreshRoster() {
+    if (!remote || !remoteReady) return;
+    fetchRows("roster", "id, front, name, role, sort_order", "sort_order", true).then(function (rows) {
+      replaceItems(retailRaid, rows.filter(function (row) { return row.front === "retail"; }).map(mapRoster));
+      replaceItems(foreverRaid, rows.filter(function (row) { return row.front === "forever"; }).map(mapRoster));
+      renderRaidKader("retail");
+      renderRaidKader("forever");
+    }).catch(function () { /* Der bisherige Kader bleibt sichtbar. */ });
+  }
+
+  function subscribeLive() {
+    if (!remote || liveChannel) return;
+    liveChannel = remote.channel("arc-guild")
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, function () {
+        window.clearTimeout(chatRefreshTimer);
+        chatRefreshTimer = window.setTimeout(refreshChat, 250);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "roster" }, function () {
+        window.clearTimeout(rosterRefreshTimer);
+        rosterRefreshTimer = window.setTimeout(refreshRoster, 250);
+      })
+      .subscribe();
   }
 
   function clone(value) {

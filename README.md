@@ -4,47 +4,24 @@ Statische Gildenhomepage für **The Arc Flame** (World of Warcraft, Horde). Die 
 
 Sie wird über GitHub Pages unter [https://thearcflame.github.io/](https://thearcflame.github.io/) ausgeliefert. Eigene Dateien sind relativ verlinkt.
 
-## Wichtig: Alle Daten bleiben im eigenen Browser
+## Gildendaten
 
-Es gibt **keinen Server und keine gemeinsame Datenbank**. Was jemand auf der Seite einträgt oder ändert, liegt im **localStorage dieses Browsers** — außer der Gildenbewerbung. Die geht an einen Discord-Webhook, damit die Leitung sie sieht. Eine Kopie bleibt zusätzlich im lokalen Gilden-Chat. Andere Personen sehen Mitglieder, Kader, Planer und Chat aus diesem Browser nicht.
+Mitglieder, Raidkader (Retail und Forever), Gildenleitung, M+-Gruppen, Classic-Runs, Status & Vision und der Gilden-Chat liegen in **Supabase**. Alle Besucher sehen denselben Stand. Die Anmeldung läuft über E-Mail und Passwort. Neue Konten sind Mitglieder. Offiziere pflegen Kader, Mitglieder, Leitung und die Statustexte. Administratoren vergeben zusätzlich die Rollen. Die eigene Rolle kann niemand selbst anheben.
 
-Das betrifft den lokalen Speicher:
+Ältere Einträge im localStorage dieses Browsers werden nicht mehr gelesen und nicht in die Datenbank kopiert.
 
-- Gildenmitglieder und Raidkader
-- M+-Gruppen und Classic-Runs
-- Gilden-Chat und die lokale Kopie einer Bewerbung
-- die bearbeiteten Texte unter „Status & Vision“
-- lokale Konten (Benutzername und Passwort)
+Ist Supabase nicht erreichbar, zeigt die Seite die Startwerte aus `js/defaults.js` und einen Hinweis auf Deutsch. Änderungen werden dann nicht gespeichert.
 
-Ein gemeinsames Backend ist der empfohlene nächste Schritt, damit Kader und Chat wirklich für die ganze Gilde gelten. Dafür eignen sich zum Beispiel **Supabase** oder **Firebase**.
+Einmalig `supabase/schema.sql` im SQL-Editor des Projekts ausführen und die Auth-Einstellungen aus `supabase/README.md` setzen. Projekt-URL und der öffentliche Schlüssel stehen in `js/config.js`.
 
-Die Anmeldung ist kein echter Zugriffsschutz. Jede Person kann sich in ihrem Browser selbst als Mitglied oder Raidplaner registrieren. Passwörter werden **unverschlüsselt** im lokalen Speicher abgelegt. Es gibt keine vorgegebenen Konten.
-
-### localStorage-Schlüssel
-
-| Schlüssel | Inhalt |
-| --- | --- |
-| `arc_users` | lokale Konten |
-| `arc_current_user` | aktuell angemeldete Person |
-| `arc_retail_members` | Retail-Mitglieder |
-| `arc_forever_members` | Forever-Mitglieder |
-| `arc_retail_raid` | Retail-Raidkader |
-| `arc_forever_raid` | Classic-Raidkader |
-| `arc_mplus_groups` | M+-Gruppen |
-| `arc_classic_runs` | Classic-Runs |
-| `arc_guild_chat` | Chat und die lokale Kopie einer Bewerbung |
-| `arc_guild_info` | die drei Statustexte |
-| `arc_application_at` | Zeitpunkt der letzten erfolgreich gesendeten Bewerbung (60 Sekunden Abstand) |
-
-Sobald ein Schlüssel gesetzt ist, gelten die Startwerte aus `js/defaults.js` für diesen Bereich nicht mehr. Zurücksetzen geht über **Lokale Daten löschen** in der Fußzeile oder über die Entwicklerwerkzeuge (Application → Local Storage).
+Im Browser bleibt nur noch `arc_application_at`: der Abstand von 60 Sekunden zwischen zwei Bewerbungen auf diesem Gerät. Die Bewerbung selbst geht weiter an den Discord-Webhook. Eine Kopie erscheint im gemeinsamen Chat.
 
 ## Inhalte bearbeiten
 
-Texte, die für alle Besucher gleich sein sollen, stehen in den Dateien — nicht im Browser.
+Feste Überschriften stehen in den Dateien. Was die Gilde selbst pflegt, liegt in Supabase.
 
-- **Sichtbare Texte und die Gildenleitung** (Namen, Rollen, Raid-Zeit, Überschriften): `index.html`
-- **Startwerte** für Mitglieder, Kader, M+, Classic-Runs, Chat und die drei Statustexte: `js/defaults.js`  
-  Diese Werte sieht nur, wer in diesem Browser noch nichts gespeichert hat.
+- **Feste Texte** (Überschriften, Raid-Zeit, Bewerbung): `index.html`
+- **Startwerte** für Mitglieder, Kader, Leitung, M+, Classic-Runs, Chat und die drei Statustexte: `js/defaults.js` und derselbe Inhalt in `supabase/schema.sql`
 - **Farben und Layout**: `css/input.css`, danach das Stylesheet neu bauen:
 
 ```bash
@@ -54,7 +31,7 @@ npm run build:css
 
 Die fertige Datei `css/styles.css` liegt im Repository. GitHub Pages braucht dafür keinen Build.
 
-Auf der Seite selbst lassen sich die Statustexte über **Informationen bearbeiten** ändern. Mitglieder, Kader, Planer und Chat haben eigene Formulare. Diese Änderungen bleiben lokal.
+Auf der Seite ändern Offiziere die Statustexte über **Informationen bearbeiten**. Mitglieder, Kader, Leitung, Planer und Chat haben eigene Formulare. Diese Änderungen gelten für alle Besucher.
 
 ## Discord
 
@@ -128,9 +105,11 @@ robots.txt          Crawler-Hinweise, Verweis auf die Sitemap
 sitemap.xml         Sitemap der Startseite
 css/input.css       Tailwind-Quelle
 css/styles.css      fertiges Stylesheet
-js/config.js        Discord, Galerie und YouTube
-js/defaults.js      Startwerte
-js/app.js           Verhalten und localStorage
+js/config.js        Discord, Supabase, Galerie und YouTube
+js/defaults.js      Startwerte, falls Supabase nicht erreichbar ist
+js/app.js           Verhalten
+supabase/schema.sql Tabellen, Rechte und Startdaten
+supabase/README.md  Einstellungen im Supabase-Dashboard
 assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
 assets/gallery/     Screenshots für die Galerie
 .nojekyll
