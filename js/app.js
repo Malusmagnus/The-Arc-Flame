@@ -2,7 +2,7 @@
    Alle veränderlichen Daten bleiben in localStorage dieses Browsers.
    Schlüssel: arc_users, arc_current_user, arc_retail_members, arc_forever_members,
    arc_retail_raid, arc_forever_raid, arc_mplus_groups, arc_classic_runs,
-   arc_guild_chat, arc_guild_info. */
+   arc_guild_chat, arc_guild_info, arc_application_at. */
 (function () {
   "use strict";
 
@@ -82,8 +82,11 @@
 
   document.addEventListener("DOMContentLoaded", boot);
 
+  const APPLICATION_COOLDOWN_MS = 60000;
+
   function boot() {
     bindStaticEvents();
+    applyDiscordLinks();
     renderMembers("retail");
     renderMembers("forever");
     renderRaidKader("retail");
@@ -996,31 +999,200 @@
     renderClassicRuns();
   }
 
+  let applicationSending = false;
+
+  function arcConfig() {
+    const config = window.ARC_CONFIG;
+    return config && typeof config === "object" ? config : {};
+  }
+
+  function discordInvite() {
+    const url = arcConfig().discordInviteUrl;
+    if (typeof url !== "string") return "";
+    const trimmed = url.trim();
+    if (!/^https:\/\/(discord\.gg|discord\.com)\//i.test(trimmed)) return "";
+    return trimmed;
+  }
+
+  function applicationWebhookUrl() {
+    const url = arcConfig().applicationWebhookUrl;
+    if (typeof url !== "string") return "";
+    const trimmed = url.trim();
+    if (!/^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[\w-]+$/i.test(trimmed)) return "";
+    return trimmed;
+  }
+
+  function applyDiscordLinks() {
+    const url = discordInvite();
+    document.querySelectorAll("[data-discord-invite]").forEach(function (link) {
+      if (!url) {
+        link.hidden = true;
+        return;
+      }
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    });
+  }
+
+  function fieldValue(id) {
+    const el = document.getElementById(id);
+    return el ? String(el.value || "") : "";
+  }
+
+  function sanitizeDiscord(value, max) {
+    let text = String(value == null ? "" : value);
+    text = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    text = text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (text.length > max) text = text.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+    text = text.replace(/@/g, "@\u200b");
+    text = text.replace(/[\\*_`~|]/g, "\\$&");
+    text = text.replace(/^>/gm, "\\>");
+    if (text.length > 1024) text = text.slice(0, 1023).replace(/\\$/, "").trimEnd() + "…";
+    return text || "–";
+  }
+
+  function embedField(name, value, inline) {
+    return { name: name, value: sanitizeDiscord(value, inline ? 80 : 900), inline: inline };
+  }
+
+  function applicationCooldownRemaining() {
+    let at = 0;
+    try {
+      at = Number(localStorage.getItem("arc_application_at")) || 0;
+    } catch (err) {
+      at = 0;
+    }
+    if (!at) return 0;
+    return Math.max(0, APPLICATION_COOLDOWN_MS - (Date.now() - at));
+  }
+
+  function buildApplicationPayload(data) {
+    return {
+      username: "The Arc Flame",
+      allowed_mentions: { parse: [] },
+      embeds: [
+        {
+          title: "Neue Gildenbewerbung",
+          color: 14417958,
+          fields: [
+            embedField("Charaktername", data.name, true),
+            embedField("Realm", data.realm, true),
+            embedField("Klasse", data.charClass, true),
+            embedField("Spezialisierung", data.spec, true),
+            embedField("Front", data.front, true),
+            embedField("Kontakt/Discord-Name", data.contact, true),
+            embedField("Erfahrung", data.experience, false),
+            embedField("Nachricht", data.message, false),
+          ],
+          footer: { text: "The Arc Flame" },
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+  }
+
+  function postApplication(payload) {
+    const url = applicationWebhookUrl();
+    if (!url) return Promise.reject(new Error("webhook"));
+    return fetch(url, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(function (response) {
+      if (!response.ok) throw new Error("webhook");
+    });
+  }
+
+  function rememberApplication(entry) {
+    chatMessages.push(entry);
+    trimChat();
+    try {
+      localStorage.setItem("arc_guild_chat", JSON.stringify(chatMessages));
+      return true;
+    } catch (err) {
+      chatMessages.pop();
+      return false;
+    }
+  }
+
+  function applicationErrorMessage() {
+    const invite = discordInvite();
+    if (!invite) return "Die Bewerbung konnte nicht gesendet werden. Bitte versuche es später noch einmal.";
+    return "Die Bewerbung konnte nicht gesendet werden. Schreib uns direkt auf Discord: " + invite;
+  }
+
   function submitApplication(form) {
-    const name = document.getElementById("app-name").value.trim();
-    const front = document.getElementById("app-front").value;
-    const charClass = document.getElementById("app-class").value.trim();
-    const msg = document.getElementById("app-msg").value.trim();
-    if (!name || !charClass || !msg) {
+    if (applicationSending) return;
+    const honeypot = document.getElementById("app-website");
+    if (honeypot && honeypot.value.trim()) return;
+
+    const frontSelect = document.getElementById("app-front");
+    const frontValue = frontSelect ? frontSelect.value : "";
+    const frontLabel = frontSelect && frontSelect.selectedOptions.length
+      ? frontSelect.selectedOptions[0].textContent.trim()
+      : frontValue;
+    const data = {
+      name: fieldValue("app-name").trim(),
+      realm: fieldValue("app-realm").trim(),
+      front: frontValue === "Forever" ? "Forever" : "Retail",
+      frontLabel: frontLabel,
+      charClass: fieldValue("app-class").trim(),
+      spec: fieldValue("app-spec").trim(),
+      contact: fieldValue("app-contact").trim(),
+      experience: fieldValue("app-experience").trim(),
+      message: fieldValue("app-msg").trim(),
+    };
+    if (!data.name || !data.realm || !data.charClass || !data.message) {
       notify("Bitte die Bewerbung vollständig ausfüllen.", "error");
       return;
     }
-    chatMessages.push({
-      author: "Bewerbung (" + name + ")",
-      text: 'Neue Bewerbung für [' + front + "] (" + charClass + '): "' + msg + '"',
-      time: clock(),
-    });
-    trimChat();
-    if (!save("arc_guild_chat", chatMessages)) {
-      chatMessages.pop();
+    if (applicationCooldownRemaining() > 0) {
+      notify("Bitte warte eine Minute, bevor du eine weitere Bewerbung abschickst.", "error");
       return;
     }
-    renderChat();
-    form.reset();
-    notify(
-      "Bewerbung erfolgreich abgeschickt! Sie wurde ohne Anmeldung direkt in den Gilden-Chat eingereicht.",
-      "info"
-    );
+
+    const button = form.querySelector('[type="submit"]');
+    applicationSending = true;
+    if (button) button.disabled = true;
+    const payload = buildApplicationPayload({
+      name: data.name,
+      realm: data.realm,
+      front: data.front,
+      charClass: data.charClass,
+      spec: data.spec,
+      contact: data.contact,
+      experience: data.experience,
+      message: data.message,
+    });
+    postApplication(payload).then(function () {
+      const spec = data.spec ? " / " + data.spec : "";
+      const extra = [];
+      if (data.experience) extra.push("Erfahrung: " + data.experience);
+      if (data.contact) extra.push("Kontakt: " + data.contact);
+      let text = 'Neue Bewerbung für [' + data.frontLabel + "] (" + data.charClass + spec + ", " + data.realm + '): "' + data.message + '"';
+      if (extra.length) text += " " + extra.join(" ");
+      rememberApplication({
+        author: "Bewerbung (" + data.name + ")",
+        text: text,
+        time: clock(),
+      });
+      try {
+        localStorage.setItem("arc_application_at", String(Date.now()));
+      } catch (err) {
+        /* Cooldown ist nur ein Zusatz; die Bewerbung ist schon angekommen. */
+      }
+      renderChat();
+      form.reset();
+      notify("Deine Bewerbung ist bei uns angekommen!", "info");
+    }).catch(function () {
+      notify(applicationErrorMessage(), "error");
+    }).then(function () {
+      applicationSending = false;
+      if (button) button.disabled = false;
+    });
   }
 
   function sendChatMessage(form) {

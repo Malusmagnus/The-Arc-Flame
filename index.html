@@ -72,6 +72,9 @@
         <a href="#bewerbung" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-extrabold text-slate-950 shadow-lg transition hover:from-amber-400 hover:to-amber-500">
           <i class="fa-solid fa-scroll" aria-hidden="true"></i> Bewerben
         </a>
+        <a data-discord-invite href="https://discord.gg/g6TP8sBZQ" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">
+          <i class="fa-brands fa-discord" aria-hidden="true"></i> Discord beitreten
+        </a>
         <div id="auth-header-section">
           <button type="button" data-action="open-auth" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-slate-700">
             <i class="fa-solid fa-user-lock" aria-hidden="true"></i> Login / Reg
@@ -315,36 +318,61 @@
     </div>
 
     <section id="bewerbung" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 p-6 shadow-2xl md:p-8">
-      <div class="border-b border-slate-800 pb-4">
-        <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Werde Teil des Teams (Ohne Anmeldung möglich)</span>
-        <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
-          <i class="fa-solid fa-scroll text-amber-400" aria-hidden="true"></i> Gilden-Bewerbung bei The Arc Flame
-        </h2>
-        <p class="mt-1 text-sm text-slate-400">Egal ob Retail-Mythic oder Classic 40er-Raid: Bewirb dich hier unkompliziert ohne Account!</p>
-        <p class="mt-1 text-xs text-amber-200/80">Die Bewerbung landet im Gilden-Chat dieses Browsers und ist für andere Geräte nicht sichtbar.</p>
+      <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+        <div class="min-w-0">
+          <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Werde Teil des Teams (Ohne Anmeldung möglich)</span>
+          <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
+            <i class="fa-solid fa-scroll text-amber-400" aria-hidden="true"></i> Gilden-Bewerbung bei The Arc Flame
+          </h2>
+          <p class="mt-1 text-sm text-slate-400">Egal ob Retail-Mythic oder Classic 40er-Raid: Bewirb dich hier unkompliziert ohne Account!</p>
+          <p class="mt-1 text-xs text-amber-200/80">Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie bleibt im Gilden-Chat dieses Browsers.</p>
+        </div>
+        <a data-discord-invite href="https://discord.gg/g6TP8sBZQ" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">
+          <i class="fa-brands fa-discord" aria-hidden="true"></i> Discord beitreten
+        </a>
       </div>
       <form id="application-form" class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div class="space-y-4">
-          <div>
-            <label for="app-name" class="mb-1 block text-xs font-semibold text-slate-400">Dein Charaktername &amp; Realm</label>
-            <input type="text" id="app-name" name="character" autocomplete="off" placeholder="z.B. Charaktername / Realm" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;">
+            <label for="app-website">Website</label>
+            <input type="text" id="app-website" name="website" tabindex="-1" autocomplete="off">
           </div>
           <div>
-            <label for="app-front" class="mb-1 block text-xs font-semibold text-slate-400">Spielbereich / Front</label>
+            <label for="app-name" class="mb-1 block text-xs font-semibold text-slate-400">Charaktername</label>
+            <input type="text" id="app-name" name="character" autocomplete="off" placeholder="z.B. Charaktername" maxlength="80" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="app-realm" class="mb-1 block text-xs font-semibold text-slate-400">Realm</label>
+            <input type="text" id="app-realm" name="realm" autocomplete="off" placeholder="z.B. Realm" maxlength="80" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="app-front" class="mb-1 block text-xs font-semibold text-slate-400">Front</label>
             <select id="app-front" name="front" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
-              <option value="Retail (Mythic Progress)">WoW Retail (Mythic Progress)</option>
-              <option value="Forever (Classic 40er Ziel)">WoW Forever (Classic)</option>
+              <option value="Retail">WoW Retail (Mythic Progress)</option>
+              <option value="Forever">WoW Forever (Classic)</option>
             </select>
           </div>
           <div>
-            <label for="app-class" class="mb-1 block text-xs font-semibold text-slate-400">Klasse &amp; Spezialisierung</label>
-            <input type="text" id="app-class" name="class" placeholder="z.B. Priester (Holy / Shadow)" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+            <label for="app-class" class="mb-1 block text-xs font-semibold text-slate-400">Klasse</label>
+            <input type="text" id="app-class" name="class" placeholder="z.B. Priester" maxlength="80" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="app-spec" class="mb-1 block text-xs font-semibold text-slate-400">Spezialisierung</label>
+            <input type="text" id="app-spec" name="spec" placeholder="z.B. Holy / Shadow" maxlength="80" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="app-contact" class="mb-1 block text-xs font-semibold text-slate-400">Kontakt / Discord-Name</label>
+            <input type="text" id="app-contact" name="contact" autocomplete="off" placeholder="Dein Discord-Name" maxlength="80" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
           </div>
         </div>
         <div class="flex flex-col justify-between space-y-4">
           <div>
-            <label for="app-msg" class="mb-1 block text-xs font-semibold text-slate-400">Über dich &amp; Deine Raiderfahrung</label>
-            <textarea id="app-msg" name="message" rows="4" placeholder="Erzähl uns kurz etwas über dich, deine Erfahrung und warum du zu The Arc Flame möchtest..." required class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
+            <label for="app-experience" class="mb-1 block text-xs font-semibold text-slate-400">Erfahrung</label>
+            <textarea id="app-experience" name="experience" rows="3" maxlength="1000" placeholder="Kurz deine Raiderfahrung…" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
+          </div>
+          <div>
+            <label for="app-msg" class="mb-1 block text-xs font-semibold text-slate-400">Nachricht</label>
+            <textarea id="app-msg" name="message" rows="4" maxlength="1000" placeholder="Erzähl uns kurz etwas über dich und warum du zu The Arc Flame möchtest…" required class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
           </div>
           <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 py-3 font-black text-white shadow-lg transition hover:opacity-90">
             <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Bewerbung abschicken (Ohne Login)
@@ -380,13 +408,13 @@
   </main>
 
   <footer id="site-footer" class="mt-20 border-t border-slate-800 bg-slate-900 py-8 text-center text-sm text-slate-500">
-    <p class="mx-auto max-w-3xl px-4 text-slate-400">Alle Einträge auf dieser Seite — Mitglieder, Kader, Planer, Chat, Bewerbungen und Konten — werden nur in diesem Browser gespeichert (localStorage) und sind für andere nicht sichtbar.</p>
+    <p class="mx-auto max-w-3xl px-4 text-slate-400">Mitglieder, Kader, Planer, Chat und Konten bleiben nur in diesem Browser (localStorage). Bewerbungen gehen an die Gilde auf Discord; eine Kopie liegt zusätzlich lokal.</p>
     <button type="button" id="reset-local-btn" data-action="reset-local" class="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 px-4 py-2 font-semibold text-slate-300 hover:border-red-500 hover:text-red-400">Lokale Daten löschen</button>
     <p class="mt-6">&copy; 2026 The Arc Flame • World of Warcraft Horde Guild. All rights reserved.</p>
   </footer>
 
   <div id="notice" hidden data-kind="info" role="status" aria-live="polite" class="fixed bottom-4 left-1/2 z-[90] flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 items-start gap-3 rounded-xl border bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-2xl">
-    <p data-notice-text class="flex-1 text-left"></p>
+    <p data-notice-text class="flex-1 break-words text-left"></p>
     <button type="button" data-action="dismiss-notice" class="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-white" aria-label="Hinweis schließen">
       <i class="fa-solid fa-xmark" aria-hidden="true"></i>
     </button>
@@ -564,6 +592,7 @@
     </div>
   </div>
 
+  <script src="js/config.js" defer></script>
   <script src="js/defaults.js" defer></script>
   <script src="js/app.js" defer></script>
 </body>
