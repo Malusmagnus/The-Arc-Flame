@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Arc Flame – WoW-Gilde der Horde</title>
+  <meta name="description" content="The Arc Flame ist eine World-of-Warcraft-Gilde der Horde. Raidkader, Mitglieder, M+-Planer, Classic-Planer, Bewerbung und Gilden-Chat – bearbeitbar in deinem Browser.">
+  <meta name="theme-color" content="#060913">
+  <link rel="canonical" href="https://malusmagnus.github.io/The-Arc-Flame/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="de_DE">
+  <meta property="og:site_name" content="The Arc Flame">
+  <meta property="og:title" content="The Arc Flame – WoW-Gilde der Horde">
+  <meta property="og:description" content="Gildenhomepage für Retail und WoW Forever: Leitung, Kader, Mitglieder, Planer, Bewerbung und Chat.">
+  <meta property="og:url" content="https://malusmagnus.github.io/The-Arc-Flame/">
+  <meta property="og:image" content="https://malusmagnus.github.io/The-Arc-Flame/assets/og.png">
+  <meta property="og:image:alt" content="The Arc Flame – WoW-Gilde der Horde">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Arc Flame – WoW-Gilde der Horde">
+  <meta name="twitter:description" content="Gildenhomepage für Retail und WoW Forever: Leitung, Kader, Mitglieder, Planer, Bewerbung und Chat.">
+  <meta name="twitter:image" content="https://malusmagnus.github.io/The-Arc-Flame/assets/og.png">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="assets/fonts/inter.css">
+  <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="flex min-h-screen flex-col selection:bg-red-600 selection:text-white">
+  <a class="skip-link" href="#inhalt">Zum Inhalt springen</a>
+
+  <header id="site-header" class="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/90 shadow-2xl backdrop-blur-md">
+    <div class="mx-auto flex max-w-7xl flex-col items-center gap-3 px-4 py-3 xl:flex-row xl:justify-between">
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-gradient-to-br from-red-600 via-rose-700 to-amber-500 shadow-lg shadow-red-900/60 sm:h-12 sm:w-12" aria-hidden="true">
+          <i class="fa-solid fa-fire text-xl text-white wow-glow sm:text-2xl"></i>
+        </div>
+        <div class="min-w-0">
+          <h1 class="red-glow bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300 bg-clip-text text-lg font-black tracking-wider text-transparent sm:text-2xl sm:tracking-widest">THE ARC FLAME</h1>
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 sm:text-xs">World of Warcraft • Horde</p>
+        </div>
+      </div>
+
+      <div role="tablist" aria-label="Spielversion" class="grid w-full grid-cols-2 gap-1 rounded-xl border border-slate-800/80 bg-slate-950 p-1.5 shadow-inner xl:flex xl:w-auto">
+        <button type="button" role="tab" id="btn-retail" data-action="switch-front" data-front="retail" aria-controls="content-retail" aria-selected="true" class="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-rose-700 px-2 py-2 text-xs font-bold text-white shadow-md shadow-red-900/50 transition-all sm:px-5 sm:text-sm">
+          <i class="fa-solid fa-dragon" aria-hidden="true"></i>
+          <span class="sm:hidden">Retail</span>
+          <span class="hidden sm:inline">WoW Retail (Mythic)</span>
+        </button>
+        <button type="button" role="tab" id="btn-forever" data-action="switch-front" data-front="forever" aria-controls="content-forever" aria-selected="false" class="flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 py-2 text-xs font-bold text-slate-400 transition-all hover:text-white sm:px-5 sm:text-sm">
+          <i class="fa-solid fa-hourglass-start" aria-hidden="true"></i>
+          <span class="sm:hidden">Forever</span>
+          <span class="hidden sm:inline">WoW Forever (Classic)</span>
+        </button>
+      </div>
+
+      <div class="flex w-full flex-wrap items-center justify-center gap-2 xl:w-auto xl:justify-end">
+        <a href="#bewerbung" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-extrabold text-slate-950 shadow-lg transition hover:from-amber-400 hover:to-amber-500">
+          <i class="fa-solid fa-scroll" aria-hidden="true"></i> Bewerben
+        </a>
+        <div id="auth-header-section">
+          <button type="button" data-action="open-auth" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-slate-700">
+            <i class="fa-solid fa-user-lock" aria-hidden="true"></i> Login / Reg
+          </button>
+        </div>
+      </div>
+    </div>
+    <nav id="mobile-nav" aria-label="Abschnitte">
+      <div id="mobile-nav-links" class="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-2"></div>
+    </nav>
+  </header>
+
+  <aside id="quick-nav" class="fixed left-4 top-1/3 z-40 flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/90 p-2 shadow-2xl backdrop-blur-md" aria-label="Schnellnavigation"></aside>
+
+  <main id="inhalt" tabindex="-1" class="mx-auto w-full max-w-7xl flex-grow space-y-12 px-4 py-8">
+    <noscript>
+      <p class="rounded-xl border border-amber-500/40 bg-slate-900 p-4 text-sm text-amber-200">Diese Seite braucht JavaScript, damit Kader, Chat und Formulare funktionieren.</p>
+    </noscript>
+
+    <section id="info-section" tabindex="-1" class="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-red-950/30 p-6 shadow-2xl md:p-8">
+      <div class="pointer-events-none absolute -bottom-10 -right-10 text-red-500 opacity-5" aria-hidden="true">
+        <i class="fa-solid fa-shield-halved text-[220px]"></i>
+      </div>
+      <div class="mb-6 flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+        <div class="min-w-0">
+          <h2 class="flex items-center gap-3 bg-gradient-to-r from-amber-400 to-red-500 bg-clip-text text-3xl font-black text-transparent">
+            <i class="fa-solid fa-book-bookmark text-amber-400" aria-hidden="true"></i> Status &amp; Vision der Gilde
+          </h2>
+          <p class="mt-1 text-sm text-slate-400">Wie es um The Arc Flame steht – Unsere Mission für Retail &amp; Classic.</p>
+        </div>
+        <button type="button" id="edit-info-btn" data-action="toggle-info-edit" aria-expanded="false" aria-controls="info-edit-mode" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-amber-400 transition hover:bg-slate-700">
+          <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Informationen bearbeiten
+        </button>
+      </div>
+
+      <div id="info-display-mode" class="grid grid-cols-1 gap-6 text-slate-300 md:grid-cols-3">
+        <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-inner">
+          <h3 class="mb-2 flex items-center gap-2 font-bold text-amber-400"><i class="fa-solid fa-fire text-red-500" aria-hidden="true"></i> Das Fundament</h3>
+          <p id="info-col-1" class="text-sm leading-relaxed text-slate-400">The Arc Flame steht für ehrgeizige, aber entspannte Horde-Gemeinschaft. Unser klares Ziel ist es, den mythischen Raid-Content zu meistern und Bosse im höchsten Schwierigkeitsgrad zu bezwingen.</p>
+        </div>
+        <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-inner">
+          <h3 class="mb-2 flex items-center gap-2 font-bold text-amber-400"><i class="fa-solid fa-calendar-days text-amber-400" aria-hidden="true"></i> Raid-Philosophie</h3>
+          <p id="info-col-2" class="text-sm leading-relaxed text-slate-400">Retail: Samstag von 20:00 bis 22:00 Uhr mit vollem Fokus auf den Mythic-Progress. Classic: Aufbau von 10er, 20er und dem ultimativen Ziel, den 40er-Raid zum Beben zu bringen!</p>
+        </div>
+        <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-inner">
+          <h3 class="mb-2 flex items-center gap-2 font-bold text-amber-400"><i class="fa-solid fa-users text-amber-400" aria-hidden="true"></i> Zwei Fronten, Eine Gilde</h3>
+          <p id="info-col-3" class="text-sm leading-relaxed text-slate-400">Ob Retail-Veteran oder Classic-Liebhaber ab dem 5. November: Über unseren gemeinsamen Gilden-Chat halten wir alle Fäden zusammen unter der roten Flagge.</p>
+        </div>
+      </div>
+
+      <div id="info-edit-mode" class="space-y-4" hidden>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <label for="edit-col-1" class="mb-1 block text-xs font-semibold text-slate-400">Fundament</label>
+            <textarea id="edit-col-1" rows="4" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-red-500"></textarea>
+          </div>
+          <div>
+            <label for="edit-col-2" class="mb-1 block text-xs font-semibold text-slate-400">Raid-Philosophie</label>
+            <textarea id="edit-col-2" rows="4" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-red-500"></textarea>
+          </div>
+          <div>
+            <label for="edit-col-3" class="mb-1 block text-xs font-semibold text-slate-400">Zwei Fronten</label>
+            <textarea id="edit-col-3" rows="4" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-red-500"></textarea>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-action="cancel-info-edit" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="button" data-action="save-info-edit" class="min-h-11 rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-lg hover:bg-red-500">Speichern</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="content-retail" role="tabpanel" aria-labelledby="btn-retail" class="space-y-12">
+      <section id="retail-leitung" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl md:p-8">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+          <div class="min-w-0">
+            <span class="text-xs font-bold uppercase tracking-widest text-amber-400">WoW Retail • Gildenleitung &amp; Flammenrat</span>
+            <h2 class="mt-1 text-3xl font-black text-white">Die Gildenleitung von The Arc Flame</h2>
+          </div>
+          <div class="text-left md:text-right">
+            <span class="block text-xs text-slate-400">Raid-Zeit</span>
+            <span class="text-sm font-bold text-amber-400"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i> Samstag 20:00 - 22:00 Uhr</span>
+          </div>
+        </div>
+        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <li class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-xl font-bold text-amber-400" aria-hidden="true"><i class="fa-solid fa-crown"></i></div>
+            <div class="min-w-0">
+              <p class="text-base font-bold text-white">Malusiamanu</p>
+              <p class="text-xs font-semibold text-amber-400">Gildenmeister • Holy Priest</p>
+            </div>
+          </li>
+          <li class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-xl font-bold text-red-400" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></div>
+            <div class="min-w-0">
+              <p class="text-base font-bold text-white">Lexxtra</p>
+              <p class="text-xs font-semibold text-red-400">Flammenrat • Monk Heal</p>
+            </div>
+          </li>
+          <li class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-xl font-bold text-red-400" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></div>
+            <div class="min-w-0">
+              <p class="text-base font-bold text-white">Lückog</p>
+              <p class="text-xs font-semibold text-red-400">Flammenrat • Jäger</p>
+            </div>
+          </li>
+          <li class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-sm">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-xl font-bold text-red-400" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></div>
+            <div class="min-w-0">
+              <p class="text-base font-bold text-white">Tuhan</p>
+              <p class="text-xs font-semibold text-red-400">Flammenrat • Paladin</p>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <section id="retail-kader" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+          <div class="min-w-0">
+            <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+              <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> Retail Raidkader (15er Mythic Progress)
+            </h2>
+            <p class="text-sm text-slate-400">Nur für den Flammenrat &amp; berechtigte Raidplaner bearbeitbar.</p>
+          </div>
+          <div class="flex w-full flex-wrap items-center justify-between gap-4 md:w-auto">
+            <div class="text-left md:text-right">
+              <span class="block text-xs text-slate-400">Kader Status</span>
+              <span id="retail-roster-count" class="text-sm font-black text-amber-400" aria-live="polite">0/15</span>
+            </div>
+            <button type="button" id="retail-raid-add-btn" data-action="open-raid-modal" data-front="retail" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-500">
+              <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Spieler eintragen
+            </button>
+          </div>
+        </div>
+        <div id="retail-kader-grid" class="grid min-h-[220px] grid-cols-1 gap-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 p-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Retail-Raidkader"></div>
+      </section>
+
+      <section id="retail-mplus" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+          <div class="min-w-0">
+            <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+              <i class="fa-solid fa-stopwatch text-amber-400" aria-hidden="true"></i> M+ Dungeon &amp; Keystone-Planer
+            </h2>
+            <p class="text-sm text-slate-400">Für alle angemeldeten Mitglieder zugänglich.</p>
+          </div>
+          <button type="button" id="mplus-add-btn" data-action="open-mplus-modal" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> M+ Gruppe erstellen
+          </button>
+        </div>
+        <div id="mplus-groups-grid" class="grid grid-cols-1 gap-6 md:grid-cols-2" aria-label="Mythic-Plus-Gruppen"></div>
+      </section>
+
+      <section id="retail-mitglieder" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+          <div class="min-w-0">
+            <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+              <i class="fa-solid fa-users-rectangle text-red-500" aria-hidden="true"></i> Gildenmitglieder (WoW Retail)
+            </h2>
+            <p class="text-sm text-slate-400">Drag &amp; Drop fähig in den Retail Raidkader, oder über „Spieler eintragen“.</p>
+          </div>
+          <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center md:w-auto">
+            <label for="retail-search" class="sr-only">Mitglied suchen</label>
+            <input type="search" id="retail-search" placeholder="Mitglied suchen..." class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500 sm:w-64">
+            <button type="button" data-action="open-member-modal" data-front="retail" class="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">
+              <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hinzufügen
+            </button>
+          </div>
+        </div>
+        <ul id="retail-members-list" class="grid max-h-[500px] grid-cols-1 gap-3 overflow-y-auto pr-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Retail-Mitglieder"></ul>
+      </section>
+    </div>
+
+    <div id="content-forever" role="tabpanel" aria-labelledby="btn-forever" class="space-y-12" hidden>
+      <div id="forever-uebersicht" tabindex="-1" class="flex flex-col items-center justify-between gap-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl md:flex-row md:p-8">
+        <div class="min-w-0 text-center md:text-left">
+          <span class="rounded-full border border-amber-500/30 bg-amber-500/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-400">WoW Classic Front</span>
+          <h2 class="mt-2 flex flex-wrap items-center justify-center gap-3 text-3xl font-extrabold text-white md:justify-start">
+            WoW Forever <span class="text-lg font-normal text-red-500">Start ab 5. November</span>
+          </h2>
+          <p class="mt-1 text-sm text-slate-400">Das ultimative Ziel: Den vollen 40er-Raid zum Beben bringen!</p>
+        </div>
+        <div class="w-full rounded-xl border border-slate-800 bg-slate-950 px-6 py-4 text-center md:w-auto">
+          <span class="mb-1 block text-xs uppercase text-slate-400">Fortschritt zum 40er Raid</span>
+          <div class="flex items-center justify-center gap-3">
+            <div id="forever-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="0" aria-valuetext="0 von 40" aria-label="Fortschritt zum 40er-Raid" class="h-3 w-32 overflow-hidden rounded-full bg-slate-800">
+              <div id="forever-progress-bar" class="h-full bg-gradient-to-r from-red-600 to-amber-500" style="width: 0%"></div>
+            </div>
+            <span class="text-lg font-black text-amber-400" id="forever-roster-count" aria-live="polite">0/40</span>
+          </div>
+        </div>
+      </div>
+
+      <section id="forever-planer" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+          <div class="min-w-0">
+            <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+              <i class="fa-solid fa-skull text-amber-400" aria-hidden="true"></i> Classic Dungeon &amp; Raid Planer (10/20/40)
+            </h2>
+            <p class="text-sm text-slate-400">Nur für berechtigte Raidplaner bearbeitbar.</p>
+          </div>
+          <button type="button" id="classic-run-add-btn" data-action="open-classic-modal" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> Classic Run ansetzen
+          </button>
+        </div>
+        <div id="classic-runs-grid" class="grid grid-cols-1 gap-6 md:grid-cols-2" aria-label="Classic-Runs"></div>
+      </section>
+
+      <section id="forever-kader" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+          <div class="min-w-0">
+            <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+              <i class="fa-solid fa-shield-cat text-amber-400" aria-hidden="true"></i> Classic Raidkader (Ziel: 40 Spieler)
+            </h2>
+            <p class="text-sm text-slate-400">Eingetragene Member für die Classic-Front (Nur für berechtigte Raidplaner).</p>
+          </div>
+          <button type="button" id="forever-raid-add-btn" data-action="open-raid-modal" data-front="forever" class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
+            <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Spieler hinzufügen
+          </button>
+        </div>
+        <div id="forever-kader-grid" class="grid min-h-[180px] grid-cols-1 gap-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 p-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Classic-Raidkader"></div>
+      </section>
+
+      <section id="forever-mitglieder" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
+          <div class="min-w-0">
+            <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+              <i class="fa-solid fa-users text-amber-400" aria-hidden="true"></i> Gildenmitglieder (WoW Forever)
+            </h2>
+            <p class="text-sm text-slate-400">Deine Classic-Crew (Drag &amp; Drop fähig in den Classic-Kader).</p>
+          </div>
+          <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center md:w-auto">
+            <label for="forever-search" class="sr-only">Classic-Mitglied suchen</label>
+            <input type="search" id="forever-search" placeholder="Classic Mitglied suchen..." class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500 sm:w-64">
+            <button type="button" data-action="open-member-modal" data-front="forever" class="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">
+              <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hinzufügen
+            </button>
+          </div>
+        </div>
+        <ul id="forever-members-list" class="grid max-h-[500px] grid-cols-1 gap-3 overflow-y-auto pr-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Forever-Mitglieder"></ul>
+      </section>
+    </div>
+
+    <section id="bewerbung" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 p-6 shadow-2xl md:p-8">
+      <div class="border-b border-slate-800 pb-4">
+        <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Werde Teil des Teams (Ohne Anmeldung möglich)</span>
+        <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
+          <i class="fa-solid fa-scroll text-amber-400" aria-hidden="true"></i> Gilden-Bewerbung bei The Arc Flame
+        </h2>
+        <p class="mt-1 text-sm text-slate-400">Egal ob Retail-Mythic oder Classic 40er-Raid: Bewirb dich hier unkompliziert ohne Account!</p>
+        <p class="mt-1 text-xs text-amber-200/80">Die Bewerbung landet im Gilden-Chat dieses Browsers und ist für andere Geräte nicht sichtbar.</p>
+      </div>
+      <form id="application-form" class="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div class="space-y-4">
+          <div>
+            <label for="app-name" class="mb-1 block text-xs font-semibold text-slate-400">Dein Charaktername &amp; Realm</label>
+            <input type="text" id="app-name" name="name" placeholder="z.B. Charaktername / Realm" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="app-front" class="mb-1 block text-xs font-semibold text-slate-400">Spielbereich / Front</label>
+            <select id="app-front" name="front" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+              <option value="Retail (Mythic Progress)">WoW Retail (Mythic Progress)</option>
+              <option value="Forever (Classic 40er Ziel)">WoW Forever (Classic)</option>
+            </select>
+          </div>
+          <div>
+            <label for="app-class" class="mb-1 block text-xs font-semibold text-slate-400">Klasse &amp; Spezialisierung</label>
+            <input type="text" id="app-class" name="class" placeholder="z.B. Priester (Holy / Shadow)" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <div class="flex flex-col justify-between space-y-4">
+          <div>
+            <label for="app-msg" class="mb-1 block text-xs font-semibold text-slate-400">Über dich &amp; Deine Raiderfahrung</label>
+            <textarea id="app-msg" name="message" rows="4" placeholder="Erzähl uns kurz etwas über dich, deine Erfahrung und warum du zu The Arc Flame möchtest..." required class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
+          </div>
+          <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 py-3 font-black text-white shadow-lg transition hover:opacity-90">
+            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Bewerbung abschicken (Ohne Login)
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section id="gilden-chat" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+      <div class="flex flex-col items-start justify-between gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+        <div class="min-w-0">
+          <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+            <i class="fa-solid fa-comments text-emerald-500" aria-hidden="true"></i> Gemeinsamer Gilden-Chat (Retail &amp; Forever)
+          </h2>
+          <p class="text-sm text-slate-400">Hier schlägt das gemeinsame Herz von The Arc Flame.</p>
+          <p class="mt-1 text-xs text-amber-200/80">Nachrichten bleiben nur in diesem Browser gespeichert.</p>
+        </div>
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400">
+          <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-500" aria-hidden="true"></span> Gildenchat aktiv
+        </span>
+      </div>
+      <div id="chat-messages" role="log" aria-label="Gilden-Chat" class="h-64 space-y-2 overflow-y-auto break-words rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-sm"></div>
+      <form id="chat-form" class="flex flex-col gap-3 sm:flex-row">
+        <label for="chat-author" class="sr-only">Charaktername</label>
+        <input type="text" id="chat-author" name="author" placeholder="Dein Charakter..." required autocomplete="nickname" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-emerald-500 sm:w-44">
+        <label for="chat-text" class="sr-only">Nachricht an die Gilde</label>
+        <input type="text" id="chat-text" name="text" placeholder="Nachricht an die Gilde schreiben..." required class="w-full flex-grow rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-emerald-500">
+        <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500">
+          <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Senden
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="mt-20 border-t border-slate-800 bg-slate-900 py-8 text-center text-sm text-slate-500">
+    <p class="mx-auto max-w-3xl px-4 text-slate-400">Alle Einträge auf dieser Seite — Mitglieder, Kader, Planer, Chat, Bewerbungen und Konten — werden nur in diesem Browser gespeichert (localStorage) und sind für andere nicht sichtbar.</p>
+    <button type="button" id="reset-local-btn" data-action="reset-local" class="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 px-4 py-2 font-semibold text-slate-300 hover:border-red-500 hover:text-red-400">Lokale Daten löschen</button>
+    <p class="mt-6">&copy; 2026 The Arc Flame • World of Warcraft Horde Guild. All rights reserved.</p>
+  </footer>
+
+  <div id="notice" hidden data-kind="info" role="status" aria-live="polite" class="fixed bottom-4 left-1/2 z-[90] flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 items-start gap-3 rounded-xl border bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-2xl">
+    <p data-notice-text class="flex-1 text-left"></p>
+    <button type="button" data-action="dismiss-notice" class="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-white" aria-label="Hinweis schließen">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <div id="auth-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="auth-modal"></div>
+    <div class="modal-panel max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+      <h2 id="auth-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-user-lock text-amber-400" aria-hidden="true"></i> Gilden-Login / Registrierung
+      </h2>
+      <p class="mt-2 text-xs text-slate-400">Erstelle einen Account oder logge dich ein, um Aktionen auf der Seite auszuführen.</p>
+      <p class="mt-2 text-xs text-amber-200/80">Konten gelten nur in diesem Browser. Das Passwort liegt unverschlüsselt im lokalen Speicher und ist kein echter Zugriffsschutz.</p>
+      <form id="auth-form" class="mt-4 space-y-4">
+        <div>
+          <label for="auth-username" class="mb-1 block text-xs font-semibold text-slate-400">Benutzername</label>
+          <input type="text" id="auth-username" name="username" autocomplete="username" placeholder="Dein Benutzername" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="auth-password" class="mb-1 block text-xs font-semibold text-slate-400">Passwort</label>
+          <input type="password" id="auth-password" name="password" autocomplete="current-password" placeholder="••••••••" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="auth-mode" class="mb-1 block text-xs font-semibold text-slate-400">Modus</label>
+          <select id="auth-mode" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+            <option value="login">Anmelden (Login)</option>
+            <option value="register">Neu Registrieren</option>
+          </select>
+        </div>
+        <div id="auth-role-wrap" hidden>
+          <label for="auth-role" class="mb-1 block text-xs font-semibold text-slate-400">Rolle (nur in diesem Browser)</label>
+          <select id="auth-role" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+            <option value="member">Mitglied</option>
+            <option value="raidplanner">Raidplaner</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="auth-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-amber-500 px-5 py-2 text-sm font-extrabold text-slate-950 shadow-lg hover:bg-amber-400">Bestätigen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="member-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="member-modal"></div>
+    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="member-modal-title">
+      <h2 id="member-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-user-plus text-red-500" aria-hidden="true"></i> Mitglied hinzufügen
+      </h2>
+      <form id="member-form" class="mt-4 space-y-4">
+        <input type="hidden" id="modal-front" value="retail">
+        <div>
+          <label for="modal-char-name" class="mb-1 block text-xs font-semibold text-slate-400">Charaktername &amp; Level</label>
+          <input type="text" id="modal-char-name" placeholder="z.B. Charaktername 80" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+        </div>
+        <div>
+          <label for="modal-char-rank" class="mb-1 block text-xs font-semibold text-slate-400">Rang</label>
+          <select id="modal-char-rank" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+            <option value="Flammenrat">Flammenrat</option>
+            <option value="Raidplaner">Raidplaner</option>
+            <option value="Raidleitung">Raidleitung</option>
+            <option value="Schlachtflamme">Schlachtflamme</option>
+            <option value="Flammenherz">Flammenherz</option>
+            <option value="Funkenecho">Funkenecho</option>
+            <option value="Frischefunke">Frischefunke</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="member-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-lg hover:bg-red-500">Hinzufügen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="raid-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="raid-modal"></div>
+    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="raid-modal-title">
+      <h2 id="raid-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> In den Raidkader eintragen (Nur Raidplaner)
+      </h2>
+      <form id="raid-form" class="mt-4 space-y-4">
+        <input type="hidden" id="modal-raid-front" value="retail">
+        <div>
+          <label for="modal-raid-name" class="mb-1 block text-xs font-semibold text-slate-400">Name &amp; Klasse</label>
+          <input type="text" id="modal-raid-name" placeholder="z.B. Name (Klasse)" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+        </div>
+        <div>
+          <label for="modal-raid-role" class="mb-1 block text-xs font-semibold text-slate-400">Rolle im Raid</label>
+          <select id="modal-raid-role" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+            <option value="Tank">Tank</option>
+            <option value="Heiler">Heiler</option>
+            <option value="Melee-DD">Melee-DD</option>
+            <option value="Range-DD">Range-DD</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="raid-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-lg hover:bg-red-500">Eintragen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="mplus-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="mplus-modal"></div>
+    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="mplus-modal-title">
+      <h2 id="mplus-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-stopwatch text-amber-400" aria-hidden="true"></i> M+ Gruppe erstellen (Für alle angemeldeten Member)
+      </h2>
+      <form id="mplus-form" class="mt-4 space-y-4">
+        <div>
+          <label for="mp-group-name" class="mb-1 block text-xs font-semibold text-slate-400">Gruppenname</label>
+          <input type="text" id="mp-group-name" placeholder="z.B. Abendgruppe" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="mp-dungeon" class="mb-1 block text-xs font-semibold text-slate-400">Dungeon &amp; Key-Stufe</label>
+          <input type="text" id="mp-dungeon" placeholder="z.B. Ara-Kara +10" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="mp-time" class="mb-1 block text-xs font-semibold text-slate-400">Termin</label>
+          <input type="text" id="mp-time" placeholder="z.B. Mittwoch 20:00 Uhr" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label for="mp-tank" class="mb-1 block text-xs font-semibold text-slate-400">Tank</label>
+            <input type="text" id="mp-tank" placeholder="Spieler..." required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="mp-heal" class="mb-1 block text-xs font-semibold text-slate-400">Heiler</label>
+            <input type="text" id="mp-heal" placeholder="Spieler..." required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <div>
+          <label for="mp-dds" class="mb-1 block text-xs font-semibold text-slate-400">DDs (durch Komma getrennt)</label>
+          <input type="text" id="mp-dds" placeholder="Spieler 1, Spieler 2, Spieler 3" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="mplus-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-amber-500 px-5 py-2 text-sm font-extrabold text-slate-950 shadow-lg hover:bg-amber-400">Erstellen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="classic-raid-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="classic-raid-modal"></div>
+    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="classic-modal-title">
+      <h2 id="classic-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-skull text-amber-400" aria-hidden="true"></i> Classic Run ansetzen (Nur Raidplaner)
+      </h2>
+      <form id="classic-form" class="mt-4 space-y-4">
+        <div>
+          <label for="cr-name" class="mb-1 block text-xs font-semibold text-slate-400">Raid / Instanz Name</label>
+          <input type="text" id="cr-name" placeholder="z.B. Molten Core (40er Raid)" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="cr-size" class="mb-1 block text-xs font-semibold text-slate-400">Größe</label>
+          <select id="cr-size" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+            <option value="10">10er Raid / Dungeon</option>
+            <option value="20">20er Raid</option>
+            <option value="40">40er Raid (Episches Ziel)</option>
+          </select>
+        </div>
+        <div>
+          <label for="cr-time" class="mb-1 block text-xs font-semibold text-slate-400">Termin</label>
+          <input type="text" id="cr-time" placeholder="z.B. Freitag 20:00 Uhr" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="classic-raid-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-amber-500 px-5 py-2 text-sm font-extrabold text-slate-950 shadow-lg hover:bg-amber-400">Ansetzen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/defaults.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "the-arc-flame",
+  "private": true,
+  "description": "Statische Gildenhomepage für The Arc Flame",
+  "scripts": {
+    "build:css": "tailwindcss -i ./css/input.css -o ./css/styles.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #060913;
+    color: #f8fafc;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+
+  ::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+  }
+}
+
+@layer components {
+  .wow-glow {
+    text-shadow: 0 0 15px rgba(255, 209, 0, 0.4);
+  }
+
+  .red-glow {
+    text-shadow: 0 0 20px rgba(220, 38, 38, 0.6);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #060913;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #dc2626;
+}
+
+:focus-visible {
+  outline: 2px solid #ffd100;
+  outline-offset: 2px;
+}
+
+main:focus,
+section:focus,
+#forever-uebersicht:focus {
+  outline: none;
+}
+
+html {
+  scroll-padding-top: 17rem;
+}
+
+@media (min-width: 1280px) {
+  html {
+    scroll-padding-top: 12rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  html {
+    scroll-padding-top: 6.75rem;
+  }
+}
+
+#quick-nav {
+  display: none;
+}
+
+#mobile-nav {
+  display: block;
+}
+
+@media (min-width: 1440px) {
+  #quick-nav {
+    display: flex;
+  }
+
+  #mobile-nav {
+    display: none;
+  }
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: 0.75rem;
+  background: #ffd100;
+  color: #090d16;
+  font-weight: 800;
+  padding: 0.5rem 1rem;
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(2 6 23 / 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.modal-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-height: min(90vh, 40rem);
+  overflow-y: auto;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+#notice[data-kind="error"] {
+  border-color: rgb(220 38 38 / 0.7);
+}
+
+#notice[data-kind="info"] {
+  border-color: rgb(245 158 11 / 0.5);
+}
+
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-pulse {
+    animation: none !important;
+  }
+}
