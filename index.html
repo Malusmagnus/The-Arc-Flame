@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Arc Flame – Deutsche WoW-Gilde der Horde | Retail &amp; Classic</title>
   <meta name="description" content="The Arc Flame ist eine deutsche WoW-Gilde der Horde. Mitglieder gesucht für Raids in Retail und für Classic auf WoW Forever. Jetzt bewerben.">
-  <meta name="theme-color" content="#060913">
+  <meta name="theme-color" content="#10080c">
   <link rel="canonical" href="https://thearcflame.github.io/">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="de_DE">
@@ -13,15 +13,15 @@
   <meta property="og:title" content="The Arc Flame – Deutsche WoW-Gilde der Horde | Retail &amp; Classic">
   <meta property="og:description" content="The Arc Flame ist eine deutsche WoW-Gilde der Horde. Mitglieder gesucht für Raids in Retail und für Classic auf WoW Forever. Jetzt bewerben.">
   <meta property="og:url" content="https://thearcflame.github.io/">
-  <meta property="og:image" content="https://thearcflame.github.io/assets/og-image.png">
+  <meta property="og:image" content="https://thearcflame.github.io/assets/og-image.jpg">
   <meta property="og:image:alt" content="The Arc Flame – WoW-Gilde der Horde, Retail und Forever. Jetzt bewerben.">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:type" content="image/jpeg">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Arc Flame – Deutsche WoW-Gilde der Horde | Retail &amp; Classic">
   <meta name="twitter:description" content="The Arc Flame ist eine deutsche WoW-Gilde der Horde. Mitglieder gesucht für Raids in Retail und für Classic auf WoW Forever. Jetzt bewerben.">
-  <meta name="twitter:image" content="https://thearcflame.github.io/assets/og-image.png">
+  <meta name="twitter:image" content="https://thearcflame.github.io/assets/og-image.jpg">
   <meta name="twitter:image:alt" content="The Arc Flame – WoW-Gilde der Horde, Retail und Forever. Jetzt bewerben.">
   <script type="application/ld+json">
   {
@@ -36,30 +36,35 @@
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preload" as="image" href="assets/hero.webp" type="image/webp" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts/inter.css">
+  <link rel="stylesheet" href="assets/fonts/cinzel.css">
   <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="flex min-h-screen flex-col selection:bg-red-600 selection:text-white">
+<body class="flex min-h-screen flex-col selection:bg-amber-500 selection:text-slate-950">
   <a class="skip-link" href="#inhalt">Zum Inhalt springen</a>
 
   <header id="site-header" class="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/90 shadow-2xl backdrop-blur-md">
     <div class="mx-auto flex max-w-7xl flex-col items-center gap-3 px-4 py-3 xl:flex-row xl:justify-between">
       <div class="flex min-w-0 items-center gap-3">
-        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-gradient-to-br from-red-600 via-rose-700 to-amber-500 shadow-lg shadow-red-900/60 sm:h-12 sm:w-12" aria-hidden="true">
-          <i class="fa-solid fa-fire text-xl text-white wow-glow sm:text-2xl"></i>
-        </div>
-        <div class="min-w-0">
-          <h1 class="red-glow bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300 bg-clip-text text-lg font-black tracking-wider text-transparent sm:text-2xl sm:tracking-widest">THE ARC FLAME</h1>
-          <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 sm:text-xs">World of Warcraft • Horde</p>
-        </div>
+        <a href="#start" class="brand">
+          <picture>
+            <source srcset="assets/emblem-128.webp 128w, assets/emblem.webp 512w" sizes="48px" type="image/webp">
+            <img class="brand-mark" src="assets/emblem-128.png" alt="" width="128" height="128">
+          </picture>
+          <span class="min-w-0">
+            <span class="brand-title">The Arc Flame</span>
+            <span class="brand-sub">World of Warcraft • Horde</span>
+          </span>
+        </a>
       </div>
 
-      <div role="tablist" aria-label="Spielversion" class="grid w-full grid-cols-2 gap-1 rounded-xl border border-slate-800/80 bg-slate-950 p-1.5 shadow-inner xl:flex xl:w-auto">
+      <div role="tablist" aria-label="Spielversion" class="front-switch grid w-full grid-cols-2 gap-1 rounded-xl border p-1.5 shadow-inner xl:flex xl:w-auto">
         <button type="button" role="tab" id="btn-retail" data-action="switch-front" data-front="retail" aria-controls="content-retail" aria-selected="true" class="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-rose-700 px-2 py-2 text-xs font-bold text-white shadow-md shadow-red-900/50 transition-all sm:px-5 sm:text-sm">
           <i class="fa-solid fa-dragon" aria-hidden="true"></i>
           <span class="sm:hidden">Retail</span>
-          <span class="hidden sm:inline">WoW Retail (Mythic)</span>
+          <span class="hidden sm:inline">WoW Retail</span>
         </button>
         <button type="button" role="tab" id="btn-forever" data-action="switch-front" data-front="forever" aria-controls="content-forever" aria-selected="false" class="flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 py-2 text-xs font-bold text-slate-400 transition-all hover:text-white sm:px-5 sm:text-sm">
           <i class="fa-solid fa-hourglass-start" aria-hidden="true"></i>
@@ -73,7 +78,9 @@
           <i class="fa-solid fa-scroll" aria-hidden="true"></i> Bewerben
         </a>
         <a data-discord-invite href="https://discord.gg/g6TP8sBZQ" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">
-          <i class="fa-brands fa-discord" aria-hidden="true"></i> Discord beitreten
+          <i class="fa-brands fa-discord" aria-hidden="true"></i>
+          <span class="sm:hidden">Discord</span>
+          <span class="hidden sm:inline">Discord beitreten</span>
         </a>
         <div id="auth-header-section">
           <button type="button" data-action="open-auth" class="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-slate-700">
@@ -89,12 +96,49 @@
 
   <aside id="quick-nav" class="fixed left-4 top-1/3 z-40 flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/90 p-2 shadow-2xl backdrop-blur-md" aria-label="Schnellnavigation"></aside>
 
-  <main id="inhalt" tabindex="-1" class="mx-auto w-full max-w-7xl flex-grow space-y-12 px-4 py-8">
+  <main id="inhalt" tabindex="-1" class="flex-grow">
+    <section id="start" class="hero" aria-labelledby="hero-title">
+      <div class="hero-media">
+        <picture>
+          <source srcset="assets/hero.webp" type="image/webp">
+          <img class="hero-bg" src="assets/hero.jpg" alt="" width="1920" height="800" decoding="async" fetchpriority="high">
+        </picture>
+        <canvas id="ember-canvas" class="hero-embers" aria-hidden="true"></canvas>
+        <div class="hero-shade" aria-hidden="true"></div>
+      </div>
+      <div class="hero-inner">
+        <div class="hero-lockup">
+          <picture class="hero-emblem">
+            <source srcset="assets/emblem.webp" type="image/webp">
+            <img src="assets/emblem.png" alt="" width="512" height="512">
+          </picture>
+          <div class="hero-copy">
+            <h1 id="hero-title">
+              <picture>
+                <source srcset="assets/wordmark.webp" type="image/webp">
+                <img src="assets/wordmark.png" alt="The Arc Flame – WoW-Gilde der Horde" width="1200" height="300">
+              </picture>
+            </h1>
+            <p class="hero-slogan">Gemeinsam durch Azeroth – in Retail und WoW Forever</p>
+            <div class="hero-actions">
+              <a class="btn btn-flame" href="#bewerbung">
+                <i class="fa-solid fa-scroll" aria-hidden="true"></i> Jetzt bewerben
+              </a>
+              <a class="btn btn-discord" data-discord-invite href="https://discord.gg/g6TP8sBZQ" target="_blank" rel="noopener noreferrer">
+                <i class="fa-brands fa-discord" aria-hidden="true"></i> Discord beitreten
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="mx-auto w-full max-w-7xl space-y-12 px-4 py-8">
     <noscript>
       <p class="rounded-xl border border-amber-500/40 bg-slate-900 p-4 text-sm text-amber-200">Diese Seite braucht JavaScript, damit Kader, Chat und Formulare funktionieren.</p>
     </noscript>
 
-    <section id="info-section" tabindex="-1" class="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-red-950/30 p-6 shadow-2xl md:p-8">
+    <section id="info-section" tabindex="-1" class="panel reveal relative overflow-hidden rounded-2xl p-6 shadow-2xl md:p-8">
       <div class="pointer-events-none absolute -bottom-10 -right-10 text-red-500 opacity-5" aria-hidden="true">
         <i class="fa-solid fa-shield-halved text-[220px]"></i>
       </div>
@@ -113,11 +157,11 @@
       <div id="info-display-mode" class="grid grid-cols-1 gap-6 text-slate-300 md:grid-cols-3">
         <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-inner">
           <h3 class="mb-2 flex items-center gap-2 font-bold text-amber-400"><i class="fa-solid fa-fire text-red-500" aria-hidden="true"></i> Das Fundament</h3>
-          <p id="info-col-1" class="text-sm leading-relaxed text-slate-400">The Arc Flame steht für ehrgeizige, aber entspannte Horde-Gemeinschaft. Unser klares Ziel ist es, den mythischen Raid-Content zu meistern und Bosse im höchsten Schwierigkeitsgrad zu bezwingen.</p>
+          <p id="info-col-1" class="text-sm leading-relaxed text-slate-400">The Arc Flame steht für eine ehrgeizige, aber entspannte Horde-Gemeinschaft. Wir ziehen gemeinsam in den Raid, üben an den Bossen und lassen den Abend freundlich bleiben.</p>
         </div>
         <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-inner">
           <h3 class="mb-2 flex items-center gap-2 font-bold text-amber-400"><i class="fa-solid fa-calendar-days text-amber-400" aria-hidden="true"></i> Raid-Philosophie</h3>
-          <p id="info-col-2" class="text-sm leading-relaxed text-slate-400">Retail: Samstag von 20:00 bis 22:00 Uhr mit vollem Fokus auf den Mythic-Progress. Classic: Aufbau von 10er, 20er und dem ultimativen Ziel, den 40er-Raid zum Beben zu bringen!</p>
+          <p id="info-col-2" class="text-sm leading-relaxed text-slate-400">Retail: Samstag von 20:00 bis 22:00 Uhr, zusammen im Raid. Classic: Aufbau von 10er- und 20er-Gruppen und das Ziel, den 40er-Raid zum Beben zu bringen.</p>
         </div>
         <div class="rounded-xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-inner">
           <h3 class="mb-2 flex items-center gap-2 font-bold text-amber-400"><i class="fa-solid fa-users text-amber-400" aria-hidden="true"></i> Zwei Fronten, Eine Gilde</h3>
@@ -148,7 +192,7 @@
     </section>
 
     <div id="content-retail" role="tabpanel" aria-labelledby="btn-retail" class="space-y-12">
-      <section id="retail-leitung" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl md:p-8">
+      <section id="retail-leitung" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
             <span class="text-xs font-bold uppercase tracking-widest text-amber-400">WoW Retail • Gildenleitung &amp; Flammenrat</span>
@@ -191,11 +235,11 @@
         </ul>
       </section>
 
-      <section id="retail-kader" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+      <section id="retail-kader" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
-              <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> Retail Raidkader (15er Mythic Progress)
+              <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> Retail Raidkader (15 Spieler)
             </h2>
             <p class="text-sm text-slate-400">Nur für den Flammenrat &amp; berechtigte Raidplaner bearbeitbar.</p>
           </div>
@@ -212,7 +256,7 @@
         <div id="retail-kader-grid" class="grid min-h-[220px] grid-cols-1 gap-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 p-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Retail-Raidkader"></div>
       </section>
 
-      <section id="retail-mplus" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+      <section id="retail-mplus" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
@@ -224,10 +268,10 @@
             <i class="fa-solid fa-plus" aria-hidden="true"></i> M+ Gruppe erstellen
           </button>
         </div>
-        <div id="mplus-groups-grid" class="grid grid-cols-1 gap-6 md:grid-cols-2" aria-label="Mythic-Plus-Gruppen"></div>
+        <div id="mplus-groups-grid" class="grid grid-cols-1 gap-6 md:grid-cols-2" aria-label="M+-Gruppen"></div>
       </section>
 
-      <section id="retail-mitglieder" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+      <section id="retail-mitglieder" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
@@ -248,7 +292,7 @@
     </div>
 
     <div id="content-forever" role="tabpanel" aria-labelledby="btn-forever" class="space-y-12" hidden>
-      <section id="forever-uebersicht" tabindex="-1" class="flex flex-col items-center justify-between gap-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl md:flex-row md:p-8">
+      <section id="forever-uebersicht" tabindex="-1" class="panel reveal flex flex-col items-center justify-between gap-6 rounded-2xl p-6 shadow-xl md:flex-row md:p-8">
         <div class="min-w-0 text-center md:text-left">
           <span class="rounded-full border border-amber-500/30 bg-amber-500/25 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-400">WoW Classic Front</span>
           <h2 class="mt-2 flex flex-wrap items-center justify-center gap-3 text-3xl font-extrabold text-white md:justify-start">
@@ -267,7 +311,7 @@
         </div>
       </section>
 
-      <section id="forever-planer" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+      <section id="forever-planer" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
@@ -282,7 +326,7 @@
         <div id="classic-runs-grid" class="grid grid-cols-1 gap-6 md:grid-cols-2" aria-label="Classic-Runs"></div>
       </section>
 
-      <section id="forever-kader" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+      <section id="forever-kader" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
@@ -297,7 +341,7 @@
         <div id="forever-kader-grid" class="grid min-h-[180px] grid-cols-1 gap-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 p-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Classic-Raidkader"></div>
       </section>
 
-      <section id="forever-mitglieder" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+      <section id="forever-mitglieder" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
             <h2 class="flex items-center gap-3 text-2xl font-black text-white">
@@ -317,14 +361,56 @@
       </section>
     </div>
 
-    <section id="bewerbung" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 p-6 shadow-2xl md:p-8">
+    <section id="galerie" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8">
+      <div class="border-b border-slate-800 pb-4">
+        <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Aus der Gilde</span>
+        <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
+          <i class="fa-solid fa-image text-amber-400" aria-hidden="true"></i> Galerie
+        </h2>
+        <p class="mt-1 max-w-3xl text-sm text-slate-400">Bilder aus unseren Abenden. Solange noch keine Screenshots hinterlegt sind, bleiben die Plätze frei markiert.</p>
+      </div>
+      <ul id="gallery-grid" class="gallery-grid">
+        <li class="gallery-tile is-placeholder is-a">
+          <div class="gallery-art" aria-hidden="true"><span class="gallery-rune"></span></div>
+          <p class="gallery-caption">Screenshot folgt</p>
+        </li>
+        <li class="gallery-tile is-placeholder is-b">
+          <div class="gallery-art" aria-hidden="true"><span class="gallery-rune"></span></div>
+          <p class="gallery-caption">Screenshot folgt</p>
+        </li>
+        <li class="gallery-tile is-placeholder is-c">
+          <div class="gallery-art" aria-hidden="true"><span class="gallery-rune"></span></div>
+          <p class="gallery-caption">Screenshot folgt</p>
+        </li>
+        <li class="gallery-tile is-placeholder is-d">
+          <div class="gallery-art" aria-hidden="true"><span class="gallery-rune"></span></div>
+          <p class="gallery-caption">Screenshot folgt</p>
+        </li>
+      </ul>
+    </section>
+
+    <section id="videos" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8" hidden>
+      <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+        <div class="min-w-0">
+          <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Kanal</span>
+          <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
+            <i class="fa-brands fa-youtube text-red-500" aria-hidden="true"></i> Videos von Malusmagnus
+          </h2>
+          <p id="videos-lead" class="mt-1 max-w-3xl text-sm text-slate-400"></p>
+        </div>
+        <a id="videos-channel" class="btn btn-discord" hidden>Zum Kanal</a>
+      </div>
+      <div id="video-grid" class="video-grid"></div>
+    </section>
+
+    <section id="bewerbung" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-2xl md:p-8">
       <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
         <div class="min-w-0">
           <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Werde Teil des Teams (Ohne Anmeldung möglich)</span>
           <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
             <i class="fa-solid fa-scroll text-amber-400" aria-hidden="true"></i> Gilden-Bewerbung bei The Arc Flame
           </h2>
-          <p class="mt-1 text-sm text-slate-400">Egal ob Retail-Mythic oder Classic 40er-Raid: Bewirb dich hier unkompliziert ohne Account!</p>
+          <p class="mt-1 text-sm text-slate-400">Egal ob Retail-Raid oder Classic 40er-Raid: Bewirb dich hier unkompliziert ohne Account!</p>
           <p class="mt-1 text-xs text-amber-200/80">Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie bleibt im Gilden-Chat dieses Browsers.</p>
         </div>
         <a data-discord-invite href="https://discord.gg/g6TP8sBZQ" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">
@@ -348,7 +434,7 @@
           <div>
             <label for="app-front" class="mb-1 block text-xs font-semibold text-slate-400">Front</label>
             <select id="app-front" name="front" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
-              <option value="Retail">WoW Retail (Mythic Progress)</option>
+              <option value="Retail">WoW Retail</option>
               <option value="Forever">WoW Forever (Classic)</option>
             </select>
           </div>
@@ -381,7 +467,7 @@
       </form>
     </section>
 
-    <section id="gilden-chat" tabindex="-1" class="space-y-6 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+    <section id="gilden-chat" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
       <div class="flex flex-col items-start justify-between gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
         <div class="min-w-0">
           <h2 class="flex items-center gap-3 text-2xl font-black text-white">
@@ -405,6 +491,7 @@
         </button>
       </form>
     </section>
+    </div>
   </main>
 
   <footer id="site-footer" class="mt-20 border-t border-slate-800 bg-slate-900 py-8 text-center text-sm text-slate-500">
@@ -412,6 +499,25 @@
     <button type="button" id="reset-local-btn" data-action="reset-local" class="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-700 px-4 py-2 font-semibold text-slate-300 hover:border-red-500 hover:text-red-400">Lokale Daten löschen</button>
     <p class="mt-6">&copy; 2026 The Arc Flame • World of Warcraft Horde Guild. All rights reserved.</p>
   </footer>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <div class="lightbox-backdrop" data-action="close-lightbox"></div>
+    <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-labelledby="lightbox-caption">
+      <button type="button" id="lightbox-close" class="lightbox-close" data-action="close-lightbox" aria-label="Galerie schließen">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+      <button type="button" id="lightbox-prev" class="lightbox-nav lightbox-prev" data-action="lightbox-step" data-step="-1" aria-label="Vorheriges Bild">
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+      </button>
+      <figure class="lightbox-figure">
+        <img id="lightbox-image" alt="">
+        <figcaption id="lightbox-caption"></figcaption>
+      </figure>
+      <button type="button" id="lightbox-next" class="lightbox-nav lightbox-next" data-action="lightbox-step" data-step="1" aria-label="Nächstes Bild">
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
 
   <div id="notice" hidden data-kind="info" role="status" aria-live="polite" class="fixed bottom-4 left-1/2 z-[90] flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 items-start gap-3 rounded-xl border bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-2xl">
     <p data-notice-text class="flex-1 break-words text-left"></p>

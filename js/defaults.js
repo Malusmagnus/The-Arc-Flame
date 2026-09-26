@@ -311,8 +311,8 @@ window.ARC_DEFAULTS = {
     }
   ],
   "guildInfo": {
-    "col1": "The Arc Flame steht für ehrgeizige, aber entspannte Horde-Gemeinschaft. Unser klares Ziel ist es, den mythischen Raid-Content zu meistern und Bosse im höchsten Schwierigkeitsgrad zu bezwingen.",
-    "col2": "Retail: Samstag von 20:00 bis 22:00 Uhr mit vollem Fokus auf den Mythic-Progress. Classic: Aufbau von 10er, 20er und dem ultimativen Ziel, den 40er-Raid zum Beben zu bringen!",
+    "col1": "The Arc Flame steht für eine ehrgeizige, aber entspannte Horde-Gemeinschaft. Wir ziehen gemeinsam in den Raid, üben an den Bossen und lassen den Abend freundlich bleiben.",
+    "col2": "Retail: Samstag von 20:00 bis 22:00 Uhr, zusammen im Raid. Classic: Aufbau von 10er- und 20er-Gruppen und das Ziel, den 40er-Raid zum Beben zu bringen.",
     "col3": "Ob Retail-Veteran oder Classic-Liebhaber ab dem 5. November: Über unseren gemeinsamen Gilden-Chat halten wir alle Fäden zusammen unter der roten Flagge."
   }
 };
