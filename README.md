@@ -67,6 +67,39 @@ Zum Austauschen die beiden Werte in `js/config.js` ersetzen und die Seite neu ve
 
 Die Webhook-URL liegt im öffentlichen JavaScript und ist für jeden Besucher sichtbar. Wenn sie missbraucht wird, den Webhook in Discord löschen und in `js/config.js` durch einen neuen ersetzen.
 
+## Galerie
+
+Die Sektion **Galerie** liest `galleryImages` aus `js/config.js`. Solange die Liste leer ist, zeigt die Seite Platzhalter mit dem Hinweis **Screenshot folgt**. Das sind keine Spielbilder.
+
+So kommt ein echtes Bild hinein:
+
+1. Datei nach `assets/gallery/` legen (webp, png, jpg oder gif). Flache Dateinamen, kein Unterordner.
+2. In `js/config.js` eintragen, zum Beispiel:
+
+```js
+galleryImages: [
+  { src: "assets/gallery/samstag-raid.webp", alt: "Kurze Beschreibung des Bildes" },
+],
+```
+
+3. Auf `main` pushen. WebP ist die schlanke Variante; png und jpg funktionieren genauso.
+
+Ein Klick öffnet das Bild in einer Lightbox (Escape, Pfeiltasten, Wischen).
+
+## Videos von Malusmagnus
+
+Der Abschnitt bleibt **komplett ausgeblendet**, solange `youtubeChannelUrl` und `youtubeVideoIds` in `js/config.js` beide leer sind.
+
+- `youtubeChannelUrl` — `https://`-Adresse auf youtube.com oder youtu.be, sonst leer lassen
+- `youtubeVideoIds` — Liste der 11 Zeichen hinter `watch?v=`
+
+```js
+youtubeChannelUrl: "https://www.youtube.com/@Kanalname",
+youtubeVideoIds: ["VIDEO_ID_11"],
+```
+
+Eingebunden wird erst nach einem Klick, über `youtube-nocookie.com`. Vorher liegt nur das Vorschaubild.
+
 ## Deployment auf GitHub Pages
 
 Der Workflow `.github/workflows/pages.yml` veröffentlicht die Seite bei jedem Push auf `main`. Er nutzt `actions/configure-pages`, `actions/upload-pages-artifact` und `actions/deploy-pages`.
@@ -95,12 +128,15 @@ robots.txt          Crawler-Hinweise, Verweis auf die Sitemap
 sitemap.xml         Sitemap der Startseite
 css/input.css       Tailwind-Quelle
 css/styles.css      fertiges Stylesheet
-js/config.js        Discord-Einladung und Bewerbungs-Webhook
+js/config.js        Discord, Galerie und YouTube
 js/defaults.js      Startwerte
 js/app.js           Verhalten und localStorage
-assets/             Favicon, Open-Graph-Bild, Schriften, Icons
+assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
+assets/gallery/     Screenshots für die Galerie
 .nojekyll
 .github/workflows/pages.yml
 ```
 
-Schrift: [Inter](https://rsms.me/inter/) (SIL Open Font License). Icons: [Font Awesome 6.4](https://fontawesome.com/) (Free).
+Neue Dateien liegen unter `assets/`. Der Pages-Workflow kopiert diesen Ordner bereits mit; ein eigener Kopierschritt ist dafür nicht nötig.
+
+Schrift: [Inter](https://rsms.me/inter/) und [Cinzel](https://fonts.google.com/specimen/Cinzel) (beide SIL Open Font License), selbst gehostet. Icons: [Font Awesome 6.4](https://fontawesome.com/) (Free).

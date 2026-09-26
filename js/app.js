@@ -52,6 +52,7 @@
     { href: "#retail-kader", label: "Raidkader", icon: "fa-shield", tone: "text-red-500" },
     { href: "#retail-mplus", label: "M+ Planer", icon: "fa-stopwatch", tone: "text-amber-400" },
     { href: "#retail-mitglieder", label: "Mitglieder", icon: "fa-users", tone: "text-red-500" },
+    { href: "#galerie", label: "Galerie", icon: "fa-image", tone: "text-amber-400" },
     { href: "#bewerbung", label: "Bewerbung", icon: "fa-scroll", tone: "text-amber-400" },
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
   ];
@@ -60,6 +61,7 @@
     { href: "#forever-planer", label: "Classic Planer", icon: "fa-skull", tone: "text-amber-400" },
     { href: "#forever-kader", label: "Classic Kader", icon: "fa-shield-cat", tone: "text-amber-400" },
     { href: "#forever-mitglieder", label: "Classic Mitglieder", icon: "fa-users", tone: "text-amber-400" },
+    { href: "#galerie", label: "Galerie", icon: "fa-image", tone: "text-amber-400" },
     { href: "#bewerbung", label: "Bewerbung", icon: "fa-scroll", tone: "text-amber-400" },
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
   ];
@@ -68,6 +70,13 @@
   let lastFocus = null;
   let noticeTimer = 0;
   let resetArmed = false;
+  let gallery = [];
+  let galleryIndex = 0;
+  let revealObserver = null;
+  const LEGACY_GUILD_INFO = {
+    col1: "The Arc Flame steht für ehrgeizige, aber entspannte Horde-Gemeinschaft. Unser klares Ziel ist es, den mythischen Raid-Content zu meistern und Bosse im höchsten Schwierigkeitsgrad zu bezwingen.",
+    col2: "Retail: Samstag von 20:00 bis 22:00 Uhr mit vollem Fokus auf den Mythic-Progress. Classic: Aufbau von 10er, 20er und dem ultimativen Ziel, den 40er-Raid zum Beben zu bringen!",
+  };
 
   const users = loadUsers();
   const retailMembers = loadArray("arc_retail_members", DEFAULTS.retailMembers);
@@ -87,6 +96,11 @@
   function boot() {
     bindStaticEvents();
     applyDiscordLinks();
+    renderGallery();
+    renderVideos();
+    setupReveal();
+    startEmbers();
+    bindLightboxTouch();
     renderMembers("retail");
     renderMembers("forever");
     renderRaidKader("retail");
@@ -223,6 +237,22 @@
       hideNotice();
       return;
     }
+    if (action === "open-gallery") {
+      openLightbox(Number(el.dataset.index));
+      return;
+    }
+    if (action === "close-lightbox") {
+      closeLightbox();
+      return;
+    }
+    if (action === "lightbox-step") {
+      showLightbox(galleryIndex + Number(el.dataset.step || 1));
+      return;
+    }
+    if (action === "play-video") {
+      playVideo(el);
+      return;
+    }
     if (action === "reset-local") {
       resetLocalData(el);
     }
@@ -266,6 +296,20 @@
   }
 
   function onKeydown(event) {
+    if (lightboxOpen()) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeLightbox();
+        return;
+      }
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        showLightbox(galleryIndex + (event.key === "ArrowRight" ? 1 : -1));
+        return;
+      }
+      if (event.key === "Tab") trapTab(event, document.getElementById("lightbox"));
+      return;
+    }
     const open = openModalEl();
     if (event.key === "Escape") {
       if (open) {
@@ -276,7 +320,11 @@
       return;
     }
     if (event.key !== "Tab" || !open) return;
-    const nodes = focusable(open);
+    trapTab(event, open);
+  }
+
+  function trapTab(event, root) {
+    const nodes = focusable(root);
     if (!nodes.length) return;
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
@@ -301,6 +349,7 @@
     foreverBtn.className = retailOn ? TAB_OFF : TAB_FOREVER_ON;
     retailBtn.setAttribute("aria-selected", retailOn ? "true" : "false");
     foreverBtn.setAttribute("aria-selected", retailOn ? "false" : "true");
+    refreshReveal(document.getElementById(activeFront === "retail" ? "content-retail" : "content-forever"));
     updateQuickNav();
 
     if (options && options.scroll) {
@@ -310,8 +359,19 @@
     }
   }
 
+  function navItems() {
+    const items = (activeFront === "retail" ? RETAIL_NAV : FOREVER_NAV).slice();
+    const videos = document.getElementById("videos");
+    if (videos && !videos.hidden) {
+      const entry = { href: "#videos", label: "Videos", icon: "fa-play", tone: "text-red-500" };
+      const at = items.findIndex(function (item) { return item.href === "#bewerbung"; });
+      items.splice(at < 0 ? items.length : at, 0, entry);
+    }
+    return items;
+  }
+
   function updateQuickNav() {
-    const items = activeFront === "retail" ? RETAIL_NAV : FOREVER_NAV;
+    const items = navItems();
     fillNav(document.getElementById("quick-nav"), items, true);
     fillNav(document.getElementById("mobile-nav-links"), items, false);
   }
@@ -1386,8 +1446,338 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
     ["col1", "col2", "col3"].forEach(function (key) {
       if (typeof value[key] === "string") fallback[key] = value[key];
+      if (LEGACY_GUILD_INFO[key] && fallback[key] === LEGACY_GUILD_INFO[key]) {
+        fallback[key] = (DEFAULTS.guildInfo && DEFAULTS.guildInfo[key]) || fallback[key];
+      }
     });
     return fallback;
+  }
+
+  function prefersReducedMotion() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function setupReveal() {
+    if (prefersReducedMotion() || !("IntersectionObserver" in window)) return;
+    revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-visible");
+        revealObserver.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -32px 0px" });
+    refreshReveal(document);
+  }
+
+  function refreshReveal(root) {
+    if (!revealObserver || !root) return;
+    root.querySelectorAll(".reveal").forEach(function (node) {
+      if (node.classList.contains("is-visible")) return;
+      if (node.closest("[hidden]")) return;
+      const rect = node.getBoundingClientRect();
+      const inView = rect.bottom > 0 && rect.top < window.innerHeight * 0.94;
+      if (inView) {
+        node.classList.add("is-visible");
+        return;
+      }
+      node.classList.add("will-reveal");
+      revealObserver.observe(node);
+    });
+  }
+
+  function isGallerySrc(src) {
+    if (typeof src !== "string") return false;
+    const value = src.trim();
+    if (!value || value.indexOf("..") !== -1) return false;
+    return /^assets\/gallery\/[^/\\]+\.(webp|png|jpe?g|gif)$/i.test(value);
+  }
+
+  function renderGallery() {
+    const grid = document.getElementById("gallery-grid");
+    if (!grid) return;
+    const list = arcConfig().galleryImages;
+    gallery = [];
+    if (!Array.isArray(list)) return;
+    list.forEach(function (item) {
+      if (!item || !isGallerySrc(item.src)) return;
+      const alt = typeof item.alt === "string" && item.alt.trim() ? item.alt.trim() : "Screenshot der Gilde";
+      gallery.push({ src: item.src.trim(), alt: alt });
+    });
+    if (!gallery.length) return;
+    grid.replaceChildren();
+    gallery.forEach(function (item, index) {
+      const li = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "gallery-tile";
+      button.dataset.action = "open-gallery";
+      button.dataset.index = String(index);
+      button.setAttribute("aria-label", item.alt + ", vergrößern");
+      const img = document.createElement("img");
+      img.src = item.src;
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      const caption = document.createElement("span");
+      caption.className = "gallery-caption";
+      caption.textContent = item.alt;
+      button.append(img, caption);
+      li.appendChild(button);
+      grid.appendChild(li);
+    });
+  }
+
+  function lightboxOpen() {
+    const box = document.getElementById("lightbox");
+    return !!(box && !box.hidden);
+  }
+
+  function showLightbox(index) {
+    if (!gallery.length) return;
+    galleryIndex = (index + gallery.length) % gallery.length;
+    const item = gallery[galleryIndex];
+    const img = document.getElementById("lightbox-image");
+    const caption = document.getElementById("lightbox-caption");
+    img.src = item.src;
+    img.alt = item.alt;
+    caption.textContent = item.alt + " (" + (galleryIndex + 1) + " von " + gallery.length + ")";
+    const single = gallery.length < 2;
+    document.getElementById("lightbox-prev").hidden = single;
+    document.getElementById("lightbox-next").hidden = single;
+  }
+
+  function openLightbox(index) {
+    if (!gallery.length || openModalEl()) return;
+    if (!Number.isFinite(index)) return;
+    lastFocus = document.activeElement;
+    showLightbox(index);
+    document.getElementById("lightbox").hidden = false;
+    document.body.classList.add("modal-open");
+    setInert(true);
+    const closeBtn = document.getElementById("lightbox-close");
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closeLightbox() {
+    const box = document.getElementById("lightbox");
+    if (!box || box.hidden) return;
+    box.hidden = true;
+    const img = document.getElementById("lightbox-image");
+    if (img) img.removeAttribute("src");
+    if (!openModalEl()) {
+      document.body.classList.remove("modal-open");
+      setInert(false);
+      if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+    }
+  }
+
+  function bindLightboxTouch() {
+    const dialog = document.querySelector(".lightbox-dialog");
+    if (!dialog) return;
+    let startX = 0;
+    dialog.addEventListener("touchstart", function (event) {
+      if (!event.changedTouches || !event.changedTouches.length) return;
+      startX = event.changedTouches[0].clientX;
+    }, { passive: true });
+    dialog.addEventListener("touchend", function (event) {
+      if (!lightboxOpen() || gallery.length < 2 || !event.changedTouches || !event.changedTouches.length) return;
+      const dx = event.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) < 48) return;
+      showLightbox(galleryIndex + (dx < 0 ? 1 : -1));
+    }, { passive: true });
+  }
+
+  function youtubeChannel() {
+    const url = arcConfig().youtubeChannelUrl;
+    if (typeof url !== "string") return "";
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== "https:") return "";
+      const host = parsed.hostname.replace(/^www\./, "");
+      if (host !== "youtube.com" && host !== "m.youtube.com" && host !== "youtu.be") return "";
+      return trimmed;
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function youtubeVideos() {
+    const ids = arcConfig().youtubeVideoIds;
+    if (!Array.isArray(ids)) return [];
+    const seen = {};
+    const list = [];
+    ids.forEach(function (id) {
+      if (typeof id !== "string") return;
+      const clean = id.trim();
+      if (!/^[a-zA-Z0-9_-]{11}$/.test(clean) || seen[clean]) return;
+      seen[clean] = true;
+      list.push(clean);
+    });
+    return list;
+  }
+
+  function renderVideos() {
+    const section = document.getElementById("videos");
+    if (!section) return;
+    const channel = youtubeChannel();
+    const videos = youtubeVideos();
+    if (!channel && !videos.length) {
+      section.hidden = true;
+      return;
+    }
+    const lead = document.getElementById("videos-lead");
+    const channelLink = document.getElementById("videos-channel");
+    const grid = document.getElementById("video-grid");
+    if (lead) {
+      lead.textContent = videos.length
+        ? "Clips von Malusmagnus. Das Video lädt erst nach einem Klick."
+        : "Zum Kanal von Malusmagnus. Einzelne Videos lassen sich in der Konfiguration eintragen.";
+    }
+    if (channelLink) {
+      if (channel) {
+        channelLink.hidden = false;
+        channelLink.href = channel;
+        channelLink.target = "_blank";
+        channelLink.rel = "noopener noreferrer";
+      } else {
+        channelLink.hidden = true;
+      }
+    }
+    if (grid) {
+      grid.replaceChildren();
+      videos.forEach(function (id, index) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "yt-facade";
+        button.dataset.action = "play-video";
+        button.dataset.videoId = id;
+        button.setAttribute("aria-label", "Video " + (index + 1) + " abspielen");
+        const img = document.createElement("img");
+        img.src = "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
+        img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+        const play = document.createElement("span");
+        play.className = "yt-play";
+        play.setAttribute("aria-hidden", "true");
+        play.innerHTML = '<i class="fa-solid fa-play"></i>';
+        button.append(img, play);
+        grid.appendChild(button);
+      });
+    }
+    section.hidden = false;
+    refreshReveal(section);
+  }
+
+  function playVideo(button) {
+    const id = button && button.dataset ? button.dataset.videoId : "";
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(id || "")) return;
+    const iframe = document.createElement("iframe");
+    iframe.className = "yt-frame";
+    iframe.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0";
+    iframe.title = button.getAttribute("aria-label") || "YouTube-Video";
+    iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+    iframe.setAttribute("allowfullscreen", "");
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    button.replaceWith(iframe);
+  }
+
+  function startEmbers() {
+    const canvas = document.getElementById("ember-canvas");
+    if (!canvas || prefersReducedMotion()) return;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+    const host = canvas.parentElement || canvas;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let width = 0;
+    let height = 0;
+    let particles = [];
+    let frameId = 0;
+    let running = false;
+    const count = Math.min(36, Math.max(16, Math.round((window.innerWidth || 800) / 42)));
+
+    function resize() {
+      const rect = host.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      width = Math.max(1, rect.width);
+      height = Math.max(1, rect.height);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function make(fromBottom) {
+      const purple = Math.random() < 0.14;
+      return {
+        x: Math.random() * width,
+        y: fromBottom ? height + 8 : Math.random() * height,
+        r: purple ? 0.7 + Math.random() * 1.1 : 0.45 + Math.random() * 1.7,
+        vy: 0.2 + Math.random() * 0.6,
+        vx: -0.16 + Math.random() * 0.32,
+        a: 0.18 + Math.random() * 0.5,
+        purple: purple,
+        wobble: Math.random() * Math.PI * 2,
+      };
+    }
+
+    function tick() {
+      if (!running) return;
+      frameId = window.requestAnimationFrame(tick);
+      if (!width || !height) return;
+      ctx.clearRect(0, 0, width, height);
+      if (particles.length < count) particles.push(make(false));
+      for (let i = 0; i < particles.length; i += 1) {
+        const spark = particles[i];
+        spark.wobble += 0.02;
+        spark.y -= spark.vy;
+        spark.x += spark.vx + Math.sin(spark.wobble) * 0.12;
+        if (spark.y < -8 || spark.x < -12 || spark.x > width + 12) {
+          particles[i] = make(true);
+          continue;
+        }
+        ctx.globalAlpha = spark.a;
+        ctx.fillStyle = spark.purple ? "#c9a6ff" : (spark.r > 1.5 ? "#ffb15a" : "#ff6a1a");
+        ctx.beginPath();
+        ctx.arc(spark.x, spark.y, spark.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function setRunning(on) {
+      if (on && !running && !media.matches) {
+        running = true;
+        frameId = window.requestAnimationFrame(tick);
+        return;
+      }
+      if (!on && running) {
+        running = false;
+        window.cancelAnimationFrame(frameId);
+      }
+    }
+
+    resize();
+    if ("ResizeObserver" in window) {
+      const observer = new ResizeObserver(resize);
+      observer.observe(host);
+    } else {
+      window.addEventListener("resize", resize);
+    }
+    const hero = document.getElementById("start");
+    if ("IntersectionObserver" in window && hero) {
+      const observer = new IntersectionObserver(function (entries) {
+        setRunning(entries[0].isIntersecting && !document.hidden);
+      });
+      observer.observe(hero);
+    } else {
+      setRunning(true);
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) setRunning(false);
+    });
   }
 
   function readCurrentUser() {
