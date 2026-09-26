@@ -14,6 +14,6 @@ window.ARC_CONFIG = {
   galleryImages: [],
   /* Beide leer: der Abschnitt „Videos von Malusmagnus“ bleibt ausgeblendet.
      youtubeVideoIds erwartet die 11 Zeichen nach watch?v= */
-  youtubeChannelUrl: "",
-  youtubeVideoIds: [],
+  youtubeChannelUrl: "https://www.youtube.com/@Malusmagnus-k9q",
+  youtubeVideoIds: ["FZPBPVesvz0", "vDd96SSvch8", "2mjFd0iLDkQ"],
 };
