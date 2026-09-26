@@ -2,7 +2,7 @@
 
 Statische Gildenhomepage für **The Arc Flame** (World of Warcraft, Horde). Die Seite zeigt Retail und WoW Forever (Classic): Gildenleitung, Raidkader, Mitglieder, M+-Planer, Classic-Planer, Bewerbung, Gilden-Chat und die bearbeitbare Gildeninfo.
 
-Sie ist für GitHub Pages unter [https://malusmagnus.github.io/The-Arc-Flame/](https://malusmagnus.github.io/The-Arc-Flame/) gedacht. Eigene Dateien sind relativ verlinkt, damit die Seite im Unterverzeichnis funktioniert.
+Sie wird über GitHub Pages unter [https://thearcflame.github.io/](https://thearcflame.github.io/) ausgeliefert. Eigene Dateien sind relativ verlinkt.
 
 ## Wichtig: Alle Daten bleiben im eigenen Browser
 
@@ -63,7 +63,7 @@ Einmalig im Repository einstellen: **Settings → Pages → Build and deployment
 
 `.nojekyll` im Root sorgt dafür, dass GitHub Pages die Dateien nicht durch Jekyll schickt.
 
-Die öffentliche Adresse ist `https://malusmagnus.github.io/The-Arc-Flame/`.
+Die öffentliche Adresse ist `https://thearcflame.github.io/`.
 
 ## Lokal ansehen
 
@@ -79,11 +79,13 @@ Dann [http://localhost:4173/](http://localhost:4173/) öffnen. Die Seite nicht p
 
 ```
 index.html          Seite
+robots.txt          Crawler-Hinweise, Verweis auf die Sitemap
+sitemap.xml         Sitemap der Startseite
 css/input.css       Tailwind-Quelle
 css/styles.css      fertiges Stylesheet
 js/defaults.js      Startwerte
 js/app.js           Verhalten und localStorage
-assets/             Favicon, Vorschaubild, Schriften, Icons
+assets/             Favicon, Open-Graph-Bild, Schriften, Icons
 .nojekyll
 .github/workflows/pages.yml
 ```

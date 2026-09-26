@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://thearcflame.github.io/sitemap.xml
