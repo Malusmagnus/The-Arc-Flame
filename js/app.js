@@ -600,6 +600,9 @@
       row.className = "mb-2 flex items-center justify-between gap-2";
       const input = document.createElement("input");
       input.type = "text";
+      input.id = "raid-role-" + front + "-" + index;
+      input.name = "raid-role-" + front + "-" + index;
+      input.autocomplete = "off";
       input.value = slot.role || "";
       input.readOnly = locked;
       input.dataset.action = "raid-role";
