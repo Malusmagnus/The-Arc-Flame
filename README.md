@@ -1,3 +1,91 @@
 # The Arc Flame
 
-Gilden-Homepage.
+Statische Gildenhomepage für **The Arc Flame** (World of Warcraft, Horde). Die Seite zeigt Retail und WoW Forever (Classic): Gildenleitung, Raidkader, Mitglieder, M+-Planer, Classic-Planer, Bewerbung, Gilden-Chat und die bearbeitbare Gildeninfo.
+
+Sie ist für GitHub Pages unter [https://malusmagnus.github.io/The-Arc-Flame/](https://malusmagnus.github.io/The-Arc-Flame/) gedacht. Eigene Dateien sind relativ verlinkt, damit die Seite im Unterverzeichnis funktioniert.
+
+## Wichtig: Alle Daten bleiben im eigenen Browser
+
+Es gibt **keinen Server und keine gemeinsame Datenbank**. Alles, was jemand auf der Seite einträgt oder ändert, liegt ausschließlich im **localStorage dieses Browsers**. Andere Personen, andere Geräte und ein späterer Besuch in einem anderen Browser sehen diese Einträge nicht.
+
+Das betrifft:
+
+- Gildenmitglieder und Raidkader
+- M+-Gruppen und Classic-Runs
+- Gilden-Chat und Bewerbungen
+- die bearbeiteten Texte unter „Status & Vision“
+- lokale Konten (Benutzername und Passwort)
+
+Ein gemeinsames Backend ist der empfohlene nächste Schritt, damit Kader, Chat und Bewerbungen wirklich für die ganze Gilde gelten. Dafür eignen sich zum Beispiel **Supabase** oder **Firebase**.
+
+Die Anmeldung ist kein echter Zugriffsschutz. Jede Person kann sich in ihrem Browser selbst als Mitglied oder Raidplaner registrieren. Passwörter werden **unverschlüsselt** im lokalen Speicher abgelegt. Es gibt keine vorgegebenen Konten.
+
+### localStorage-Schlüssel
+
+| Schlüssel | Inhalt |
+| --- | --- |
+| `arc_users` | lokale Konten |
+| `arc_current_user` | aktuell angemeldete Person |
+| `arc_retail_members` | Retail-Mitglieder |
+| `arc_forever_members` | Forever-Mitglieder |
+| `arc_retail_raid` | Retail-Raidkader |
+| `arc_forever_raid` | Classic-Raidkader |
+| `arc_mplus_groups` | M+-Gruppen |
+| `arc_classic_runs` | Classic-Runs |
+| `arc_guild_chat` | Chat und Bewerbungen |
+| `arc_guild_info` | die drei Statustexte |
+
+Sobald ein Schlüssel gesetzt ist, gelten die Startwerte aus `js/defaults.js` für diesen Bereich nicht mehr. Zurücksetzen geht über **Lokale Daten löschen** in der Fußzeile oder über die Entwicklerwerkzeuge (Application → Local Storage).
+
+## Inhalte bearbeiten
+
+Texte, die für alle Besucher gleich sein sollen, stehen in den Dateien — nicht im Browser.
+
+- **Sichtbare Texte und die Gildenleitung** (Namen, Rollen, Raid-Zeit, Überschriften): `index.html`
+- **Startwerte** für Mitglieder, Kader, M+, Classic-Runs, Chat und die drei Statustexte: `js/defaults.js`  
+  Diese Werte sieht nur, wer in diesem Browser noch nichts gespeichert hat.
+- **Farben und Layout**: `css/input.css`, danach das Stylesheet neu bauen:
+
+```bash
+npm install
+npm run build:css
+```
+
+Die fertige Datei `css/styles.css` liegt im Repository. GitHub Pages braucht dafür keinen Build.
+
+Auf der Seite selbst lassen sich die Statustexte über **Informationen bearbeiten** ändern. Mitglieder, Kader, Planer und Chat haben eigene Formulare. Diese Änderungen bleiben lokal.
+
+## Deployment auf GitHub Pages
+
+Der Workflow `.github/workflows/pages.yml` veröffentlicht die Seite bei jedem Push auf `main`. Er nutzt `actions/configure-pages`, `actions/upload-pages-artifact` und `actions/deploy-pages`.
+
+Einmalig im Repository einstellen: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+`.nojekyll` im Root sorgt dafür, dass GitHub Pages die Dateien nicht durch Jekyll schickt.
+
+Die öffentliche Adresse ist `https://malusmagnus.github.io/The-Arc-Flame/`.
+
+## Lokal ansehen
+
+Im Projektordner:
+
+```bash
+python3 -m http.server 4173
+```
+
+Dann [http://localhost:4173/](http://localhost:4173/) öffnen. Die Seite nicht per `file://` öffnen, sonst kann der Browser Skripte und Speicher blockieren.
+
+## Projektstruktur
+
+```
+index.html          Seite
+css/input.css       Tailwind-Quelle
+css/styles.css      fertiges Stylesheet
+js/defaults.js      Startwerte
+js/app.js           Verhalten und localStorage
+assets/             Favicon, Vorschaubild, Schriften, Icons
+.nojekyll
+.github/workflows/pages.yml
+```
+
+Schrift: [Inter](https://rsms.me/inter/) (SIL Open Font License). Icons: [Font Awesome 6.4](https://fontawesome.com/) (Free).
