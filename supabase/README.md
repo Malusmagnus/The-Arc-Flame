@@ -31,6 +31,16 @@ update public.profiles set role = 'admin' where id = (select id from auth.users 
 
 Danach auf der Seite abmelden und wieder anmelden. Neben dem Namen erscheint **Rollen**. Weitere Konten werden dort Offizier oder Administrator. Die eigene Rolle lässt sich dort nicht ändern.
 
+## Galerie
+
+`gallery.sql` einmal ausführen, wenn `schema.sql` schon auf dem Projekt liegt und der Galerie-Block darin noch nicht gelaufen ist. Ein komplettes erneutes Ausführen von `schema.sql` enthält dieselben Anweisungen. Beides kann wiederholt werden.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/gallery.sql
+```
+
+Danach gibt es den öffentlichen Bucket `gallery` (höchstens 10 MB, JPEG, PNG, WebP, GIF) und die Tabelle `public.gallery_images`. Jeder darf die Bilder sehen. Hochladen und Löschen dürfen nur Profile mit der Rolle `officer` oder `admin` (`public.is_officer()`).
+
 ## Realtime
 
 `schema.sql` hängt `chat_messages` und `roster` an die Publication `supabase_realtime`. Unter **Database → Publications** sollten beide Tabellen dort stehen, damit Chat und Kader live mitlaufen.

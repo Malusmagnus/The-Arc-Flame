@@ -73,6 +73,10 @@
   let noticeTimer = 0;
   let gallery = [];
   let galleryIndex = 0;
+  let galleryFromDb = [];
+  let galleryDbReady = false;
+  let galleryBusy = false;
+  let galleryWebp = null;
   let revealObserver = null;
   let remote = null;
   let remoteReady = false;
@@ -156,6 +160,16 @@
 
     const mode = document.getElementById("auth-mode");
     if (mode) mode.addEventListener("change", syncAuthMode);
+
+    const galleryFile = document.getElementById("gallery-file");
+    if (galleryFile) {
+      galleryFile.addEventListener("change", function () {
+        const picked = Array.prototype.slice.call(galleryFile.files || []);
+        galleryFile.value = "";
+        if (!picked.length) return;
+        uploadGalleryFiles(picked);
+      });
+    }
   }
 
   function onClick(event) {
@@ -272,6 +286,12 @@
       openLightbox(Number(el.dataset.index));
       return;
     }
+    if (action === "delete-gallery") {
+      event.preventDefault();
+      event.stopPropagation();
+      deleteGalleryImage(el.dataset.id, el.dataset.path);
+      return;
+    }
     if (action === "close-lightbox") {
       closeLightbox();
       return;
@@ -327,6 +347,8 @@
     } else if (form.id === "leadership-form") {
       event.preventDefault();
       saveLeadership(form);
+    } else if (form.id === "gallery-upload-form") {
+      event.preventDefault();
     }
   }
 
@@ -1793,6 +1815,10 @@
     });
   }
 
+  const GALLERY_MAX_WIDTH = 1920;
+  const GALLERY_MAX_BYTES = 10 * 1024 * 1024;
+  const GALLERY_BATCH = 10;
+
   function isGallerySrc(src) {
     if (typeof src !== "string") return false;
     const value = src.trim();
@@ -1800,21 +1826,123 @@
     return /^assets\/gallery\/[^/\\]+\.(webp|png|jpe?g|gif)$/i.test(value);
   }
 
+  function isGalleryId(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value || "");
+  }
+
+  function isGalleryObjectPath(path) {
+    return typeof path === "string" && path.length <= 160 && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(path);
+  }
+
+  function supabaseHost() {
+    const raw = arcConfig().supabaseUrl;
+    if (typeof raw !== "string") return "";
+    try {
+      const parsed = new URL(raw.trim());
+      if (parsed.protocol !== "https:") return "";
+      return parsed.host;
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function isGalleryPublicUrl(url, objectPath) {
+    if (typeof url !== "string") return false;
+    try {
+      const parsed = new URL(url.trim());
+      if (parsed.protocol !== "https:" || parsed.search || parsed.hash) return false;
+      const host = supabaseHost();
+      if (!host || parsed.host !== host) return false;
+      const prefix = "/storage/v1/object/public/gallery/";
+      if (parsed.pathname.indexOf(prefix) !== 0) return false;
+      const name = decodeURIComponent(parsed.pathname.slice(prefix.length));
+      if (!isGalleryObjectPath(name)) return false;
+      if (objectPath && name !== objectPath) return false;
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function staticGalleryItems() {
+    const list = arcConfig().galleryImages;
+    const items = [];
+    if (!Array.isArray(list)) return items;
+    list.forEach(function (item) {
+      if (!item || !isGallerySrc(item.src)) return;
+      const alt = typeof item.alt === "string" && item.alt.trim() ? item.alt.trim().slice(0, 200) : "Screenshot der Gilde";
+      items.push({ src: item.src.trim(), alt: alt, caption: alt, remote: false });
+    });
+    return items;
+  }
+
+  function mapGalleryRow(row) {
+    if (!row || !isGalleryId(String(row.id || "")) || !isGalleryObjectPath(row.path)) return null;
+    const path = row.path.trim();
+    const url = typeof row.url === "string" ? row.url.trim() : "";
+    if (!isGalleryPublicUrl(url, path)) return null;
+    const caption = typeof row.caption === "string" ? row.caption.trim().slice(0, 200) : "";
+    return {
+      id: String(row.id),
+      path: path,
+      src: url,
+      alt: caption || "Screenshot der Gilde",
+      caption: caption,
+      remote: true,
+    };
+  }
+
+  function mergedGallery() {
+    const merged = [];
+    const seen = {};
+    const remoteItems = galleryDbReady ? galleryFromDb : [];
+    remoteItems.forEach(function (item) {
+      if (!item || !item.src || seen[item.src]) return;
+      seen[item.src] = true;
+      merged.push(item);
+    });
+    staticGalleryItems().forEach(function (item) {
+      if (seen[item.src]) return;
+      seen[item.src] = true;
+      merged.push(item);
+    });
+    return merged;
+  }
+
+  function renderGalleryPlaceholders(grid) {
+    grid.replaceChildren();
+    ["a", "b", "c", "d"].forEach(function (tone) {
+      const li = document.createElement("li");
+      li.className = "gallery-tile is-placeholder is-" + tone;
+      const art = document.createElement("div");
+      art.className = "gallery-art";
+      art.setAttribute("aria-hidden", "true");
+      const rune = document.createElement("span");
+      rune.className = "gallery-rune";
+      art.appendChild(rune);
+      const caption = document.createElement("p");
+      caption.className = "gallery-caption";
+      caption.textContent = "Screenshot folgt";
+      li.append(art, caption);
+      grid.appendChild(li);
+    });
+  }
+
   function renderGallery() {
     const grid = document.getElementById("gallery-grid");
     if (!grid) return;
-    const list = arcConfig().galleryImages;
-    gallery = [];
-    if (!Array.isArray(list)) return;
-    list.forEach(function (item) {
-      if (!item || !isGallerySrc(item.src)) return;
-      const alt = typeof item.alt === "string" && item.alt.trim() ? item.alt.trim() : "Screenshot der Gilde";
-      gallery.push({ src: item.src.trim(), alt: alt });
-    });
-    if (!gallery.length) return;
+    const items = mergedGallery();
+    gallery = items;
+    if (!items.length) {
+      if (lightboxOpen()) closeLightbox();
+      renderGalleryPlaceholders(grid);
+      return;
+    }
+    const officer = isOfficer();
     grid.replaceChildren();
-    gallery.forEach(function (item, index) {
+    items.forEach(function (item, index) {
       const li = document.createElement("li");
+      li.className = "gallery-item";
       const button = document.createElement("button");
       button.type = "button";
       button.className = "gallery-tile";
@@ -1826,12 +1954,408 @@
       img.alt = "";
       img.loading = "lazy";
       img.decoding = "async";
-      const caption = document.createElement("span");
-      caption.className = "gallery-caption";
-      caption.textContent = item.alt;
-      button.append(img, caption);
+      button.appendChild(img);
+      if (item.caption) {
+        const caption = document.createElement("span");
+        caption.className = "gallery-caption";
+        caption.textContent = item.caption;
+        button.appendChild(caption);
+      }
       li.appendChild(button);
+      if (officer && item.remote && item.id && item.path) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "gallery-delete";
+        remove.dataset.action = "delete-gallery";
+        remove.dataset.id = item.id;
+        remove.dataset.path = item.path;
+        remove.textContent = "Löschen";
+        remove.setAttribute("aria-label", item.caption ? "Löschen: " + item.caption : "Bild löschen");
+        li.appendChild(remove);
+      }
       grid.appendChild(li);
+    });
+  }
+
+  function loadGallery() {
+    if (!remote || typeof remote.from !== "function") return;
+    let request;
+    try {
+      request = remote.from("gallery_images").select("id, path, url, caption, created_at").order("created_at", { ascending: false });
+    } catch (err) {
+      return;
+    }
+    Promise.resolve(request).then(function (result) {
+      if (!result || result.error) return;
+      const next = [];
+      (result.data || []).forEach(function (row) {
+        const item = mapGalleryRow(row);
+        if (item) next.push(item);
+      });
+      galleryFromDb = next;
+      galleryDbReady = true;
+      renderGallery();
+    }).catch(function () { /* Tabelle fehlt oder ist nicht erreichbar: statische Bilder bleiben. */ });
+  }
+
+  function setGalleryStatus(message) {
+    const el = document.getElementById("gallery-status");
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+  }
+
+  function setGalleryBusy(busy) {
+    galleryBusy = busy;
+    const form = document.getElementById("gallery-upload-form");
+    const input = document.getElementById("gallery-file");
+    const caption = document.getElementById("gallery-caption");
+    if (form) form.classList.toggle("is-busy", busy);
+    if (input) input.disabled = busy;
+    if (caption) caption.readOnly = busy;
+  }
+
+  function galleryCaptionValue() {
+    const input = document.getElementById("gallery-caption");
+    if (!input) return null;
+    const value = input.value.trim();
+    if (!value) return null;
+    return value.slice(0, 200);
+  }
+
+  function galleryError(code) {
+    const err = new Error(code);
+    err.code = code;
+    return err;
+  }
+
+  function galleryErrorMessage(code) {
+    if (code === "type") return "Nur JPEG, PNG, WebP oder GIF sind erlaubt.";
+    if (code === "decode") return "Dieses Bild konnte nicht gelesen werden.";
+    if (code === "size") return "Das Bild ist größer als 10 MB und ließ sich nicht genug verkleinern.";
+    if (code === "auth") return "Nur Offiziere und Administratoren dürfen die Galerie ändern.";
+    if (code === "missing") return "Die Galerie ist noch nicht eingerichtet.";
+    if (code === "row") return "Das Bild konnte nicht in der Galerie gespeichert werden.";
+    return "Das Bild konnte nicht hochgeladen werden.";
+  }
+
+  function galleryFailureCode(error, fallback) {
+    if (!error) return fallback;
+    const code = String(error.code || "");
+    const message = String(error.message || error.error || "").toLowerCase();
+    const status = Number(error.status || error.statusCode || 0);
+    if (
+      code === "PGRST205" ||
+      code === "42P01" ||
+      code === "PGRST204" ||
+      message.indexOf("bucket not found") !== -1 ||
+      (message.indexOf("gallery_images") !== -1 && (message.indexOf("schema cache") !== -1 || message.indexOf("does not exist") !== -1 || message.indexOf("could not find") !== -1))
+    ) {
+      return "missing";
+    }
+    if (status === 413 || message.indexOf("payload too large") !== -1 || message.indexOf("file size") !== -1 || message.indexOf("exceeded") !== -1) {
+      return "size";
+    }
+    if (message.indexOf("mime") !== -1) return "type";
+    if (status === 401 || status === 403 || code === "42501" || message.indexOf("row-level security") !== -1 || message.indexOf("permission") !== -1 || message.indexOf("not allowed") !== -1) {
+      return "auth";
+    }
+    return fallback;
+  }
+
+  function galleryStorageMissing(error) {
+    if (!error) return false;
+    const status = Number(error.status || error.statusCode || 0);
+    const message = String(error.message || "").toLowerCase();
+    return status === 404 || message.indexOf("not found") !== -1;
+  }
+
+  function galleryTypeOf(file) {
+    if (!file) return "";
+    const mime = String(file.type || "").toLowerCase();
+    if (mime === "image/jpg" || mime === "image/jpeg" || mime === "image/pjpeg") return "image/jpeg";
+    if (mime === "image/png" || mime === "image/webp" || mime === "image/gif") return mime;
+    if (mime) return "";
+    const name = String(file.name || "").toLowerCase();
+    if (/\.jpe?g$/.test(name)) return "image/jpeg";
+    if (/\.png$/.test(name)) return "image/png";
+    if (/\.webp$/.test(name)) return "image/webp";
+    if (/\.gif$/.test(name)) return "image/gif";
+    return "";
+  }
+
+  function galleryExt(type) {
+    if (type === "image/png") return "png";
+    if (type === "image/webp") return "webp";
+    if (type === "image/gif") return "gif";
+    return "jpg";
+  }
+
+  function canvasSupportsWebp() {
+    if (galleryWebp !== null) return galleryWebp;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      galleryWebp = canvas.toDataURL("image/webp").indexOf("data:image/webp") === 0;
+    } catch (err) {
+      galleryWebp = false;
+    }
+    return galleryWebp;
+  }
+
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise(function (resolve, reject) {
+      try {
+        canvas.toBlob(function (blob) { resolve(blob || null); }, type, quality);
+      } catch (err) {
+        reject(galleryError("decode"));
+      }
+    });
+  }
+
+  function decodeGalleryImageElement(file) {
+    return new Promise(function (resolve, reject) {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(galleryError("decode"));
+      };
+      img.src = url;
+    });
+  }
+
+  function decodeGalleryImage(file) {
+    if (typeof createImageBitmap === "function") {
+      return Promise.resolve().then(function () {
+        return createImageBitmap(file, { imageOrientation: "from-image" });
+      }).catch(function () {
+        return decodeGalleryImageElement(file);
+      });
+    }
+    return decodeGalleryImageElement(file);
+  }
+
+  function closeDecodedImage(image) {
+    if (image && typeof image.close === "function") {
+      try { image.close(); } catch (err) { /* Bitmap ist bereits geschlossen. */ }
+    }
+  }
+
+  function blobAsFile(blob, mime) {
+    const type = blob.type === "image/webp" || mime === "image/webp" ? "image/webp" : "image/jpeg";
+    return new File([blob], "bild." + galleryExt(type), { type: type });
+  }
+
+  function encodeScaledGallery(image, width, height) {
+    const scale = width > GALLERY_MAX_WIDTH ? GALLERY_MAX_WIDTH / width : 1;
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+    if (targetWidth * targetHeight > 4096 * 4096) return Promise.reject(galleryError("size"));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return Promise.reject(galleryError("decode"));
+    ctx.fillStyle = "#10080c";
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+    ctx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+    const first = canvasSupportsWebp() ? "image/webp" : "image/jpeg";
+    const qualities = [0.86, 0.72, 0.58, 0.44];
+
+    function attempt(kind, index) {
+      if (index >= qualities.length) {
+        if (kind === "image/webp") return attempt("image/jpeg", 0);
+        return Promise.reject(galleryError("size"));
+      }
+      return canvasToBlob(canvas, kind, qualities[index]).then(function (blob) {
+        if (!blob || (blob.type && blob.type !== kind) || blob.size > GALLERY_MAX_BYTES) {
+          return attempt(kind, index + 1);
+        }
+        return blobAsFile(blob, kind);
+      });
+    }
+
+    return attempt(first, 0);
+  }
+
+  function prepareGalleryFile(file) {
+    const type = galleryTypeOf(file);
+    if (!type) return Promise.reject(galleryError("type"));
+    if (file.size > 40 * 1024 * 1024) return Promise.reject(galleryError("size"));
+    return decodeGalleryImage(file).then(function (image) {
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      if (!width || !height) {
+        closeDecodedImage(image);
+        return Promise.reject(galleryError("decode"));
+      }
+      if (width <= GALLERY_MAX_WIDTH && file.size <= GALLERY_MAX_BYTES) {
+        closeDecodedImage(image);
+        if (file.type === type) return file;
+        return new File([file], "bild." + galleryExt(type), { type: type });
+      }
+      return encodeScaledGallery(image, width, height).then(function (out) {
+        closeDecodedImage(image);
+        return out;
+      }, function (err) {
+        closeDecodedImage(image);
+        throw err;
+      });
+    });
+  }
+
+  function newGalleryObjectPath(type) {
+    let id = "";
+    if (window.crypto && typeof crypto.randomUUID === "function") id = crypto.randomUUID();
+    else id = Date.now().toString(16) + Math.random().toString(16).slice(2);
+    return id + "." + galleryExt(type);
+  }
+
+  function sendGalleryFile(file, caption) {
+    const objectPath = newGalleryObjectPath(file.type);
+    return remote.storage.from("gallery").upload(objectPath, file, {
+      contentType: file.type || "image/jpeg",
+      cacheControl: "3600",
+      upsert: false,
+    }).then(function (uploaded) {
+      if (!uploaded || uploaded.error) throw galleryError(galleryFailureCode(uploaded && uploaded.error, "storage"));
+      const pub = remote.storage.from("gallery").getPublicUrl(objectPath);
+      const url = pub && pub.data ? pub.data.publicUrl : "";
+      if (!isGalleryPublicUrl(url, objectPath)) {
+        return remote.storage.from("gallery").remove([objectPath]).then(function () {
+          throw galleryError("storage");
+        });
+      }
+      const row = { path: objectPath, url: url, caption: caption };
+      if (currentUser && currentUser.id) row.uploaded_by = currentUser.id;
+      return remote.from("gallery_images").insert(row).select("id").single().then(function (inserted) {
+        if (!inserted || inserted.error || !inserted.data) {
+          return remote.storage.from("gallery").remove([objectPath]).then(function () {
+            throw galleryError(galleryFailureCode(inserted && inserted.error, "row"));
+          });
+        }
+      });
+    });
+  }
+
+  function uploadGalleryFiles(list) {
+    if (galleryBusy) return;
+    if (!isOfficer()) {
+      notify("Nur Offiziere und Administratoren dürfen Bilder hochladen.", "error");
+      return;
+    }
+    if (!remote || !remoteReady) {
+      notify("Hochladen ist gerade nicht möglich.", "error");
+      return;
+    }
+    const files = Array.prototype.slice.call(list || []);
+    if (!files.length) return;
+    let skipped = 0;
+    if (files.length > GALLERY_BATCH) {
+      skipped = files.length - GALLERY_BATCH;
+      files.length = GALLERY_BATCH;
+    }
+    const caption = galleryCaptionValue();
+    setGalleryBusy(true);
+    let ok = 0;
+    let failed = 0;
+    let reason = "";
+    let index = 0;
+
+    function finish() {
+      setGalleryBusy(false);
+      setGalleryStatus("");
+      const limitNote = skipped ? " Es werden höchstens " + GALLERY_BATCH + " Bilder auf einmal hochgeladen." : "";
+      if (ok && !failed) {
+        const input = document.getElementById("gallery-caption");
+        if (input) input.value = "";
+        notify((ok === 1 ? "Bild hochgeladen." : ok + " Bilder hochgeladen.") + limitNote, "info");
+        loadGallery();
+        return;
+      }
+      if (ok) {
+        notify(ok + " von " + (ok + failed) + " Bildern hochgeladen." + (reason ? " " + reason : "") + limitNote, "error");
+        loadGallery();
+        return;
+      }
+      notify((reason || "Kein Bild konnte hochgeladen werden.") + limitNote, "error");
+    }
+
+    function next() {
+      if (index >= files.length) {
+        finish();
+        return;
+      }
+      const file = files[index];
+      const position = index + 1;
+      index += 1;
+      setGalleryStatus("Bild " + position + " von " + files.length + " wird vorbereitet…");
+      prepareGalleryFile(file).then(function (prepared) {
+        setGalleryStatus("Bild " + position + " von " + files.length + " wird hochgeladen…");
+        return sendGalleryFile(prepared, caption);
+      }).then(function () {
+        ok += 1;
+        next();
+      }).catch(function (err) {
+        failed += 1;
+        if (!reason) reason = galleryErrorMessage(err && err.code);
+        next();
+      });
+    }
+
+    next();
+  }
+
+  function deleteGalleryImage(id, objectPath) {
+    if (galleryBusy) {
+      notify("Bitte warten, bis der Upload fertig ist.", "error");
+      return;
+    }
+    if (!isOfficer()) {
+      notify("Nur Offiziere und Administratoren dürfen Bilder löschen.", "error");
+      return;
+    }
+    if (!remote || !remoteReady) {
+      notify("Löschen ist gerade nicht möglich.", "error");
+      return;
+    }
+    if (!isGalleryId(id) || !isGalleryObjectPath(objectPath)) {
+      notify("Dieses Bild kann hier nicht gelöscht werden.", "error");
+      return;
+    }
+    if (!window.confirm("Dieses Bild wirklich aus der Galerie löschen?")) return;
+    setGalleryBusy(true);
+    setGalleryStatus("Bild wird gelöscht…");
+    remote.storage.from("gallery").remove([objectPath]).then(function (removed) {
+      if (removed && removed.error && !galleryStorageMissing(removed.error)) {
+        throw galleryError(galleryFailureCode(removed.error, "storage"));
+      }
+      return remote.from("gallery_images").delete().eq("id", id);
+    }).then(function (deleted) {
+      if (!deleted || deleted.error) throw galleryError(galleryFailureCode(deleted && deleted.error, "row"));
+      galleryFromDb = galleryFromDb.filter(function (item) { return item.id !== id; });
+      if (lightboxOpen()) closeLightbox();
+      renderGallery();
+      notify("Bild gelöscht.", "info");
+      loadGallery();
+    }).catch(function (err) {
+      notify(err && err.code === "missing" ? galleryErrorMessage("missing") : "Das Bild konnte nicht gelöscht werden.", "error");
+    }).then(function () {
+      setGalleryBusy(false);
+      setGalleryStatus("");
     });
   }
 
@@ -2134,6 +2658,7 @@
     renderClassicRuns();
     renderChat();
     renderLeadership();
+    renderGallery();
   }
 
   function renderLeadership() {
@@ -2383,6 +2908,7 @@
       notify(OFFLINE_MSG, "error");
       return;
     }
+    loadGallery();
     if (!authReady) {
       authReady = true;
       remote.auth.onAuthStateChange(function (event, session) {

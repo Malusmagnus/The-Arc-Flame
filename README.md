@@ -46,9 +46,13 @@ Die Webhook-URL liegt im öffentlichen JavaScript und ist für jeden Besucher si
 
 ## Galerie
 
-Die Sektion **Galerie** liest `galleryImages` aus `js/config.js`. Solange die Liste leer ist, zeigt die Seite Platzhalter mit dem Hinweis **Screenshot folgt**. Das sind keine Spielbilder.
+Die Sektion **Galerie** zeigt zuerst die Zeilen aus `public.gallery_images` (neueste zuerst) und danach die statischen Einträge aus `galleryImages` in `js/config.js`. Dieselbe Adresse wird nicht doppelt angezeigt. Solange beides leer ist, bleiben die Platzhalter mit **Screenshot folgt**.
 
-So kommt ein echtes Bild hinein:
+Offiziere und Administratoren sehen **Bild hochladen**. Mehrere Dateien sind erlaubt, die Bildunterschrift ist optional und gilt für den ganzen Vorgang. Bilder, die breiter als 1920 Pixel sind, verkleinert der Browser vorher auf JPEG oder WebP. **Löschen** entfernt die Datei im Bucket `gallery` und die Zeile. Ein Klick auf das Bild öffnet die Lightbox (Escape, Pfeiltasten, Wischen).
+
+Fehlt die Tabelle noch, bleibt die Seite bei den statischen Bildern und stürzt nicht ab. Dafür einmal `supabase/gallery.sql` ausführen (dieselben Anweisungen stehen in `supabase/schema.sql`). Siehe `supabase/README.md`.
+
+Statische Bilder bleiben möglich:
 
 1. Datei nach `assets/gallery/` legen (webp, png, jpg oder gif). Flache Dateinamen, kein Unterordner.
 2. In `js/config.js` eintragen, zum Beispiel:
@@ -59,9 +63,7 @@ galleryImages: [
 ],
 ```
 
-3. Auf `main` pushen. WebP ist die schlanke Variante; png und jpg funktionieren genauso.
-
-Ein Klick öffnet das Bild in einer Lightbox (Escape, Pfeiltasten, Wischen).
+3. Auf `main` pushen. Diese Dateien haben kein **Löschen** auf der Seite.
 
 ## Videos von Malusmagnus
 
@@ -105,10 +107,11 @@ robots.txt          Crawler-Hinweise, Verweis auf die Sitemap
 sitemap.xml         Sitemap der Startseite
 css/input.css       Tailwind-Quelle
 css/styles.css      fertiges Stylesheet
-js/config.js        Discord, Supabase, Galerie und YouTube
+js/config.js        Discord, Supabase, statische Galerie und YouTube
 js/defaults.js      Startwerte, falls Supabase nicht erreichbar ist
 js/app.js           Verhalten
-supabase/schema.sql Tabellen, Rechte und Startdaten
+supabase/schema.sql Tabellen, Rechte, Startdaten und Galerie
+supabase/gallery.sql Galerie-Bucket, Tabelle und Rechte (erneut ausführbar)
 supabase/README.md  Einstellungen im Supabase-Dashboard
 assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
 assets/gallery/     Screenshots für die Galerie

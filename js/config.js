@@ -9,7 +9,8 @@ window.ARC_CONFIG = {
      Schreibrechte regelt die Datenbank, nicht dieser Schlüssel. */
   supabaseUrl: "https://asbhzoskbbifiuluijwl.supabase.co",
   supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzYmh6b3NrYmJpZml1bHVpandsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0MTYyMTIsImV4cCI6MjEwNTk5MjIxMn0.bmOULxoOVViR7WWiXWeawcufNKMOH3rNZsWbSHBwUU0",
-  /* Leer lassen, bis echte Screenshots in assets/gallery/ liegen.
+  /* Statische Bilder, zusätzlich zu den hochgeladenen oder als Ersatz,
+     solange die Tabelle gallery_images noch nicht existiert.
      Eintrag: { src: "assets/gallery/dateiname.webp", alt: "Kurze Beschreibung" } */
   galleryImages: [],
   /* Beide leer: der Abschnitt „Videos von Malusmagnus“ bleibt ausgeblendet.
