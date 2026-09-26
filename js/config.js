@@ -5,6 +5,10 @@
 window.ARC_CONFIG = {
   applicationWebhookUrl: "https://discord.com/api/webhooks/1553356945476427806/abNAiUCIk7I3IF0evg19Rb_aRbO0L4DrDIUQHuV3BzP0GhdD3THerXwUNVdSo4bZV5zX",
   discordInviteUrl: "https://discord.gg/g6TP8sBZQ",
+  /* Öffentlicher Supabase-Schlüssel. Er darf im Browser stehen;
+     Schreibrechte regelt die Datenbank, nicht dieser Schlüssel. */
+  supabaseUrl: "https://asbhzoskbbifiuluijwl.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzYmh6b3NrYmJpZml1bHVpandsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0MTYyMTIsImV4cCI6MjEwNTk5MjIxMn0.bmOULxoOVViR7WWiXWeawcufNKMOH3rNZsWbSHBwUU0",
   /* Leer lassen, bis echte Screenshots in assets/gallery/ liegen.
      Eintrag: { src: "assets/gallery/dateiname.webp", alt: "Kurze Beschreibung" } */
   galleryImages: [],
