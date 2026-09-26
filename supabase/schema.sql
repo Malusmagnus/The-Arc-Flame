@@ -1,7 +1,10 @@
 -- The Arc Flame: Tabellen, Rechte und Startdaten.
 -- Im Supabase-SQL-Editor ausführen. Die Datei ist erneut ausführbar:
 -- vorhandene Tabellen, Richtlinien und gefüllte Starttabellen bleiben erhalten.
--- Neue Konten starten als Mitglied. Die erste Admin-Rolle setzt die letzte Zeile.
+-- Neue Konten starten als Mitglied und warten auf Freischaltung (status pending).
+-- Bestehende Profile werden beim ersten Anlegen der Status-Spalte freigeschaltet.
+-- Die erste Admin-Rolle setzt die letzte Zeile. Offiziere und Administratoren
+-- gelten immer als freigeschaltet. Dieselben Freischalt-Regeln liegen in approval.sql.
 -- Die Galerie steht direkt davor; dieselben Anweisungen liegen in gallery.sql.
 
 create extension if not exists pgcrypto;
@@ -11,6 +14,9 @@ create table if not exists public.profiles (
   display_name text not null,
   role text not null default 'member',
   email text not null default '',
+  status text not null default 'pending',
+  approved_by uuid references auth.users (id) on delete set null,
+  approved_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -86,6 +92,37 @@ create table if not exists public.chat_messages (
   created_at timestamptz not null default now()
 );
 
+alter table public.profiles add column if not exists status text;
+
+update public.profiles
+set status = 'approved'
+where status is null;
+
+alter table public.profiles alter column status set default 'pending';
+alter table public.profiles alter column status set not null;
+
+alter table public.profiles drop constraint if exists profiles_status_check;
+alter table public.profiles add constraint profiles_status_check
+  check (status in ('pending', 'approved', 'rejected'));
+
+alter table public.profiles add column if not exists approved_by uuid;
+alter table public.profiles add column if not exists approved_at timestamptz;
+
+do $fk$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_approved_by_fkey'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles
+      add constraint profiles_approved_by_fkey
+      foreign key (approved_by) references auth.users (id) on delete set null;
+  end if;
+end
+$fk$;
+
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check check (role in ('member', 'officer', 'admin'));
 alter table public.profiles drop constraint if exists profiles_name_len;
@@ -149,6 +186,7 @@ create index if not exists roster_front_sort_idx on public.roster (front, sort_o
 create index if not exists leadership_sort_idx on public.leadership (sort_order);
 create index if not exists chat_messages_created_idx on public.chat_messages (created_at);
 create index if not exists mplus_signups_group_idx on public.mplus_signups (group_id);
+create index if not exists profiles_status_idx on public.profiles (status);
 
 create or replace function public.is_officer()
 returns boolean
@@ -176,6 +214,23 @@ as $$
   );
 $$;
 
+create or replace function public.is_approved()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+      and (
+        role in ('officer', 'admin')
+        or status = 'approved'
+      )
+  );
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -195,8 +250,8 @@ begin
   if chosen = '' then
     chosen := 'Mitglied';
   end if;
-  insert into public.profiles (id, display_name, role, email)
-  values (new.id, chosen, 'member', coalesce(new.email, ''))
+  insert into public.profiles (id, display_name, role, email, status)
+  values (new.id, chosen, 'member', coalesce(new.email, ''), 'pending')
   on conflict (id) do nothing;
   return new;
 end;
@@ -215,6 +270,18 @@ begin
   if new.email is distinct from old.email then
     raise exception 'Die E-Mail kann hier nicht geändert werden.';
   end if;
+  if new.created_at is distinct from old.created_at then
+    raise exception 'Das Registrierungsdatum kann nicht geändert werden.';
+  end if;
+  if new.display_name is distinct from old.display_name and auth.uid() is distinct from old.id then
+    if auth.uid() is null then
+      if session_user not in ('postgres', 'supabase_admin') then
+        raise exception 'Der Name kann so nicht geändert werden.';
+      end if;
+    elsif not public.is_admin() then
+      raise exception 'Nur Administratoren dürfen fremde Namen ändern.';
+    end if;
+  end if;
   if new.role is distinct from old.role then
     if auth.uid() is null then
       if session_user not in ('postgres', 'supabase_admin') then
@@ -227,6 +294,27 @@ begin
     elsif new.role not in ('member', 'officer', 'admin') then
       raise exception 'Ungültige Rolle.';
     end if;
+  end if;
+  if new.status is distinct from old.status then
+    if auth.uid() is null then
+      if session_user not in ('postgres', 'supabase_admin') then
+        raise exception 'Statuswechsel ohne Anmeldung ist nicht erlaubt.';
+      end if;
+    elsif auth.uid() = old.id then
+      raise exception 'Der eigene Status kann nicht geändert werden.';
+    elsif not public.is_officer() then
+      raise exception 'Nur Offiziere dürfen den Status ändern.';
+    elsif new.status not in ('pending', 'approved', 'rejected') then
+      raise exception 'Ungültiger Status.';
+    else
+      new.approved_by := auth.uid();
+      new.approved_at := case when new.status = 'pending' then null else now() end;
+    end if;
+  elsif auth.uid() is not null and (
+    new.approved_by is distinct from old.approved_by
+    or new.approved_at is distinct from old.approved_at
+  ) then
+    raise exception 'Freigabe-Zeitpunkt kann nicht allein geändert werden.';
   end if;
   return new;
 end;
@@ -257,6 +345,9 @@ begin
     new.author := btrim(new.author);
     new.body := btrim(new.body);
     return new;
+  end if;
+  if not public.is_approved() then
+    raise exception 'Dein Konto ist noch nicht freigeschaltet.';
   end if;
   new.user_id := auth.uid();
   select display_name into name from public.profiles where id = auth.uid();
@@ -302,12 +393,17 @@ as $$
 begin
   if tg_op = 'INSERT' then
     if auth.uid() is not null then
+      if not public.is_approved() then
+        raise exception 'Dein Konto ist noch nicht freigeschaltet.';
+      end if;
       new.created_by := auth.uid();
     elsif session_user not in ('postgres', 'supabase_admin') then
       raise exception 'Anmeldung erforderlich.';
     end if;
   elsif new.created_by is distinct from old.created_by then
     raise exception 'Der Ersteller kann nicht geändert werden.';
+  elsif auth.uid() is not null and not public.is_approved() then
+    raise exception 'Dein Konto ist noch nicht freigeschaltet.';
   end if;
   return new;
 end;
@@ -320,6 +416,9 @@ security definer
 set search_path = public
 as $$
 begin
+  if auth.uid() is not null and not public.is_approved() then
+    raise exception 'Dein Konto ist noch nicht freigeschaltet.';
+  end if;
   if tg_op = 'INSERT' then
     if auth.uid() is not null then
       new.created_by := auth.uid();
@@ -344,6 +443,9 @@ declare
 begin
   if auth.uid() is null then
     raise exception 'Anmeldung erforderlich.';
+  end if;
+  if not public.is_approved() then
+    raise exception 'Dein Konto ist noch nicht freigeschaltet.';
   end if;
   new.user_id := auth.uid();
   select display_name into name from public.profiles where id = auth.uid();
@@ -387,6 +489,7 @@ create trigger mplus_signups_prepare
 
 alter function public.is_officer() set row_security = off;
 alter function public.is_admin() set row_security = off;
+alter function public.is_approved() set row_security = off;
 alter function public.handle_new_user() set row_security = off;
 alter function public.guard_profile_update() set row_security = off;
 alter function public.prepare_chat_message() set row_security = off;
@@ -418,19 +521,31 @@ alter table public.chat_messages force row level security;
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles
   for select to authenticated
-  using (id = auth.uid() or public.is_admin());
+  using (id = auth.uid() or public.is_officer());
 
 drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles
   for update to authenticated
   using (id = auth.uid())
-  with check (id = auth.uid() and role = (select p.role from public.profiles p where p.id = auth.uid()));
+  with check (
+    id = auth.uid()
+    and role = (select p.role from public.profiles p where p.id = auth.uid())
+    and status = (select p.status from public.profiles p where p.id = auth.uid())
+    and approved_by is not distinct from (select p.approved_by from public.profiles p where p.id = auth.uid())
+    and approved_at is not distinct from (select p.approved_at from public.profiles p where p.id = auth.uid())
+  );
 
 drop policy if exists profiles_update_admin on public.profiles;
 create policy profiles_update_admin on public.profiles
   for update to authenticated
   using (public.is_admin() and id <> auth.uid())
   with check (public.is_admin() and id <> auth.uid());
+
+drop policy if exists profiles_update_officer on public.profiles;
+create policy profiles_update_officer on public.profiles
+  for update to authenticated
+  using (public.is_officer() and id <> auth.uid())
+  with check (public.is_officer() and id <> auth.uid());
 
 drop policy if exists members_select on public.members;
 create policy members_select on public.members
@@ -440,18 +555,18 @@ create policy members_select on public.members
 drop policy if exists members_insert on public.members;
 create policy members_insert on public.members
   for insert to authenticated
-  with check (public.is_officer());
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists members_update on public.members;
 create policy members_update on public.members
   for update to authenticated
-  using (public.is_officer())
-  with check (public.is_officer());
+  using (public.is_officer() and public.is_approved())
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists members_delete on public.members;
 create policy members_delete on public.members
   for delete to authenticated
-  using (public.is_officer());
+  using (public.is_officer() and public.is_approved());
 
 drop policy if exists roster_select on public.roster;
 create policy roster_select on public.roster
@@ -461,18 +576,18 @@ create policy roster_select on public.roster
 drop policy if exists roster_insert on public.roster;
 create policy roster_insert on public.roster
   for insert to authenticated
-  with check (public.is_officer());
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists roster_update on public.roster;
 create policy roster_update on public.roster
   for update to authenticated
-  using (public.is_officer())
-  with check (public.is_officer());
+  using (public.is_officer() and public.is_approved())
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists roster_delete on public.roster;
 create policy roster_delete on public.roster
   for delete to authenticated
-  using (public.is_officer());
+  using (public.is_officer() and public.is_approved());
 
 drop policy if exists leadership_select on public.leadership;
 create policy leadership_select on public.leadership
@@ -482,18 +597,18 @@ create policy leadership_select on public.leadership
 drop policy if exists leadership_insert on public.leadership;
 create policy leadership_insert on public.leadership
   for insert to authenticated
-  with check (public.is_officer());
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists leadership_update on public.leadership;
 create policy leadership_update on public.leadership
   for update to authenticated
-  using (public.is_officer())
-  with check (public.is_officer());
+  using (public.is_officer() and public.is_approved())
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists leadership_delete on public.leadership;
 create policy leadership_delete on public.leadership
   for delete to authenticated
-  using (public.is_officer());
+  using (public.is_officer() and public.is_approved());
 
 drop policy if exists guild_info_select on public.guild_info;
 create policy guild_info_select on public.guild_info
@@ -503,8 +618,8 @@ create policy guild_info_select on public.guild_info
 drop policy if exists guild_info_update on public.guild_info;
 create policy guild_info_update on public.guild_info
   for update to authenticated
-  using (public.is_officer())
-  with check (public.is_officer());
+  using (public.is_officer() and public.is_approved())
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists mplus_groups_select on public.mplus_groups;
 create policy mplus_groups_select on public.mplus_groups
@@ -514,18 +629,21 @@ create policy mplus_groups_select on public.mplus_groups
 drop policy if exists mplus_groups_insert on public.mplus_groups;
 create policy mplus_groups_insert on public.mplus_groups
   for insert to authenticated
-  with check (created_by = auth.uid());
+  with check (created_by = auth.uid() and public.is_approved());
 
 drop policy if exists mplus_groups_update on public.mplus_groups;
 create policy mplus_groups_update on public.mplus_groups
   for update to authenticated
-  using (created_by = auth.uid())
-  with check (created_by = auth.uid());
+  using (created_by = auth.uid() and public.is_approved())
+  with check (created_by = auth.uid() and public.is_approved());
 
 drop policy if exists mplus_groups_delete on public.mplus_groups;
 create policy mplus_groups_delete on public.mplus_groups
   for delete to authenticated
-  using (created_by = auth.uid() or public.is_officer());
+  using (
+    (created_by = auth.uid() and public.is_approved())
+    or public.is_officer()
+  );
 
 drop policy if exists mplus_signups_select on public.mplus_signups;
 create policy mplus_signups_select on public.mplus_signups
@@ -535,17 +653,20 @@ create policy mplus_signups_select on public.mplus_signups
 drop policy if exists mplus_signups_insert on public.mplus_signups;
 create policy mplus_signups_insert on public.mplus_signups
   for insert to authenticated
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() and public.is_approved());
 
 drop policy if exists mplus_signups_delete on public.mplus_signups;
 create policy mplus_signups_delete on public.mplus_signups
   for delete to authenticated
   using (
-    user_id = auth.uid()
+    (user_id = auth.uid() and public.is_approved())
     or public.is_officer()
-    or exists (
-      select 1 from public.mplus_groups g
-      where g.id = group_id and g.created_by = auth.uid()
+    or (
+      public.is_approved()
+      and exists (
+        select 1 from public.mplus_groups g
+        where g.id = group_id and g.created_by = auth.uid()
+      )
     )
   );
 
@@ -557,37 +678,43 @@ create policy classic_runs_select on public.classic_runs
 drop policy if exists classic_runs_insert on public.classic_runs;
 create policy classic_runs_insert on public.classic_runs
   for insert to authenticated
-  with check (public.is_officer());
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists classic_runs_update on public.classic_runs;
 create policy classic_runs_update on public.classic_runs
   for update to authenticated
-  using (public.is_officer())
-  with check (public.is_officer());
+  using (public.is_officer() and public.is_approved())
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists classic_runs_delete on public.classic_runs;
 create policy classic_runs_delete on public.classic_runs
   for delete to authenticated
-  using (public.is_officer());
+  using (public.is_officer() and public.is_approved());
 
+-- Lesen bleibt für Besucher offen, außer beim Chat: der ist nur für
+-- freigeschaltete Konten. Offiziere und Administratoren gelten immer
+-- als freigeschaltet.
 drop policy if exists chat_messages_select on public.chat_messages;
 create policy chat_messages_select on public.chat_messages
-  for select to anon, authenticated
-  using (true);
+  for select to authenticated
+  using (public.is_approved());
 
 drop policy if exists chat_messages_insert on public.chat_messages;
 create policy chat_messages_insert on public.chat_messages
   for insert to authenticated
-  with check (user_id = auth.uid());
+  with check (user_id = auth.uid() and public.is_approved());
 
 drop policy if exists chat_messages_delete on public.chat_messages;
 create policy chat_messages_delete on public.chat_messages
   for delete to authenticated
-  using (user_id = auth.uid() or public.is_officer());
+  using (
+    (user_id = auth.uid() and public.is_approved())
+    or public.is_officer()
+  );
 
 revoke all on table public.profiles from public, anon, authenticated;
 grant select on table public.profiles to authenticated;
-grant update (display_name, role) on table public.profiles to authenticated;
+grant update (display_name, role, status, approved_by, approved_at) on table public.profiles to authenticated;
 
 revoke all on table public.members from public, anon, authenticated;
 grant select on table public.members to anon, authenticated;
@@ -623,9 +750,11 @@ grant insert, delete on table public.chat_messages to authenticated;
 
 revoke all on function public.is_officer() from public;
 revoke all on function public.is_admin() from public;
+revoke all on function public.is_approved() from public;
 revoke all on function public.post_application_note(text, text) from public;
 grant execute on function public.is_officer() to anon, authenticated;
 grant execute on function public.is_admin() to anon, authenticated;
+grant execute on function public.is_approved() to anon, authenticated;
 grant execute on function public.post_application_note(text, text) to anon, authenticated;
 
 alter table public.chat_messages replica identity full;
@@ -763,7 +892,8 @@ where not exists (select 1 from public.chat_messages);
 -- Galerie: dieselben Anweisungen wie in supabase/gallery.sql.
 
 -- The Arc Flame: Galerie.
--- Voraussetzung: public.is_officer() aus schema.sql (Rolle officer oder admin).
+-- Voraussetzung: public.is_officer() und public.is_approved() aus schema.sql
+-- oder approval.sql (Rolle officer oder admin gilt als freigeschaltet).
 -- Erneut ausführbar. Dieselben Anweisungen stehen auch in schema.sql.
 --
 -- psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/gallery.sql
@@ -791,6 +921,15 @@ set
 where id = 'gallery';
 
 -- storage.objects hat in Supabase bereits RLS. Nicht abschalten.
+-- Bricht ab, bevor Richtlinien gelöscht werden, falls die Freischaltung fehlt.
+do $need_approved$
+begin
+  if to_regprocedure('public.is_approved()') is null then
+    raise exception 'public.is_approved() fehlt. Zuerst supabase/approval.sql oder schema.sql ausführen.';
+  end if;
+end
+$need_approved$;
+
 drop policy if exists gallery_objects_select on storage.objects;
 create policy gallery_objects_select on storage.objects
   for select to anon, authenticated
@@ -799,12 +938,12 @@ create policy gallery_objects_select on storage.objects
 drop policy if exists gallery_objects_insert on storage.objects;
 create policy gallery_objects_insert on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'gallery' and public.is_officer());
+  with check (bucket_id = 'gallery' and public.is_officer() and public.is_approved());
 
 drop policy if exists gallery_objects_delete on storage.objects;
 create policy gallery_objects_delete on storage.objects
   for delete to authenticated
-  using (bucket_id = 'gallery' and public.is_officer());
+  using (bucket_id = 'gallery' and public.is_officer() and public.is_approved());
 
 create table if not exists public.gallery_images (
   id uuid primary key default gen_random_uuid(),
@@ -846,6 +985,9 @@ begin
     return new;
   end if;
   if auth.uid() is not null then
+    if not public.is_approved() then
+      raise exception 'Dein Konto ist noch nicht freigeschaltet.';
+    end if;
     new.uploaded_by := auth.uid();
   elsif session_user not in ('postgres', 'supabase_admin') then
     raise exception 'Anmeldung erforderlich.';
@@ -877,12 +1019,12 @@ create policy gallery_images_select on public.gallery_images
 drop policy if exists gallery_images_insert on public.gallery_images;
 create policy gallery_images_insert on public.gallery_images
   for insert to authenticated
-  with check (public.is_officer());
+  with check (public.is_officer() and public.is_approved());
 
 drop policy if exists gallery_images_delete on public.gallery_images;
 create policy gallery_images_delete on public.gallery_images
   for delete to authenticated
-  using (public.is_officer());
+  using (public.is_officer() and public.is_approved());
 
 revoke all on table public.gallery_images from public, anon, authenticated;
 grant select on table public.gallery_images to anon, authenticated;
@@ -891,4 +1033,6 @@ grant insert, delete on table public.gallery_images to authenticated;
 revoke all on function public.prepare_gallery_image() from public;
 
 
--- update public.profiles set role = 'admin' where id = (select id from auth.users where email = 'deine@email.de');
+-- update public.profiles
+-- set role = 'admin', status = 'approved', approved_at = now()
+-- where id = (select id from auth.users where email = 'deine@email.de');

@@ -18,6 +18,12 @@
 
   const OFFLINE_MSG = "Die Gildendaten konnten nicht geladen werden. Es werden die Standardwerte angezeigt.";
   const SAVE_FAIL = "Speichern ist gerade nicht möglich. Die Änderung wurde nicht übernommen.";
+  const PENDING_NOTICE = "Deine Registrierung wartet auf Freischaltung durch einen Offizier.";
+  const REJECTED_NOTICE = "Deine Registrierung wurde abgelehnt.";
+  const DISCORD_NOTE = "Discord-Zugang gibt es nach der Freischaltung.";
+  const CHAT_PUBLIC_HINT = "Nachrichten sind für alle Besucher sichtbar. Zum Schreiben bitte anmelden.";
+  const CHAT_MEMBER_HINT = "Der Gilden-Chat ist für freigeschaltete Mitglieder sichtbar.";
+  const CHAT_LOCKED_HINT = "Der Gilden-Chat öffnet sich nach der Freischaltung.";
 
   const FOREVER_IDS = new Set([
     "content-forever",
@@ -95,6 +101,7 @@
   const leadership = clone(DEFAULTS.leadership || []);
   const guildInfo = clone(DEFAULTS.guildInfo || { col1: "", col2: "", col3: "" });
   let currentUser = null;
+  let approvalEnforced = false;
 
   document.addEventListener("DOMContentLoaded", boot);
 
@@ -102,7 +109,7 @@
 
   function boot() {
     bindStaticEvents();
-    applyDiscordLinks();
+    renderDiscordSlots();
     renderGallery();
     renderVideos();
     setupReveal();
@@ -276,6 +283,18 @@
     }
     if (action === "open-roles") {
       openRolesModal();
+      return;
+    }
+    if (action === "open-approvals") {
+      goTo("freischaltungen");
+      return;
+    }
+    if (action === "approve-user" || action === "reject-user") {
+      setProfileStatus(
+        el.dataset.userId,
+        action === "approve-user" ? "approved" : "rejected",
+        el.dataset.userName || ""
+      );
       return;
     }
     if (action === "dismiss-notice") {
@@ -473,7 +492,7 @@
     if (currentUser) {
       const pill = document.createElement("div");
       pill.className =
-        "flex max-w-full items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs";
+        "flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs";
       const name = document.createElement("span");
       name.className = "truncate font-bold text-amber-400";
       const icon = document.createElement("i");
@@ -489,6 +508,19 @@
         roles.className = "inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-amber-400 hover:text-white";
         roles.textContent = "Rollen";
         pill.appendChild(roles);
+      }
+      if (approvalEnforced && isOfficer()) {
+        const approvals = document.createElement("button");
+        approvals.type = "button";
+        approvals.dataset.action = "open-approvals";
+        approvals.className = "inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-xs font-bold text-amber-400 hover:text-white";
+        approvals.appendChild(document.createTextNode("Freischaltungen"));
+        const badge = document.createElement("span");
+        badge.id = "approval-header-count";
+        badge.className = "inline-flex items-center rounded-full bg-red-600 px-2 py-1 text-xs font-bold text-white";
+        badge.hidden = true;
+        approvals.appendChild(badge);
+        pill.appendChild(approvals);
       }
       const logout = document.createElement("button");
       logout.type = "button";
@@ -515,9 +547,80 @@
   function syncPermissions() {
     document.querySelectorAll("[data-perm]").forEach(function (el) {
       const perm = el.dataset.perm;
-      const show = perm === "admin" ? isAdmin() : perm === "officer" ? isOfficer() : !!currentUser;
+      const show = perm === "admin" ? isAdmin() : perm === "officer" ? isOfficer() : isApproved();
       el.hidden = !show;
     });
+    syncAccessChrome();
+  }
+
+  function isApproved() {
+    if (!currentUser) return false;
+    if (!approvalEnforced) return true;
+    if (isOfficer()) return true;
+    if (currentUser.statusKnown === false) return true;
+    return currentUser.status === "approved";
+  }
+
+  function accessNotice() {
+    if (currentUser && currentUser.status === "rejected") return REJECTED_NOTICE;
+    return PENDING_NOTICE;
+  }
+
+  function canReadChat() {
+    if (!approvalEnforced) return true;
+    return isApproved();
+  }
+
+  function syncAccessChrome() {
+    syncApprovalBanner();
+    renderDiscordSlots();
+    syncChatGate();
+    syncApprovalSection();
+    renderChat();
+  }
+
+  function syncApprovalBanner() {
+    const banner = document.getElementById("approval-banner");
+    if (!banner) return;
+    const pending = approvalEnforced && currentUser && !isOfficer() && currentUser.status === "pending";
+    const rejected = approvalEnforced && currentUser && !isOfficer() && currentUser.status === "rejected";
+    if (!pending && !rejected) {
+      banner.hidden = true;
+      banner.textContent = "";
+      return;
+    }
+    banner.hidden = false;
+    banner.textContent = rejected ? REJECTED_NOTICE : PENDING_NOTICE;
+    banner.className = rejected
+      ? "border-b border-red-900/50 bg-slate-950 px-4 py-3 text-center text-sm text-red-400"
+      : "border-b border-amber-500/40 bg-slate-950 px-4 py-3 text-center text-sm text-amber-200";
+  }
+
+  function syncChatGate() {
+    const form = document.getElementById("chat-form");
+    const hint = document.getElementById("chat-hint");
+    const applyHint = document.getElementById("application-hint");
+    const locked = approvalEnforced && !isApproved();
+    if (form) form.hidden = locked;
+    if (hint) {
+      if (!approvalEnforced) hint.textContent = CHAT_PUBLIC_HINT;
+      else hint.textContent = isApproved() ? CHAT_MEMBER_HINT : CHAT_LOCKED_HINT;
+    }
+    if (applyHint) {
+      applyHint.textContent = approvalEnforced
+        ? "Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie liegt im Gilden-Chat für freigeschaltete Mitglieder."
+        : "Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie erscheint im gemeinsamen Gilden-Chat.";
+    }
+  }
+
+  function syncApprovalSection() {
+    const section = document.getElementById("freischaltungen");
+    if (!section) return;
+    const show = !!(approvalEnforced && isOfficer() && remote);
+    section.hidden = !show;
+    if (!show) return;
+    refreshReveal(section.parentElement || document);
+    loadApprovals();
   }
 
   function isOfficer() {
@@ -593,6 +696,11 @@
           notify(authErrorText(result.error), "error");
           return;
         }
+        const createdUser = result.data && result.data.user;
+        const identities = createdUser && createdUser.identities;
+        if (createdUser && (!Array.isArray(identities) || identities.length > 0)) {
+          postRegistrationNotice(displayName, email);
+        }
         if (result.data && result.data.session) {
           return adoptSession(result.data.session).then(function () {
             closeModal("auth-modal");
@@ -600,13 +708,16 @@
             syncAuthMode();
             updateAuthUI();
             renderPermissionSurfaces();
-            notify("Willkommen, du bist angemeldet.", "info");
+            if (remoteReady) refreshChat();
+            notify(approvalEnforced && currentUser && !isApproved() ? accessNotice() : "Willkommen, du bist angemeldet.", "info");
           });
         }
         closeModal("auth-modal");
         form.reset();
         syncAuthMode();
-        notify("Konto angelegt. Bitte bestätige die E-Mail, danach kannst du dich anmelden.", "info");
+        notify(approvalEnforced
+          ? "Konto angelegt. Bitte bestätige die E-Mail. " + PENDING_NOTICE
+          : "Konto angelegt. Bitte bestätige die E-Mail, danach kannst du dich anmelden.", "info");
       }).catch(function () {
         notify("Die Registrierung ist gerade nicht möglich.", "error");
       });
@@ -622,7 +733,10 @@
         form.reset();
         updateAuthUI();
         renderPermissionSurfaces();
-        notify("Angemeldet als " + currentUser.displayName + ".", "info");
+        if (remoteReady) refreshChat();
+        notify(approvalEnforced && currentUser && !isApproved()
+          ? accessNotice()
+          : "Angemeldet als " + (currentUser ? currentUser.displayName : "Mitglied") + ".", "info");
       });
     }).catch(function () {
       notify("Die Anmeldung ist gerade nicht möglich.", "error");
@@ -1094,6 +1208,10 @@
       openAuthModal();
       return;
     }
+    if (!isApproved()) {
+      notify(accessNotice(), "error");
+      return;
+    }
     if (!requireRemote()) return;
     const group = readMPlusForm();
     if (!group.name || !group.dungeon || !group.meeting_time || !group.tank || !group.heal || !group.dds.length) {
@@ -1205,7 +1323,7 @@
           signups.join(", ")
         ));
       }
-      if (currentUser && group.id && remoteReady) {
+      if (isApproved() && group.id && remoteReady) {
         const mine = (group.signups || []).find(function (signup) { return signup.userId === currentUser.id; });
         const join = document.createElement("button");
         join.type = "button";
@@ -1253,6 +1371,10 @@
       openAuthModal();
       return;
     }
+    if (!isApproved()) {
+      notify(accessNotice(), "error");
+      return;
+    }
     if (!requireRemote()) return;
     remote.from("mplus_signups").insert({ group_id: groupId }).select("id, group_id, user_id, character_name").single().then(function (result) {
       if (result.error || !result.data) {
@@ -1269,7 +1391,7 @@
   }
 
   function leaveMPlus(signupId) {
-    if (!currentUser || !requireRemote() || !signupId) return;
+    if (!currentUser || !isApproved() || !requireRemote() || !signupId) return;
     remote.from("mplus_signups").delete().eq("id", signupId).then(function (result) {
       if (result.error) {
         notify(SAVE_FAIL, "error");
@@ -1398,17 +1520,68 @@
     return trimmed;
   }
 
-  function applyDiscordLinks() {
-    const url = discordInvite();
-    document.querySelectorAll("[data-discord-invite]").forEach(function (link) {
-      if (!url) {
-        link.hidden = true;
+  function renderDiscordSlots() {
+    const url = isApproved() ? discordInvite() : "";
+    document.querySelectorAll("[data-discord-slot]").forEach(function (slot) {
+      slot.replaceChildren();
+      if (url) {
+        slot.hidden = false;
+        slot.appendChild(discordJoinLink(url, slot.dataset.discordStyle || ""));
         return;
       }
-      link.href = url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
+      if (currentUser) {
+        slot.hidden = true;
+        return;
+      }
+      slot.hidden = false;
+      slot.appendChild(discordLockedNote());
     });
+  }
+
+  function discordJoinLink(url, style) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    const icon = document.createElement("i");
+    icon.className = "fa-brands fa-discord";
+    icon.setAttribute("aria-hidden", "true");
+    link.appendChild(icon);
+    if (style === "hero") {
+      link.className = "btn btn-discord";
+      link.appendChild(document.createTextNode(" Discord beitreten"));
+      return link;
+    }
+    link.className = "inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700";
+    if (style === "header") {
+      const shortLabel = document.createElement("span");
+      shortLabel.className = "sm:hidden";
+      shortLabel.textContent = "Discord";
+      const fullLabel = document.createElement("span");
+      fullLabel.className = "hidden sm:inline";
+      fullLabel.textContent = "Discord beitreten";
+      link.append(shortLabel, fullLabel);
+      return link;
+    }
+    link.appendChild(document.createTextNode(" Discord beitreten"));
+    return link;
+  }
+
+  function discordLockedNote() {
+    const note = document.createElement("p");
+    note.className = "text-xs leading-relaxed text-slate-300";
+    note.appendChild(document.createTextNode(DISCORD_NOTE + " "));
+    const apply = document.createElement("a");
+    apply.href = "#bewerbung";
+    apply.className = "font-semibold text-amber-400 hover:text-white";
+    apply.textContent = "Bewerben";
+    const register = document.createElement("button");
+    register.type = "button";
+    register.dataset.action = "open-auth";
+    register.className = "font-semibold text-amber-400 hover:text-white";
+    register.textContent = "Registrieren";
+    note.append(apply, document.createTextNode(" · "), register);
+    return note;
   }
 
   function fieldValue(id) {
@@ -1502,10 +1675,40 @@
     });
   }
 
+  function maskEmail(email) {
+    const value = String(email || "").trim().toLowerCase();
+    const at = value.indexOf("@");
+    if (at < 1 || at !== value.lastIndexOf("@")) return "";
+    const local = value.slice(0, at);
+    const domain = value.slice(at + 1);
+    if (!local || domain.indexOf(".") < 1) return "";
+    return local.charAt(0) + "***@" + domain;
+  }
+
+  function registrationWebhookText(name, email) {
+    const safeName = sanitizeDiscord(name, 80);
+    const masked = maskEmail(email);
+    const who = masked ? safeName + " (" + masked + ")" : safeName;
+    return "Neue Registrierung auf der Webseite: " + who + " – bitte auf https://thearcflame.github.io freischalten.";
+  }
+
+  function postRegistrationNotice(name, email) {
+    if (!applicationWebhookUrl()) return Promise.resolve();
+    return postApplication({
+      username: "The Arc Flame",
+      allowed_mentions: { parse: [] },
+      content: registrationWebhookText(name, email).slice(0, 1800),
+    }).catch(function () {
+      /* Die Registrierung bleibt gültig, auch wenn Discord gerade nicht antwortet. */
+    });
+  }
+
   function applicationErrorMessage() {
-    const invite = discordInvite();
-    if (!invite) return "Die Bewerbung konnte nicht gesendet werden. Bitte versuche es später noch einmal.";
-    return "Die Bewerbung konnte nicht gesendet werden. Schreib uns direkt auf Discord: " + invite;
+    if (isApproved()) {
+      const invite = discordInvite();
+      if (invite) return "Die Bewerbung konnte nicht gesendet werden. Schreib uns direkt auf Discord: " + invite;
+    }
+    return "Die Bewerbung konnte nicht gesendet werden. Bitte versuche es später noch einmal.";
   }
 
   function submitApplication(form) {
@@ -1585,6 +1788,10 @@
       openAuthModal();
       return;
     }
+    if (!isApproved()) {
+      notify(accessNotice(), "error");
+      return;
+    }
     if (!requireRemote()) return;
     const text = document.getElementById("chat-text").value.trim();
     if (!text) {
@@ -1614,6 +1821,10 @@
   function removeChatMessage(id) {
     const message = chatMessages.find(function (item) { return item.id === id; });
     if (!message || !currentUser) return;
+    if (!isApproved()) {
+      notify(accessNotice(), "error");
+      return;
+    }
     if (message.userId !== currentUser.id && !isOfficer()) {
       notify("Diese Nachricht darfst du nicht löschen.", "error");
       return;
@@ -1637,6 +1848,13 @@
     const messages = chatMessages.filter(function (message) {
       return message && typeof message.text === "string";
     });
+    if (!canReadChat()) {
+      const locked = document.createElement("p");
+      locked.className = "text-amber-200";
+      locked.textContent = CHAT_LOCKED_HINT;
+      box.appendChild(locked);
+      return;
+    }
     if (!messages.length) {
       const empty = document.createElement("p");
       empty.className = "text-slate-500";
@@ -2630,7 +2848,7 @@
   }
 
   function canEditGroup(group) {
-    return !!(currentUser && group && group.createdBy && group.createdBy === currentUser.id);
+    return !!(isApproved() && currentUser && group && group.createdBy && group.createdBy === currentUser.id);
   }
 
   function canDeleteGroup(group) {
@@ -2862,6 +3080,139 @@
     });
   }
 
+  function loadApprovals() {
+    if (!remote || !approvalEnforced || !isOfficer()) return;
+    remote.from("profiles")
+      .select("id, display_name, status, role, created_at")
+      .in("status", ["pending", "rejected"])
+      .order("created_at", { ascending: true })
+      .then(function (result) {
+        if (result.error) {
+          if (missingStatusColumn(result.error)) {
+            approvalEnforced = false;
+            updateAuthUI();
+          }
+          return;
+        }
+        const rows = (result.data || []).filter(function (profile) {
+          return profile && profile.role !== "officer" && profile.role !== "admin";
+        });
+        renderApprovals(rows);
+      }).catch(function () { /* Die Liste bleibt, wie sie ist. */ });
+  }
+
+  function renderApprovals(rows) {
+    const pending = rows.filter(function (profile) { return profile.status === "pending"; });
+    const rejected = rows.filter(function (profile) { return profile.status === "rejected"; });
+    paintApprovalBadge(pending.length);
+    fillApprovalList(document.getElementById("approval-pending"), pending, true);
+    const wrap = document.getElementById("approval-rejected-wrap");
+    if (wrap) wrap.hidden = rejected.length === 0;
+    fillApprovalList(document.getElementById("approval-rejected"), rejected, false);
+  }
+
+  function paintApprovalBadge(count) {
+    ["approval-count", "approval-header-count"].forEach(function (id) {
+      const badge = document.getElementById(id);
+      if (!badge) return;
+      badge.textContent = String(count);
+      badge.hidden = id === "approval-header-count" ? count < 1 : false;
+    });
+  }
+
+  function fillApprovalList(container, rows, pending) {
+    if (!container) return;
+    container.replaceChildren();
+    if (!rows.length) {
+      if (!pending) return;
+      const empty = document.createElement("p");
+      empty.className = "text-sm text-slate-400";
+      empty.textContent = "Keine offenen Freischaltungen.";
+      container.appendChild(empty);
+      return;
+    }
+    rows.forEach(function (profile) {
+      const row = document.createElement("div");
+      row.className = "flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:flex-row sm:items-center sm:justify-between";
+      const label = document.createElement("div");
+      label.className = "min-w-0";
+      const name = document.createElement("p");
+      name.className = "truncate text-sm font-bold text-white";
+      name.textContent = profile.display_name || "Mitglied";
+      const when = document.createElement("p");
+      when.className = "text-xs text-slate-400";
+      when.textContent = formatRegistration(profile.created_at);
+      label.append(name, when);
+      const actions = document.createElement("div");
+      actions.className = "flex flex-wrap gap-2";
+      actions.appendChild(approvalButton(
+        "approve-user",
+        profile,
+        "Freischalten",
+        "inline-flex min-h-11 items-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 hover:bg-amber-400"
+      ));
+      if (pending) {
+        actions.appendChild(approvalButton(
+          "reject-user",
+          profile,
+          "Ablehnen",
+          "inline-flex min-h-11 items-center rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500"
+        ));
+      }
+      row.append(label, actions);
+      container.appendChild(row);
+    });
+  }
+
+  function approvalButton(action, profile, text, className) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.action = action;
+    button.dataset.userId = profile.id;
+    button.dataset.userName = profile.display_name || "Mitglied";
+    button.className = className;
+    button.textContent = text;
+    return button;
+  }
+
+  function setProfileStatus(userId, status, name) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Konten freischalten.", "error");
+      return;
+    }
+    if (!userId || (currentUser && userId === currentUser.id)) {
+      notify("Den eigenen Status kannst du nicht ändern.", "error");
+      return;
+    }
+    if (status !== "approved" && status !== "rejected") return;
+    const label = name || "dieses Konto";
+    const question = status === "approved"
+      ? "„" + label + "“ wirklich freischalten?"
+      : "„" + label + "“ wirklich ablehnen?";
+    if (!window.confirm(question)) return;
+    if (!requireRemote()) return;
+    remote.from("profiles").update({ status: status }).eq("id", userId).then(function (result) {
+      if (result.error) {
+        notify(status === "approved" ? "Die Freischaltung ist nicht gelungen." : "Die Ablehnung ist nicht gelungen.", "error");
+        return;
+      }
+      notify(status === "approved" ? "Konto freigeschaltet." : "Konto abgelehnt.", "info");
+      loadApprovals();
+    });
+  }
+
+  function formatRegistration(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   function createRemote() {
     const lib = window.supabase;
     const config = arcConfig();
@@ -2882,23 +3233,65 @@
     }
   }
 
+  function missingStatusColumn(error) {
+    if (!error) return false;
+    const code = String(error.code || "");
+    const message = String(error.message || "").toLowerCase();
+    if (message.indexOf("status") < 0) return false;
+    return code === "42703" || code === "PGRST204" || /does not exist|schema cache/.test(message);
+  }
+
+  function profileFromSession(user, profile, statusKnown) {
+    const meta = user.user_metadata || {};
+    let role = "member";
+    if (profile && (profile.role === "officer" || profile.role === "admin")) role = profile.role;
+    let status = "approved";
+    if (statusKnown && profile && (profile.status === "pending" || profile.status === "approved" || profile.status === "rejected")) {
+      status = profile.status;
+    } else if (statusKnown && approvalEnforced && !profile) {
+      status = "pending";
+    }
+    return {
+      id: user.id,
+      email: user.email || "",
+      displayName: (profile && profile.display_name) || meta.display_name || user.email || "Mitglied",
+      role: role,
+      status: status,
+      statusKnown: statusKnown,
+    };
+  }
+
   function adoptSession(session) {
     const user = session && session.user;
     if (!user || !remote) {
       currentUser = null;
       return Promise.resolve();
     }
-    return remote.from("profiles").select("display_name, role").eq("id", user.id).maybeSingle().then(function (result) {
-      const profile = result && result.data;
-      const meta = user.user_metadata || {};
-      let role = "member";
-      if (profile && (profile.role === "officer" || profile.role === "admin")) role = profile.role;
-      currentUser = {
-        id: user.id,
-        email: user.email || "",
-        displayName: (profile && profile.display_name) || meta.display_name || user.email || "Mitglied",
-        role: role,
-      };
+    return remote.from("profiles").select("display_name, role, status").eq("id", user.id).maybeSingle().then(function (result) {
+      if (result && result.error && missingStatusColumn(result.error)) {
+        approvalEnforced = false;
+        return remote.from("profiles").select("display_name, role").eq("id", user.id).maybeSingle().then(function (fallback) {
+          return { result: fallback || {}, statusKnown: false };
+        });
+      }
+      return { result: result || {}, statusKnown: !(result && result.error) };
+    }).then(function (payload) {
+      const result = payload.result || {};
+      currentUser = profileFromSession(user, result.data, payload.statusKnown);
+    }).catch(function () {
+      currentUser = profileFromSession(user, null, false);
+    });
+  }
+
+  function probeApproval() {
+    if (!remote || typeof remote.rpc !== "function") {
+      approvalEnforced = false;
+      return Promise.resolve();
+    }
+    return remote.rpc("is_approved").then(function (result) {
+      approvalEnforced = !(result && result.error);
+    }).catch(function () {
+      approvalEnforced = false;
     });
   }
 
@@ -2909,25 +3302,30 @@
       return;
     }
     loadGallery();
-    if (!authReady) {
-      authReady = true;
-      remote.auth.onAuthStateChange(function (event, session) {
-        if (event === "SIGNED_OUT") {
-          currentUser = null;
-          updateAuthUI();
-          renderPermissionSurfaces();
-          return;
-        }
-        if (!session || (event !== "SIGNED_IN" && event !== "INITIAL_SESSION" && event !== "TOKEN_REFRESHED")) return;
-        adoptSession(session).then(function () {
-          updateAuthUI();
-          renderPermissionSurfaces();
-        }).catch(function () {
-          updateAuthUI();
+    probeApproval().then(function () {
+      if (!authReady) {
+        authReady = true;
+        remote.auth.onAuthStateChange(function (event, session) {
+          if (event === "SIGNED_OUT") {
+            currentUser = null;
+            if (approvalEnforced) replaceItems(chatMessages, []);
+            updateAuthUI();
+            renderPermissionSurfaces();
+            return;
+          }
+          if (!session || (event !== "SIGNED_IN" && event !== "INITIAL_SESSION" && event !== "TOKEN_REFRESHED")) return;
+          adoptSession(session).then(function () {
+            updateAuthUI();
+            renderPermissionSurfaces();
+            if (remoteReady && event !== "TOKEN_REFRESHED") refreshChat();
+          }).catch(function () {
+            updateAuthUI();
+          });
         });
-      });
-    }
-    remote.auth.getSession().then(function (result) {
+      }
+      return remote.auth.getSession();
+    }).then(function (result) {
+      if (!result) return null;
       if (result.error) throw result.error;
       if (result.data && result.data.session) return adoptSession(result.data.session);
       return null;
@@ -2940,6 +3338,7 @@
       renderGuild();
       updateAuthUI();
       subscribeLive();
+      if (currentUser && approvalEnforced) refreshChat();
     }).catch(function () {
       remoteReady = false;
       notify(OFFLINE_MSG, "error");
@@ -2968,7 +3367,6 @@
       remote.from("chat_messages").select("id, author, body, user_id, created_at").order("created_at", { ascending: false }).limit(200),
     ]).then(function (rows) {
       const chatResult = rows[7];
-      if (chatResult.error) throw chatResult.error;
       replaceItems(retailMembers, rows[0].filter(function (row) { return row.front === "retail"; }).map(mapMember));
       replaceItems(foreverMembers, rows[0].filter(function (row) { return row.front === "forever"; }).map(mapMember));
       replaceItems(retailRaid, rows[1].filter(function (row) { return row.front === "retail"; }).map(mapRoster));
@@ -2985,8 +3383,13 @@
         return mapGroup(row, signups.filter(function (signup) { return signup.groupId === row.id; }));
       }));
       replaceItems(classicRuns, rows[6].map(mapRun));
-      const messages = (chatResult.data || []).slice().reverse().map(mapChat);
-      replaceItems(chatMessages, messages);
+      if (!canReadChat()) {
+        replaceItems(chatMessages, []);
+      } else if (chatResult.error) {
+        throw chatResult.error;
+      } else {
+        replaceItems(chatMessages, (chatResult.data || []).slice().reverse().map(mapChat));
+      }
     });
   }
 
@@ -3058,6 +3461,11 @@
 
   function refreshChat() {
     if (!remote || !remoteReady) return;
+    if (!canReadChat()) {
+      replaceItems(chatMessages, []);
+      renderChat();
+      return;
+    }
     remote.from("chat_messages").select("id, author, body, user_id, created_at").order("created_at", { ascending: false }).limit(200).then(function (result) {
       if (result.error || !result.data) return;
       replaceItems(chatMessages, result.data.slice().reverse().map(mapChat));
