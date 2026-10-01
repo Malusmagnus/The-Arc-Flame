@@ -109,6 +109,7 @@
   let foreverPollRows = [];
   let foreverPollOwn = null;
   let foreverPollSending = false;
+  let foreverPollReadable = false;
 
   const FOREVER_POLL_CLASSES = ["Krieger", "Paladin", "Jäger", "Schurke", "Priester", "Schamane", "Magier", "Hexenmeister", "Druide"];
   const FOREVER_POLL_TWINK = FOREVER_POLL_CLASSES.concat(["Noch unklar"]);
@@ -141,8 +142,12 @@
   let dkpAwardQuery = "";
   let dkpSelectedIds = {};
   let dkpPointsStamp = "";
-  let dkpOfficerTab = "activity";
+  let dkpOfficerTab = "import";
   let dkpReverseId = "";
+  let dkpImportSource = "forever";
+  let dkpImportQuery = "";
+  let dkpImportSelected = {};
+  let dkpImportNames = {};
 
   document.addEventListener("DOMContentLoaded", boot);
 
@@ -235,6 +240,25 @@
       });
       dkpAwardSearch.addEventListener("keydown", function (event) {
         if (event.key === "Enter") event.preventDefault();
+      });
+    }
+    const dkpImportSearch = document.getElementById("dkp-import-search");
+    if (dkpImportSearch) {
+      dkpImportSearch.addEventListener("input", function () {
+        dkpImportQuery = dkpImportSearch.value;
+        renderDkpImport();
+      });
+      dkpImportSearch.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") event.preventDefault();
+      });
+    }
+    const dkpImportList = document.getElementById("dkp-import-list");
+    if (dkpImportList) {
+      dkpImportList.addEventListener("input", function (event) {
+        const field = event.target;
+        if (!field || !field.dataset || !field.dataset.importName || dkpBusy) return;
+        dkpImportNames[field.dataset.importName] = field.value;
+        syncDkpImportRow(field);
       });
     }
   }
@@ -3510,12 +3534,16 @@
     return Promise.resolve(request).then(function (result) {
       if (!result || result.error) {
         showForeverPollStatus("Die Antworten konnten nicht geladen werden.", "error", false);
+        renderDkpImport();
         return;
       }
+      foreverPollReadable = true;
       foreverPollRows = (result.data || []).map(normalizePollRow).filter(Boolean);
       renderForeverPoll();
+      renderDkpImport();
     }).catch(function () {
       showForeverPollStatus("Die Antworten konnten nicht geladen werden.", "error", false);
+      renderDkpImport();
     });
   }
 
@@ -4326,6 +4354,13 @@
         nameBtn.appendChild(badge);
       }
       nameCell.appendChild(nameBtn);
+      const memberRank = dkpMemberRank(player.member_id);
+      if (memberRank) {
+        const rank = document.createElement("p");
+        rank.className = "text-xs text-slate-400 break-words";
+        rank.textContent = memberRank;
+        nameCell.appendChild(rank);
+      }
       const dkpCell = document.createElement("td");
       dkpCell.className = "px-2 py-1 align-middle whitespace-nowrap";
       const dkpValue = Math.max(0, Math.min(500, Number(player.dkp) || 0));
@@ -4585,8 +4620,14 @@
     if (!players.length) {
       const empty = document.createElement("p");
       empty.className = "px-2 py-3 text-sm text-slate-500";
-      empty.textContent = sortedDkpPlayers(true).length ? "Kein Spieler passt zur Suche." : "Keine aktiven Spieler.";
-      box.appendChild(empty);
+      if (sortedDkpPlayers(true).length) {
+        empty.textContent = "Kein Spieler passt zur Suche.";
+        box.appendChild(empty);
+      } else {
+        empty.textContent = "Keine aktiven Spieler. Übernimm zuerst Mitglieder aus der Gildenliste.";
+        box.appendChild(empty);
+        box.appendChild(dkpJumpImportButton());
+      }
       updateDkpSelectedCount();
       return;
     }
@@ -4679,6 +4720,7 @@
     fillDkpSelect(memberSelect, members, "Kein Gildenmitglied");
     syncDkpActivityPoints(false);
     renderDkpAwardPlayers();
+    renderDkpImport();
     renderDkpHints();
     renderDkpPlayerAdmin();
     renderDkpTypeAdmin();
@@ -4775,8 +4817,8 @@
   }
 
   function showDkpTab(name) {
-    const known = { activity: 1, transfer: 1, item: 1, adjust: 1, players: 1, types: 1, items: 1 };
-    if (!known[name]) name = "activity";
+    const known = { import: 1, activity: 1, transfer: 1, item: 1, adjust: 1, players: 1, types: 1, items: 1 };
+    if (!known[name]) name = "import";
     dkpOfficerTab = name;
     document.querySelectorAll("[data-action='dkp-tab']").forEach(function (tab) {
       const on = tab.dataset.tab === name;
@@ -4791,7 +4833,10 @@
 
   function handleDkpChange(event) {
     const target = event.target;
-    if (!target || !target.id && target.name !== "dkp-award-player") return false;
+    if (!target) return false;
+    const tracked = target.id || target.name === "dkp-award-player" || target.name === "dkp-import-player";
+    if (!tracked) return false;
+    if (dkpBusy && (target.id === "dkp-import-source" || target.name === "dkp-import-player")) return true;
     if (target.id === "dkp-show-inactive") {
       dkpShowInactive = !!target.checked;
       renderDkpScores();
@@ -4818,6 +4863,20 @@
       if (target.checked) dkpSelectedIds[id] = true;
       else delete dkpSelectedIds[id];
       updateDkpSelectedCount();
+      return true;
+    }
+    if (target.name === "dkp-import-player") {
+      const key = target.dataset.key || "";
+      if (!key) return true;
+      if (target.checked) dkpImportSelected[key] = true;
+      else delete dkpImportSelected[key];
+      updateDkpImportCount();
+      return true;
+    }
+    if (target.id === "dkp-import-source") {
+      const value = target.value === "retail" || target.value === "poll" ? target.value : "forever";
+      dkpImportSource = value === "poll" && !foreverPollReadable ? "forever" : value;
+      renderDkpImport();
       return true;
     }
     if (target.id === "dkp-transfer-player" || target.id === "dkp-item-player" || target.id === "dkp-adjust-player" || target.id === "dkp-item-id") {
@@ -4847,6 +4906,352 @@
   function selectNoDkpPlayers() {
     dkpSelectedIds = {};
     renderDkpAwardPlayers();
+  }
+
+  function suggestDkpName(raw) {
+    let text = String(raw == null ? "" : raw).trim();
+    const paren = text.indexOf("(");
+    if (paren !== -1) text = text.slice(0, paren);
+    text = text.trim().replace(/\s+\d+$/, "").trim();
+    if (text.length > 40) text = text.slice(0, 40).trim();
+    return text;
+  }
+
+  function dkpNameKey(value) {
+    return String(value == null ? "" : value).trim().toLowerCase();
+  }
+
+  function dkpMemberById(memberId) {
+    if (!isDkpUuid(memberId)) return null;
+    const lists = [foreverMembers, retailMembers];
+    for (let i = 0; i < lists.length; i += 1) {
+      const list = lists[i];
+      for (let j = 0; j < list.length; j += 1) {
+        if (list[j] && list[j].id === memberId) return list[j];
+      }
+    }
+    return null;
+  }
+
+  function dkpMemberRank(memberId) {
+    const member = dkpMemberById(memberId);
+    if (!member || member.rank == null) return "";
+    return String(member.rank).trim();
+  }
+
+  function dkpNameTaken(name) {
+    const key = dkpNameKey(name);
+    if (!key) return false;
+    return dkpPlayers.some(function (player) {
+      return player && dkpNameKey(player.char_name) === key;
+    });
+  }
+
+  function dkpMemberTaken(memberId) {
+    if (!isDkpUuid(memberId)) return false;
+    return dkpPlayers.some(function (player) {
+      return player && String(player.member_id || "") === memberId;
+    });
+  }
+
+  function dkpImportCurrentName(entry) {
+    if (!entry) return "";
+    if (Object.prototype.hasOwnProperty.call(dkpImportNames, entry.key)) {
+      return String(dkpImportNames[entry.key] == null ? "" : dkpImportNames[entry.key]).trim();
+    }
+    return suggestDkpName(entry.sourceName);
+  }
+
+  function dkpImportLocked(entry) {
+    if (!entry) return false;
+    if (entry.memberId && dkpMemberTaken(entry.memberId)) return true;
+    if (dkpNameTaken(entry.sourceName)) return true;
+    if (dkpNameTaken(suggestDkpName(entry.sourceName))) return true;
+    return false;
+  }
+
+  function dkpImportBlocked(entry) {
+    return dkpImportLocked(entry) || dkpNameTaken(dkpImportCurrentName(entry));
+  }
+
+  function dkpImportEntries() {
+    if (dkpImportSource === "poll") {
+      if (!foreverPollReadable) return [];
+      return foreverPollRows.filter(function (row) {
+        return row && isDkpUuid(row.id);
+      }).map(function (row) {
+        const detail = [row.main_class, row.main_role].filter(Boolean).join(" · ");
+        return {
+          key: "poll:" + row.id,
+          sourceName: row.char_name || "",
+          detail: detail,
+          memberId: null,
+        };
+      });
+    }
+    const list = dkpImportSource === "retail" ? retailMembers : foreverMembers;
+    return list.filter(function (member) {
+      return member && isDkpUuid(member.id);
+    }).map(function (member) {
+      return {
+        key: member.id,
+        sourceName: member.name || "",
+        detail: member.rank ? String(member.rank).trim() : "",
+        memberId: member.id,
+      };
+    });
+  }
+
+  function dkpImportEntryByKey(key) {
+    const entries = dkpImportEntries();
+    for (let i = 0; i < entries.length; i += 1) {
+      if (entries[i].key === key) return entries[i];
+    }
+    return null;
+  }
+
+  function visibleDkpImportEntries() {
+    const query = dkpImportQuery.trim().toLocaleLowerCase("de");
+    return dkpImportEntries().filter(function (entry) {
+      if (!query) return true;
+      const hay = [entry.sourceName, entry.detail, dkpImportCurrentName(entry)].join(" ").toLocaleLowerCase("de");
+      return hay.indexOf(query) !== -1;
+    });
+  }
+
+  function pruneDkpImportSelection() {
+    dkpImportEntries().forEach(function (entry) {
+      if (dkpImportSelected[entry.key] && dkpImportBlocked(entry)) delete dkpImportSelected[entry.key];
+    });
+  }
+
+  function updateDkpImportCount() {
+    const el = document.getElementById("dkp-import-count");
+    if (!el) return;
+    let count = 0;
+    dkpImportEntries().forEach(function (entry) {
+      if (dkpImportSelected[entry.key]) count += 1;
+    });
+    el.textContent = count === 1 ? "1 ausgewählt" : count + " ausgewählt";
+  }
+
+  function syncDkpImportSource() {
+    const select = document.getElementById("dkp-import-source");
+    if (!select) return;
+    const options = [
+      { value: "forever", label: "Forever-Mitglieder" },
+      { value: "retail", label: "Retail-Mitglieder" },
+    ];
+    if (foreverPollReadable) options.push({ value: "poll", label: "Forever-Umfrage" });
+    if (dkpImportSource === "poll" && !foreverPollReadable) dkpImportSource = "forever";
+    if (dkpImportSource !== "forever" && dkpImportSource !== "retail" && dkpImportSource !== "poll") dkpImportSource = "forever";
+    select.replaceChildren();
+    options.forEach(function (option) {
+      select.appendChild(dkpOption(option.value, option.label));
+    });
+    select.value = dkpImportSource;
+  }
+
+  function dkpJumpImportButton() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.action = "dkp-open-import";
+    button.className = "mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 sm:w-auto";
+    button.textContent = "Mitglieder übernehmen";
+    return button;
+  }
+
+  function syncDkpImportRow(field) {
+    const key = field.dataset.importName;
+    const entry = dkpImportEntryByKey(key);
+    const row = field.closest("[data-import-row]");
+    if (!entry || !row) return;
+    const locked = dkpImportLocked(entry);
+    const blocked = locked || dkpNameTaken(String(field.value || "").trim());
+    const box = row.querySelector("input[name='dkp-import-player']");
+    if (box) {
+      box.disabled = blocked || dkpBusy;
+      if (blocked) {
+        box.checked = false;
+        delete dkpImportSelected[key];
+      }
+    }
+    field.disabled = locked || dkpBusy;
+    let note = row.querySelector("[data-import-note]");
+    if (blocked) {
+      if (!note) {
+        note = document.createElement("span");
+        note.dataset.importNote = "1";
+        note.className = "mt-1 inline-flex rounded-full border border-slate-700 px-2 py-0.5 text-xs font-bold text-slate-400";
+        const wrap = row.querySelector("[data-import-text]");
+        if (wrap) wrap.appendChild(note);
+      }
+      note.textContent = "schon im DKP";
+    } else if (note) {
+      note.remove();
+    }
+    updateDkpImportCount();
+  }
+
+  function renderDkpImport() {
+    syncDkpImportSource();
+    const box = document.getElementById("dkp-import-list");
+    if (!box) return;
+    pruneDkpImportSelection();
+    const entries = visibleDkpImportEntries();
+    box.replaceChildren();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "px-2 py-3 text-sm text-slate-500";
+      empty.textContent = dkpImportEntries().length ? "Kein Eintrag passt zur Suche." : "Keine Einträge in dieser Quelle.";
+      box.appendChild(empty);
+      updateDkpImportCount();
+      return;
+    }
+    entries.forEach(function (entry) {
+      const locked = dkpImportLocked(entry);
+      const blocked = dkpImportBlocked(entry);
+      const stored = Object.prototype.hasOwnProperty.call(dkpImportNames, entry.key);
+      const row = document.createElement("div");
+      row.dataset.importRow = "1";
+      row.className = "flex flex-col gap-2 rounded-lg px-2 py-2 sm:flex-row sm:items-center" + (locked ? " opacity-70" : "");
+      const label = document.createElement("label");
+      label.className = "flex min-h-11 min-w-0 flex-1 items-center gap-3 text-sm text-slate-200";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.name = "dkp-import-player";
+      input.dataset.key = entry.key;
+      input.checked = !!dkpImportSelected[entry.key] && !blocked;
+      input.disabled = blocked || dkpBusy;
+      input.className = "h-4 w-4 shrink-0 accent-amber-500";
+      const textWrap = document.createElement("span");
+      textWrap.dataset.importText = "1";
+      textWrap.className = "min-w-0";
+      const nameEl = document.createElement("span");
+      nameEl.className = "block break-words font-semibold text-white";
+      nameEl.textContent = entry.sourceName || "Ohne Name";
+      textWrap.appendChild(nameEl);
+      if (entry.detail) {
+        const detail = document.createElement("span");
+        detail.className = "block break-words text-xs text-slate-400";
+        detail.textContent = entry.detail;
+        textWrap.appendChild(detail);
+      }
+      if (blocked) {
+        const badge = document.createElement("span");
+        badge.dataset.importNote = "1";
+        badge.className = "mt-1 inline-flex rounded-full border border-slate-700 px-2 py-0.5 text-xs font-bold text-slate-400";
+        badge.textContent = "schon im DKP";
+        textWrap.appendChild(badge);
+      }
+      label.append(input, textWrap);
+      const nameField = document.createElement("input");
+      nameField.type = "text";
+      nameField.maxLength = 40;
+      nameField.autocomplete = "off";
+      nameField.placeholder = "DKP-Name";
+      nameField.value = stored ? String(dkpImportNames[entry.key] == null ? "" : dkpImportNames[entry.key]) : suggestDkpName(entry.sourceName);
+      nameField.disabled = locked || dkpBusy;
+      nameField.dataset.importName = entry.key;
+      nameField.setAttribute("aria-label", "DKP-Name für " + (entry.sourceName || "Eintrag"));
+      nameField.className = DKP_INPUT + " sm:max-w-xs";
+      row.append(label, nameField);
+      box.appendChild(row);
+    });
+    updateDkpImportCount();
+  }
+
+  function selectAllDkpImport() {
+    if (dkpBusy) return;
+    visibleDkpImportEntries().forEach(function (entry) {
+      if (!dkpImportBlocked(entry)) dkpImportSelected[entry.key] = true;
+    });
+    renderDkpImport();
+  }
+
+  function selectNoDkpImport() {
+    if (dkpBusy) return;
+    dkpImportEntries().forEach(function (entry) {
+      delete dkpImportSelected[entry.key];
+    });
+    renderDkpImport();
+  }
+
+  function openDkpImport() {
+    if (!isOfficer()) return;
+    showDkpTab("import");
+    const target = document.getElementById("dkp-import");
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ behavior: motion(), block: "start" });
+    }
+    const source = document.getElementById("dkp-import-source");
+    if (source && typeof source.focus === "function") source.focus();
+  }
+
+  function submitDkpImport() {
+    if (dkpBusy) return;
+    if (!isOfficer()) {
+      const text = "Nur Offiziere und Administratoren dürfen DKP verwalten.";
+      setDkpStatus("dkp-import-status", text);
+      notify(text, "error");
+      return;
+    }
+    pruneDkpImportSelection();
+    updateDkpImportCount();
+    const chosen = dkpImportEntries().filter(function (entry) {
+      return !!dkpImportSelected[entry.key] && !dkpImportBlocked(entry);
+    });
+    if (!chosen.length) {
+      setDkpStatus("dkp-import-status", "Bitte mindestens einen Eintrag auswählen.");
+      return;
+    }
+    const preview = chosen.map(function (entry) {
+      return dkpImportCurrentName(entry) || entry.sourceName || "Eintrag";
+    });
+    const question = chosen.length === 1 ? "1 Mitglied ins DKP übernehmen?" : chosen.length + " Mitglieder ins DKP übernehmen?";
+    const shown = preview.length <= 8 ? preview.join(", ") : preview.slice(0, 8).join(", ") + " und " + (preview.length - 8) + " weitere";
+    if (!window.confirm(question + "\n\n" + shown)) return;
+    setDkpBusy(true);
+    setDkpStatus("dkp-import-status", "");
+    const successes = [];
+    const errors = [];
+    const savedKeys = [];
+    let chain = Promise.resolve();
+    chosen.forEach(function (entry) {
+      chain = chain.then(function () {
+        const name = dkpImportCurrentName(entry);
+        const shownName = name || entry.sourceName || "Eintrag";
+        if (name.length < 2 || name.length > 40) {
+          errors.push(shownName + ": Bitte einen Namen mit 2 bis 40 Zeichen eingeben.");
+          return;
+        }
+        return dkpRpc("dkp_save_player", {
+          p_char_name: name,
+          p_member_id: entry.memberId,
+          p_active: true,
+        }).then(function () {
+          successes.push(name);
+          savedKeys.push(entry.key);
+        }).catch(function (error) {
+          errors.push(shownName + ": " + dkpErrorText(error));
+        });
+      });
+    });
+    chain.then(function () {
+      savedKeys.forEach(function (key) {
+        delete dkpImportSelected[key];
+      });
+      return loadDkp();
+    }).catch(function () {
+      return null;
+    }).then(function () {
+      let text = successes.length + " übernommen";
+      if (errors.length) text += ", " + errors.length + " Fehler: " + errors.join("; ");
+      setDkpBusy(false);
+      renderDkpImport();
+      setDkpStatus("dkp-import-status", text);
+      notify(text, errors.length ? "error" : "info");
+    });
   }
 
   function resetDkpPlayerForm() {
@@ -4966,6 +5371,22 @@
     }
     if (action === "dkp-select-none") {
       selectNoDkpPlayers();
+      return;
+    }
+    if (action === "dkp-import-all") {
+      selectAllDkpImport();
+      return;
+    }
+    if (action === "dkp-import-none") {
+      selectNoDkpImport();
+      return;
+    }
+    if (action === "dkp-import-save") {
+      submitDkpImport();
+      return;
+    }
+    if (action === "dkp-open-import") {
+      openDkpImport();
       return;
     }
     if (action === "dkp-history-more") {
