@@ -51,6 +51,16 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/gallery.sql
 
 Danach gibt es den öffentlichen Bucket `gallery` (höchstens 10 MB, JPEG, PNG, WebP, GIF) und die Tabelle `public.gallery_images`. Jeder darf die Bilder sehen. Hochladen und Löschen dürfen nur freigeschaltete Profile mit der Rolle `officer` oder `admin` (`public.is_officer()` und `public.is_approved()`). `gallery.sql` bricht ab, wenn `public.is_approved()` noch fehlt.
 
+## DKP
+
+`dkp.sql` einmal ausführen, wenn `schema.sql` schon auf dem Projekt liegt und der DKP-Block darin noch nicht gelaufen ist. Ein komplettes erneutes Ausführen von `schema.sql` enthält dieselben Anweisungen. Beides kann wiederholt werden. Vorhandene Punkte bleiben erhalten. Die Start-Aktivitäten werden nur angelegt, solange `dkp_activity_types` leer ist.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/dkp.sql
+```
+
+Danach gibt es `public.dkp_players`, `public.dkp_activity_types`, `public.dkp_items` und `public.dkp_history`. Lesen dürfen alle, auch ohne Anmeldung (`anon` und `authenticated`). Im Verlauf ist die Offiziers-ID verborgen, sichtbar ist nur der Name. Schreiben aus dem Browser ist gesperrt. Änderungen laufen nur über die Funktionen `dkp_save_player`, `dkp_delete_player`, `dkp_save_activity_type`, `dkp_delete_activity_type`, `dkp_save_item`, `dkp_delete_item`, `dkp_award_activity`, `dkp_transfer_overflow`, `dkp_award_item`, `dkp_adjust` und `dkp_reverse_entry`. Aufrufen dürfen das nur freigeschaltete Offiziere und Administratoren (`public.is_officer()` und `public.is_approved()`).
+
 ## Realtime
 
 `schema.sql` hängt `chat_messages` und `roster` an die Publication `supabase_realtime`. Unter **Database → Publications** sollten beide Tabellen dort stehen, damit Chat und Kader live mitlaufen.

@@ -31,6 +31,7 @@
     "forever-planer",
     "forever-kader",
     "forever-mitglieder",
+    "forever-dkp",
   ]);
   const RETAIL_IDS = new Set([
     "retail-leitung",
@@ -69,6 +70,7 @@
     { href: "#forever-planer", label: "Classic Planer", icon: "fa-skull", tone: "text-amber-400" },
     { href: "#forever-kader", label: "Classic Kader", icon: "fa-shield-cat", tone: "text-amber-400" },
     { href: "#forever-mitglieder", label: "Classic Mitglieder", icon: "fa-users", tone: "text-amber-400" },
+    { href: "#forever-dkp", label: "DKP", icon: "fa-coins", tone: "text-amber-400" },
     { href: "#galerie", label: "Galerie", icon: "fa-image", tone: "text-amber-400" },
     { href: "#bewerbung", label: "Bewerbung", icon: "fa-scroll", tone: "text-amber-400" },
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
@@ -102,6 +104,34 @@
   const guildInfo = clone(DEFAULTS.guildInfo || { col1: "", col2: "", col3: "" });
   let currentUser = null;
   let approvalEnforced = false;
+
+  const DKP_HISTORY_COLUMNS = "id, created_at, kind, player_id, char_name, activity_type_id, activity_name, item_id, item_name, dkp_change, overflow_change, dkp_after, overflow_after, reason, batch_id, reverses_id, officer_name";
+  const DKP_PAGE_SIZE = 50;
+  const DKP_INPUT = "min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500";
+  const DKP_TAB_ON = "inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-sm font-extrabold text-slate-950";
+  const DKP_TAB_OFF = "inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700";
+  const DKP_LOAD_FAIL = "Die DKP-Daten sind gerade nicht erreichbar. Bitte versuche es später noch einmal.";
+
+  let dkpPlayers = [];
+  let dkpActivityTypes = [];
+  let dkpItems = [];
+  let dkpHistory = [];
+  let dkpHistoryHasMore = false;
+  let dkpLoaded = false;
+  let dkpLoadFailed = false;
+  let dkpBusy = false;
+  let dkpEpoch = 0;
+  let dkpHistoryEpoch = 0;
+  let dkpSort = { key: "dkp", dir: "desc" };
+  let dkpPlayerQuery = "";
+  let dkpShowInactive = false;
+  let dkpHistoryPlayerId = "";
+  let dkpShowSetup = false;
+  let dkpAwardQuery = "";
+  let dkpSelectedIds = {};
+  let dkpPointsStamp = "";
+  let dkpOfficerTab = "activity";
+  let dkpReverseId = "";
 
   document.addEventListener("DOMContentLoaded", boot);
 
@@ -175,6 +205,24 @@
         galleryFile.value = "";
         if (!picked.length) return;
         uploadGalleryFiles(picked);
+      });
+    }
+
+    const dkpSearch = document.getElementById("dkp-search");
+    if (dkpSearch) {
+      dkpSearch.addEventListener("input", function () {
+        dkpPlayerQuery = dkpSearch.value;
+        renderDkpScores();
+      });
+    }
+    const dkpAwardSearch = document.getElementById("dkp-activity-search");
+    if (dkpAwardSearch) {
+      dkpAwardSearch.addEventListener("input", function () {
+        dkpAwardQuery = dkpAwardSearch.value;
+        renderDkpAwardPlayers();
+      });
+      dkpAwardSearch.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") event.preventDefault();
       });
     }
   }
@@ -321,7 +369,9 @@
     }
     if (action === "play-video") {
       playVideo(el);
+      return;
     }
+    if (action.indexOf("dkp-") === 0) handleDkpAction(action, el);
   }
 
   function onChange(event) {
@@ -334,6 +384,7 @@
       );
       return;
     }
+    if (handleDkpChange(event)) return;
     const profileRole = event.target.closest('[data-action="set-role"]');
     if (!profileRole) return;
     setProfileRole(profileRole.dataset.userId, profileRole.value, profileRole);
@@ -368,6 +419,9 @@
       saveLeadership(form);
     } else if (form.id === "gallery-upload-form") {
       event.preventDefault();
+    } else if (form.id && form.id.indexOf("dkp-") === 0) {
+      event.preventDefault();
+      submitDkpForm(form);
     }
   }
 
@@ -2865,6 +2919,7 @@
     renderChat();
     renderLeadership();
     loadGuildInfoView();
+    renderDkp();
   }
 
   function renderPermissionSurfaces() {
@@ -2877,6 +2932,7 @@
     renderChat();
     renderLeadership();
     renderGallery();
+    renderDkp();
   }
 
   function renderLeadership() {
@@ -3299,9 +3355,13 @@
     remote = createRemote();
     if (!remote) {
       notify(OFFLINE_MSG, "error");
+      dkpLoadFailed = true;
+      setDkpLoadStatus(DKP_LOAD_FAIL);
+      renderDkp();
       return;
     }
     loadGallery();
+    loadDkp();
     probeApproval().then(function () {
       if (!authReady) {
         authReady = true;
@@ -3496,6 +3556,1474 @@
       })
       .subscribe();
   }
+
+  function isDkpUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
+  }
+
+  function dkpErrorText(error) {
+    if (!error) return DKP_LOAD_FAIL;
+    const code = String(error.code || "");
+    const raw = String(error.message || error.error_description || "");
+    const lower = raw.toLowerCase();
+    if (
+      error.name === "TypeError" ||
+      !raw ||
+      /^PGRST/i.test(code) ||
+      code === "42501" ||
+      lower.indexOf("permission denied") !== -1 ||
+      lower.indexOf("jwt") !== -1 ||
+      lower.indexOf("failed to fetch") !== -1 ||
+      lower.indexOf("networkerror") !== -1 ||
+      lower.indexOf("network error") !== -1 ||
+      lower.indexOf("load failed") !== -1
+    ) {
+      return DKP_LOAD_FAIL;
+    }
+    return raw.replace(/^\s*ERROR:\s*/i, "");
+  }
+
+  function setDkpStatus(id, message) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+  }
+
+  function setDkpLoadStatus(message) {
+    setDkpStatus("dkp-load-status", message);
+  }
+
+  function setDkpBusy(busy) {
+    dkpBusy = busy;
+    const section = document.getElementById("forever-dkp");
+    if (section) section.setAttribute("aria-busy", busy ? "true" : "false");
+    document.querySelectorAll("#forever-dkp button[type='submit'], #forever-dkp [data-dkp-write]").forEach(function (el) {
+      el.disabled = busy;
+    });
+  }
+
+  function dkpById(list, id) {
+    if (!isDkpUuid(id)) return null;
+    for (let i = 0; i < list.length; i += 1) {
+      if (list[i] && list[i].id === id) return list[i];
+    }
+    return null;
+  }
+
+  function dkpPlayerById(id) {
+    return dkpById(dkpPlayers, id);
+  }
+
+  function dkpNum(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "0";
+    return n.toLocaleString("de-DE");
+  }
+
+  function dkpSigned(value) {
+    const n = Number(value) || 0;
+    const text = Math.abs(n).toLocaleString("de-DE");
+    if (n > 0) return "+" + text;
+    if (n < 0) return "-" + text;
+    return "0";
+  }
+
+  function readDkpInt(raw) {
+    const text = String(raw == null ? "" : raw).trim();
+    if (!text) return { empty: true, value: null, invalid: false };
+    if (!/^-?\d+$/.test(text)) return { empty: false, value: null, invalid: true };
+    const value = parseInt(text, 10);
+    if (!Number.isFinite(value)) return { empty: false, value: null, invalid: true };
+    return { empty: false, value: value, invalid: false };
+  }
+
+  function dkpOptionalText(raw, max) {
+    const text = String(raw == null ? "" : raw).trim();
+    if (!text) return { value: null, error: "" };
+    if (text.length > max) return { value: null, error: "Der Text ist zu lang (höchstens " + max + " Zeichen)." };
+    return { value: text, error: "" };
+  }
+
+  function formatDkpStamp(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString("de-DE", {
+      timeZone: "Europe/Berlin",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function dkpOption(value, label) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    return option;
+  }
+
+  function fillDkpSelect(select, entries, placeholder) {
+    if (!select) return;
+    const previous = select.value;
+    select.replaceChildren();
+    if (placeholder) select.appendChild(dkpOption("", placeholder));
+    entries.forEach(function (entry) {
+      if (!isDkpUuid(entry.value)) return;
+      select.appendChild(dkpOption(entry.value, entry.label));
+    });
+    const hasPrevious = previous && Array.prototype.some.call(select.options, function (option) {
+      return option.value === previous;
+    });
+    if (hasPrevious) select.value = previous;
+  }
+
+  function unwrapDkpRows(result) {
+    if (!result || result.error) throw (result && result.error) || new TypeError("Failed to fetch");
+    return result.data || [];
+  }
+
+  function fetchDkpPlayers() {
+    return remote.from("dkp_players")
+      .select("id, char_name, member_id, dkp, overflow, active, created_at, updated_at")
+      .order("char_name", { ascending: true })
+      .then(unwrapDkpRows);
+  }
+
+  function fetchDkpActivityTypes() {
+    return remote.from("dkp_activity_types")
+      .select("id, name, points, active, sort_order, created_at, updated_at")
+      .order("sort_order", { ascending: true })
+      .then(unwrapDkpRows);
+  }
+
+  function fetchDkpItems() {
+    return remote.from("dkp_items")
+      .select("id, name, cost, note, active, created_at, updated_at")
+      .order("name", { ascending: true })
+      .then(unwrapDkpRows);
+  }
+
+  function fetchDkpHistoryPage(from) {
+    let query = remote.from("dkp_history").select(DKP_HISTORY_COLUMNS).order("created_at", { ascending: false });
+    if (isDkpUuid(dkpHistoryPlayerId)) query = query.eq("player_id", dkpHistoryPlayerId);
+    if (!dkpShowSetup) query = query.neq("kind", "setup");
+    return query.range(from, from + DKP_PAGE_SIZE - 1).then(function (result) {
+      const rows = unwrapDkpRows(result);
+      return { rows: rows, hasMore: rows.length === DKP_PAGE_SIZE };
+    });
+  }
+
+  function loadDkp() {
+    if (!remote || typeof remote.from !== "function") {
+      dkpLoaded = false;
+      dkpLoadFailed = true;
+      setDkpLoadStatus(DKP_LOAD_FAIL);
+      renderDkp();
+      return Promise.resolve();
+    }
+    const epoch = ++dkpEpoch;
+    const historyEpoch = ++dkpHistoryEpoch;
+    return Promise.all([
+      fetchDkpPlayers(),
+      fetchDkpActivityTypes(),
+      fetchDkpItems(),
+      fetchDkpHistoryPage(0),
+    ]).then(function (parts) {
+      if (epoch !== dkpEpoch) return;
+      dkpPlayers = parts[0];
+      dkpActivityTypes = parts[1];
+      dkpItems = parts[2];
+      if (historyEpoch === dkpHistoryEpoch) {
+        dkpHistory = parts[3].rows;
+        dkpHistoryHasMore = parts[3].hasMore;
+      }
+      dkpLoaded = true;
+      dkpLoadFailed = false;
+      pruneDkpSelection();
+      setDkpLoadStatus("");
+      renderDkp();
+    }).catch(function (error) {
+      if (epoch !== dkpEpoch) return;
+      dkpLoaded = false;
+      dkpLoadFailed = true;
+      setDkpLoadStatus(dkpErrorText(error));
+      renderDkp();
+    });
+  }
+
+  function reloadDkpHistory() {
+    if (!remote) return Promise.resolve();
+    const historyEpoch = ++dkpHistoryEpoch;
+    return fetchDkpHistoryPage(0).then(function (page) {
+      if (historyEpoch !== dkpHistoryEpoch) return;
+      dkpHistory = page.rows;
+      dkpHistoryHasMore = page.hasMore;
+      setDkpStatus("dkp-history-status", "");
+      renderDkpHistory();
+    }).catch(function (error) {
+      if (historyEpoch !== dkpHistoryEpoch) return;
+      setDkpStatus("dkp-history-status", dkpErrorText(error));
+    });
+  }
+
+  function loadMoreDkpHistory() {
+    if (dkpBusy || !dkpHistoryHasMore || !remote) return;
+    const historyEpoch = dkpHistoryEpoch;
+    const from = dkpHistory.length;
+    setDkpBusy(true);
+    fetchDkpHistoryPage(from).then(function (page) {
+      if (historyEpoch !== dkpHistoryEpoch) return;
+      dkpHistory = dkpHistory.concat(page.rows);
+      dkpHistoryHasMore = page.hasMore;
+      renderDkpHistory();
+    }).catch(function (error) {
+      if (historyEpoch !== dkpHistoryEpoch) return;
+      setDkpStatus("dkp-history-status", dkpErrorText(error));
+    }).then(function () {
+      setDkpBusy(false);
+    });
+  }
+
+  function dkpRpc(name, params) {
+    if (!remote || typeof remote.rpc !== "function") return Promise.reject(new TypeError("Failed to fetch"));
+    return remote.rpc(name, params).then(function (result) {
+      if (!result || result.error) throw (result && result.error) || new TypeError("Failed to fetch");
+      return result.data;
+    });
+  }
+
+  function runDkpWrite(statusId, work) {
+    if (dkpBusy) return;
+    if (!isOfficer()) {
+      const text = "Nur Offiziere und Administratoren dürfen DKP verwalten.";
+      setDkpStatus(statusId, text);
+      notify(text, "error");
+      return;
+    }
+    setDkpBusy(true);
+    setDkpStatus(statusId, "");
+    Promise.resolve().then(work).then(function (message) {
+      return loadDkp().then(function () {
+        return message;
+      });
+    }).then(function (message) {
+      if (message) {
+        setDkpStatus(statusId, message);
+        notify(message, "info");
+      }
+    }).catch(function (error) {
+      const text = dkpErrorText(error);
+      setDkpStatus(statusId, text);
+      notify(text, "error");
+    }).then(function () {
+      setDkpBusy(false);
+    });
+  }
+
+  function sortedDkpPlayers(activeOnly) {
+    return dkpPlayers.filter(function (player) {
+      return player && isDkpUuid(player.id) && (!activeOnly || player.active);
+    }).slice().sort(function (a, b) {
+      return String(a.char_name || "").localeCompare(String(b.char_name || ""), "de");
+    });
+  }
+
+  function sortedDkpTypes(activeOnly) {
+    return dkpActivityTypes.filter(function (row) {
+      return row && isDkpUuid(row.id) && (!activeOnly || row.active);
+    }).slice().sort(function (a, b) {
+      const order = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+      if (order) return order;
+      return String(a.name || "").localeCompare(String(b.name || ""), "de");
+    });
+  }
+
+  function sortedDkpItems(activeOnly) {
+    return dkpItems.filter(function (row) {
+      return row && isDkpUuid(row.id) && (!activeOnly || row.active);
+    }).slice().sort(function (a, b) {
+      return String(a.name || "").localeCompare(String(b.name || ""), "de");
+    });
+  }
+
+  function visibleScorePlayers() {
+    const query = dkpPlayerQuery.trim().toLocaleLowerCase("de");
+    const list = dkpPlayers.filter(function (player) {
+      if (!player || !isDkpUuid(player.id)) return false;
+      if (!dkpShowInactive && !player.active) return false;
+      if (!query) return true;
+      return String(player.char_name || "").toLocaleLowerCase("de").indexOf(query) !== -1;
+    });
+    const dir = dkpSort.dir === "asc" ? 1 : -1;
+    list.sort(function (a, b) {
+      if (dkpSort.key === "name") {
+        const cmp = String(a.char_name || "").localeCompare(String(b.char_name || ""), "de");
+        if (cmp) return cmp * dir;
+      } else {
+        const key = dkpSort.key === "overflow" ? "overflow" : "dkp";
+        const diff = (Number(a[key]) || 0) - (Number(b[key]) || 0);
+        if (diff) return diff * dir;
+      }
+      return String(a.char_name || "").localeCompare(String(b.char_name || ""), "de");
+    });
+    return list;
+  }
+
+  function visibleAwardPlayers() {
+    const query = dkpAwardQuery.trim().toLocaleLowerCase("de");
+    return sortedDkpPlayers(true).filter(function (player) {
+      if (!query) return true;
+      return String(player.char_name || "").toLocaleLowerCase("de").indexOf(query) !== -1;
+    });
+  }
+
+  function pruneDkpSelection() {
+    const live = {};
+    dkpPlayers.forEach(function (player) {
+      if (player && player.active && isDkpUuid(player.id)) live[player.id] = true;
+    });
+    Object.keys(dkpSelectedIds).forEach(function (id) {
+      if (!live[id]) delete dkpSelectedIds[id];
+    });
+    if (dkpReverseId && !dkpHistory.some(function (row) { return row.id === dkpReverseId; })) dkpReverseId = "";
+  }
+
+  function selectedDkpCount() {
+    return Object.keys(dkpSelectedIds).length;
+  }
+
+  function updateDkpSelectedCount() {
+    const el = document.getElementById("dkp-activity-count");
+    if (!el) return;
+    const count = selectedDkpCount();
+    el.textContent = count === 1 ? "1 ausgewählt" : count + " ausgewählt";
+  }
+
+  function dkpEmptyCell(text) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 3;
+    td.className = "px-2 py-6 text-center text-slate-500";
+    td.textContent = text;
+    tr.appendChild(td);
+    return tr;
+  }
+
+  function syncDkpSortHeaders() {
+    document.querySelectorAll("[data-action='dkp-sort']").forEach(function (button) {
+      const key = button.dataset.sort;
+      const th = button.closest("th");
+      const active = dkpSort.key === key;
+      if (th) th.setAttribute("aria-sort", active ? (dkpSort.dir === "asc" ? "ascending" : "descending") : "none");
+      const mark = button.querySelector("[data-sort-mark]");
+      if (mark) mark.textContent = !active ? "" : dkpSort.dir === "asc" ? " ↑" : " ↓";
+    });
+  }
+
+  function renderDkpScores() {
+    const body = document.getElementById("dkp-score-body");
+    if (!body) return;
+    syncDkpSortHeaders();
+    body.replaceChildren();
+    if (!dkpLoaded) {
+      body.appendChild(dkpEmptyCell(dkpLoadFailed ? "Die Punkteliste konnte nicht geladen werden." : "DKP werden geladen…"));
+      return;
+    }
+    const players = visibleScorePlayers();
+    if (!players.length) {
+      let message = "Noch keine Spieler im DKP-System.";
+      if (dkpPlayers.length && dkpPlayerQuery.trim()) message = "Kein Spieler passt zur Suche.";
+      else if (dkpPlayers.length && !dkpShowInactive) message = "Keine aktiven Spieler. Inaktive sind ausgeblendet.";
+      body.appendChild(dkpEmptyCell(message));
+      return;
+    }
+    players.forEach(function (player) {
+      const tr = document.createElement("tr");
+      tr.className = "border-b border-slate-800/80";
+      const nameCell = document.createElement("td");
+      nameCell.className = "px-2 py-1 align-middle";
+      const nameBtn = document.createElement("button");
+      nameBtn.type = "button";
+      nameBtn.dataset.action = "dkp-filter-player";
+      nameBtn.dataset.id = player.id;
+      nameBtn.className = "inline-flex min-h-11 w-full items-center gap-2 text-left font-semibold text-white hover:text-amber-300";
+      nameBtn.setAttribute("aria-label", "Verlauf von " + (player.char_name || "Spieler") + " anzeigen");
+      const nameText = document.createElement("span");
+      nameText.className = player.active ? "break-words" : "break-words text-slate-400";
+      nameText.textContent = player.char_name || "Spieler";
+      nameBtn.appendChild(nameText);
+      if (!player.active) {
+        const badge = document.createElement("span");
+        badge.className = "rounded-full border border-slate-700 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-slate-400";
+        badge.textContent = "inaktiv";
+        nameBtn.appendChild(badge);
+      }
+      nameCell.appendChild(nameBtn);
+      const dkpCell = document.createElement("td");
+      dkpCell.className = "px-2 py-1 align-middle whitespace-nowrap";
+      const dkpValue = Math.max(0, Math.min(500, Number(player.dkp) || 0));
+      const dkpText = document.createElement("div");
+      dkpText.className = "font-bold text-amber-300";
+      dkpText.textContent = dkpNum(player.dkp) + " / 500";
+      const bar = document.createElement("div");
+      bar.className = "mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-slate-800";
+      bar.setAttribute("aria-hidden", "true");
+      const fill = document.createElement("div");
+      fill.className = "h-full bg-amber-500";
+      fill.style.width = (dkpValue / 500) * 100 + "%";
+      bar.appendChild(fill);
+      dkpCell.append(dkpText, bar);
+      const overCell = document.createElement("td");
+      overCell.className = "px-2 py-1 align-middle font-semibold text-slate-200";
+      overCell.textContent = dkpNum(player.overflow);
+      tr.append(nameCell, dkpCell, overCell);
+      body.appendChild(tr);
+    });
+  }
+
+  function dkpKindLabel(row) {
+    if (!row) return "Eintrag";
+    if (row.kind === "activity") return "Aktivität";
+    if (row.kind === "item") return "Gegenstand";
+    if (row.kind === "transfer") return "Übertrag aus Überstunden";
+    if (row.kind === "reversal") return "Storno";
+    if (row.kind === "setup") return "Einstellung";
+    if (row.kind === "adjustment") {
+      const delta = (Number(row.dkp_change) || 0) + (Number(row.overflow_change) || 0);
+      return delta < 0 ? "Abzug" : "Bonus";
+    }
+    return "Eintrag";
+  }
+
+  function dkpWhatText(row) {
+    if (row.activity_name) return row.activity_name;
+    if (row.item_name) return row.item_name;
+    return "";
+  }
+
+  function dkpReversedMap() {
+    const map = {};
+    dkpHistory.forEach(function (row) {
+      if (row && isDkpUuid(row.reverses_id)) map[row.reverses_id] = true;
+    });
+    return map;
+  }
+
+  function dkpLine(label, value, muted) {
+    const p = document.createElement("p");
+    p.className = muted ? "text-sm text-slate-400" : "text-sm text-slate-200";
+    const strong = document.createElement("span");
+    strong.className = "font-semibold text-slate-400";
+    strong.textContent = label + ": ";
+    p.appendChild(strong);
+    p.appendChild(document.createTextNode(value || "—"));
+    return p;
+  }
+
+  function renderDkpHistory() {
+    const list = document.getElementById("dkp-history-list");
+    const more = document.getElementById("dkp-history-more");
+    if (!list) return;
+    list.replaceChildren();
+    if (more) more.hidden = !dkpHistoryHasMore;
+    if (!dkpLoaded) {
+      const li = document.createElement("li");
+      li.className = "px-2 py-4 text-center text-sm text-slate-500";
+      li.textContent = dkpLoadFailed ? "Der Verlauf konnte nicht geladen werden." : "Verlauf wird geladen…";
+      list.appendChild(li);
+      return;
+    }
+    if (!dkpHistory.length) {
+      const li = document.createElement("li");
+      li.className = "px-2 py-4 text-center text-sm text-slate-500";
+      li.textContent = dkpHistoryPlayerId ? "Keine Einträge für diesen Spieler." : "Noch keine Einträge im Verlauf.";
+      list.appendChild(li);
+      return;
+    }
+    const reversed = dkpReversedMap();
+    const officer = isOfficer();
+    dkpHistory.forEach(function (row) {
+      if (!row) return;
+      const li = document.createElement("li");
+      const isReversed = !!(row.id && reversed[row.id]);
+      li.className = "rounded-xl border border-slate-800 bg-slate-950 p-3" + (isReversed ? " opacity-70" : "");
+      const top = document.createElement("div");
+      top.className = "flex flex-wrap items-center gap-2";
+      const date = document.createElement("span");
+      date.className = "text-xs text-slate-400";
+      date.textContent = formatDkpStamp(row.created_at);
+      const kind = document.createElement("span");
+      kind.className = "rounded-full border border-amber-500/40 px-2 py-0.5 text-xs font-bold text-amber-300";
+      kind.textContent = dkpKindLabel(row);
+      top.append(date, kind);
+      if (isReversed) {
+        const badge = document.createElement("span");
+        badge.className = "rounded-full border border-slate-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-slate-400";
+        badge.textContent = "storniert";
+        top.appendChild(badge);
+      }
+      li.appendChild(top);
+      if (isDkpUuid(row.player_id)) {
+        const playerBtn = document.createElement("button");
+        playerBtn.type = "button";
+        playerBtn.dataset.action = "dkp-filter-player";
+        playerBtn.dataset.id = row.player_id;
+        playerBtn.className = "mt-2 inline-flex min-h-11 items-center text-left text-sm font-bold text-white hover:text-amber-300";
+        playerBtn.textContent = row.char_name || "Spieler";
+        li.appendChild(playerBtn);
+      } else {
+        li.appendChild(dkpLine("Spieler", row.char_name || "—"));
+      }
+      li.appendChild(dkpLine("Was", dkpWhatText(row) || "—"));
+      const points = document.createElement("p");
+      points.className = "mt-1 text-sm";
+      const dkpChange = Number(row.dkp_change) || 0;
+      const overChange = Number(row.overflow_change) || 0;
+      const dkpSpan = document.createElement("span");
+      dkpSpan.className = "font-bold " + (dkpChange > 0 ? "text-emerald-400" : dkpChange < 0 ? "text-red-400" : "text-slate-400");
+      dkpSpan.textContent = dkpSigned(dkpChange);
+      points.appendChild(dkpSpan);
+      if (overChange !== 0) {
+        const overSpan = document.createElement("span");
+        overSpan.className = "ml-2 text-xs font-semibold " + (overChange > 0 ? "text-emerald-300" : "text-red-300");
+        overSpan.textContent = dkpSigned(overChange) + " Überstunden";
+        points.appendChild(overSpan);
+      }
+      li.appendChild(points);
+      li.appendChild(dkpLine("Grund", row.reason || "—", true));
+      li.appendChild(dkpLine("Offizier", row.officer_name || "—", true));
+      if (row.kind === "reversal") {
+        const note = document.createElement("p");
+        note.className = "mt-1 text-xs text-slate-400";
+        const original = dkpHistory.find(function (item) { return item && item.id === row.reverses_id; });
+        if (!original) {
+          note.textContent = "Storno einer älteren Buchung.";
+        } else {
+          const what = dkpWhatText(original);
+          note.textContent = "Storno von " + dkpKindLabel(original) + (what ? " „" + what + "“" : "") + ", " + formatDkpStamp(original.created_at) + ".";
+        }
+        li.appendChild(note);
+      }
+      const reversible = officer && isDkpUuid(row.id) && !isReversed && (row.kind === "activity" || row.kind === "item" || row.kind === "adjustment" || row.kind === "transfer");
+      if (reversible && dkpReverseId === row.id) {
+        li.appendChild(buildDkpReverseForm());
+      } else if (reversible) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.action = "dkp-reverse";
+        button.dataset.id = row.id;
+        button.dataset.dkpWrite = "1";
+        button.className = "mt-2 inline-flex min-h-11 items-center justify-center rounded-xl border border-red-900/60 bg-slate-950 px-3 py-2 text-sm font-bold text-red-300 transition hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-50";
+        button.textContent = "Stornieren";
+        button.disabled = dkpBusy;
+        li.appendChild(button);
+      }
+      list.appendChild(li);
+    });
+    if (dkpReverseId) {
+      const input = document.getElementById("dkp-reverse-reason");
+      if (input) input.focus();
+    }
+  }
+
+  function buildDkpReverseForm() {
+    const form = document.createElement("form");
+    form.id = "dkp-reverse-form";
+    form.setAttribute("novalidate", "");
+    form.className = "mt-3 space-y-2 rounded-xl border border-slate-800 p-3";
+    const label = document.createElement("label");
+    label.htmlFor = "dkp-reverse-reason";
+    label.className = "mb-1 block text-xs font-semibold text-slate-400";
+    label.textContent = "Grund für die Stornierung";
+    const input = document.createElement("input");
+    input.id = "dkp-reverse-reason";
+    input.name = "reason";
+    input.type = "text";
+    input.maxLength = 300;
+    input.autocomplete = "off";
+    input.required = true;
+    input.className = DKP_INPUT;
+    const actions = document.createElement("div");
+    actions.className = "flex flex-col gap-2 sm:flex-row";
+    const save = document.createElement("button");
+    save.type = "submit";
+    save.dataset.dkpWrite = "1";
+    save.className = "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto";
+    save.textContent = "Stornierung speichern";
+    save.disabled = dkpBusy;
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.dataset.action = "dkp-reverse-cancel";
+    cancel.className = "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700 sm:w-auto";
+    cancel.textContent = "Abbrechen";
+    actions.append(save, cancel);
+    form.append(label, input, actions);
+    return form;
+  }
+
+  function playerSelectEntries(activeOnly) {
+    return sortedDkpPlayers(activeOnly).map(function (player) {
+      return {
+        value: player.id,
+        label: (player.char_name || "Spieler") + " · " + dkpNum(player.dkp) + " / 500 DKP · " + dkpNum(player.overflow) + " Überstunden",
+      };
+    });
+  }
+
+  function syncDkpActivityPoints(force) {
+    const select = document.getElementById("dkp-activity-type");
+    const input = document.getElementById("dkp-activity-points");
+    if (!select || !input) return;
+    const type = dkpById(dkpActivityTypes, select.value);
+    const next = type ? String(type.points) : "";
+    if (force || input.value.trim() === "" || input.value === dkpPointsStamp) input.value = next;
+    dkpPointsStamp = next;
+  }
+
+  function renderDkpHints() {
+    const transfer = dkpPlayerById((document.getElementById("dkp-transfer-player") || {}).value);
+    const transferText = document.getElementById("dkp-transfer-balance");
+    if (transferText) {
+      transferText.textContent = transfer
+        ? transfer.char_name + ": " + dkpNum(transfer.dkp) + " / 500 DKP, " + dkpNum(transfer.overflow) + " Überstunden."
+        : "Kein Spieler ausgewählt.";
+    }
+    const item = dkpById(dkpItems, (document.getElementById("dkp-item-id") || {}).value);
+    const itemHint = document.getElementById("dkp-item-hint");
+    if (itemHint) {
+      if (!item) itemHint.textContent = "Kein Gegenstand ausgewählt.";
+      else itemHint.textContent = item.name + " kostet " + dkpNum(item.cost) + " DKP." + (item.note ? " " + item.note : "");
+    }
+    const itemPlayer = dkpPlayerById((document.getElementById("dkp-item-player") || {}).value);
+    const itemBalance = document.getElementById("dkp-item-balance");
+    if (itemBalance) {
+      itemBalance.textContent = itemPlayer
+        ? itemPlayer.char_name + " hat " + dkpNum(itemPlayer.dkp) + " / 500 DKP."
+        : "Kein Spieler ausgewählt.";
+    }
+    const adjustPlayer = dkpPlayerById((document.getElementById("dkp-adjust-player") || {}).value);
+    const adjustBalance = document.getElementById("dkp-adjust-balance");
+    if (adjustBalance) {
+      adjustBalance.textContent = adjustPlayer
+        ? adjustPlayer.char_name + ": " + dkpNum(adjustPlayer.dkp) + " / 500 DKP, " + dkpNum(adjustPlayer.overflow) + " Überstunden."
+        : "Kein Spieler ausgewählt.";
+    }
+  }
+
+  function renderDkpAwardPlayers() {
+    const box = document.getElementById("dkp-activity-players");
+    if (!box) return;
+    box.replaceChildren();
+    const players = visibleAwardPlayers();
+    if (!players.length) {
+      const empty = document.createElement("p");
+      empty.className = "px-2 py-3 text-sm text-slate-500";
+      empty.textContent = sortedDkpPlayers(true).length ? "Kein Spieler passt zur Suche." : "Keine aktiven Spieler.";
+      box.appendChild(empty);
+      updateDkpSelectedCount();
+      return;
+    }
+    players.forEach(function (player) {
+      const label = document.createElement("label");
+      label.className = "flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm text-slate-200 hover:bg-slate-900";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.name = "dkp-award-player";
+      input.dataset.id = player.id;
+      input.checked = !!dkpSelectedIds[player.id];
+      input.className = "h-4 w-4 shrink-0 accent-amber-500";
+      const text = document.createElement("span");
+      text.textContent = (player.char_name || "Spieler") + " · " + dkpNum(player.dkp) + " DKP · " + dkpNum(player.overflow) + " Überstunden";
+      label.append(input, text);
+      box.appendChild(label);
+    });
+    updateDkpSelectedCount();
+  }
+
+  function dkpAdminButton(action, id, label, danger) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.action = action;
+    button.dataset.id = id;
+    if (danger) button.dataset.dkpWrite = "1";
+    button.className = danger
+      ? "inline-flex min-h-11 items-center justify-center rounded-xl border border-red-900/60 px-3 py-2 text-sm font-bold text-red-300 transition hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-50"
+      : "inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700";
+    button.textContent = label;
+    button.disabled = danger && dkpBusy;
+    return button;
+  }
+
+  function dkpAdminShell(title, meta) {
+    const li = document.createElement("li");
+    li.className = "flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:flex-row sm:items-center sm:justify-between";
+    const body = document.createElement("div");
+    body.className = "min-w-0";
+    const heading = document.createElement("p");
+    heading.className = "font-bold text-white break-words";
+    heading.textContent = title;
+    body.appendChild(heading);
+    meta.forEach(function (line) {
+      const p = document.createElement("p");
+      p.className = "text-sm text-slate-400 break-words";
+      p.textContent = line;
+      body.appendChild(p);
+    });
+    li.appendChild(body);
+    return li;
+  }
+
+  function renderDkpOfficer() {
+    fillDkpSelect(
+      document.getElementById("dkp-activity-type"),
+      sortedDkpTypes(true).map(function (row) {
+        return { value: row.id, label: (row.name || "Aktivität") + " (" + dkpNum(row.points) + " DKP)" };
+      }),
+      sortedDkpTypes(true).length ? "" : "Keine aktive Aktivität"
+    );
+    fillDkpSelect(document.getElementById("dkp-transfer-player"), playerSelectEntries(true), "Spieler wählen");
+    fillDkpSelect(document.getElementById("dkp-item-player"), playerSelectEntries(true), "Spieler wählen");
+    fillDkpSelect(document.getElementById("dkp-adjust-player"), playerSelectEntries(true), "Spieler wählen");
+    fillDkpSelect(
+      document.getElementById("dkp-item-id"),
+      sortedDkpItems(true).map(function (row) {
+        return { value: row.id, label: (row.name || "Gegenstand") + " · " + dkpNum(row.cost) + " DKP" };
+      }),
+      "Gegenstand wählen"
+    );
+    const historySelect = document.getElementById("dkp-history-player");
+    const historyEntries = sortedDkpPlayers(false).map(function (player) {
+      return { value: player.id, label: (player.char_name || "Spieler") + (player.active ? "" : " (inaktiv)") };
+    });
+    fillDkpSelect(historySelect, historyEntries, "Alle Spieler");
+    if (historySelect && isDkpUuid(dkpHistoryPlayerId)) historySelect.value = dkpHistoryPlayerId;
+    const memberSelect = document.getElementById("dkp-player-member");
+    const currentMember = memberSelect ? memberSelect.value : "";
+    const members = foreverMembers.filter(function (member) {
+      return member && isDkpUuid(member.id);
+    }).slice().sort(function (a, b) {
+      return String(a.name || "").localeCompare(String(b.name || ""), "de");
+    }).map(function (member) {
+      return { value: member.id, label: member.name || "Mitglied" };
+    });
+    if (isDkpUuid(currentMember) && !members.some(function (entry) { return entry.value === currentMember; })) {
+      members.push({ value: currentMember, label: "Verknüpftes Mitglied" });
+    }
+    fillDkpSelect(memberSelect, members, "Kein Gildenmitglied");
+    syncDkpActivityPoints(false);
+    renderDkpAwardPlayers();
+    renderDkpHints();
+    renderDkpPlayerAdmin();
+    renderDkpTypeAdmin();
+    renderDkpItemAdmin();
+    showDkpTab(dkpOfficerTab);
+  }
+
+  function renderDkpPlayerAdmin() {
+    const list = document.getElementById("dkp-player-list");
+    if (!list) return;
+    list.replaceChildren();
+    const players = sortedDkpPlayers(false);
+    if (!players.length) {
+      const li = document.createElement("li");
+      li.className = "text-sm text-slate-500";
+      li.textContent = "Noch keine Spieler angelegt.";
+      list.appendChild(li);
+      return;
+    }
+    players.forEach(function (player) {
+      const li = dkpAdminShell(player.char_name || "Spieler", [
+        dkpNum(player.dkp) + " / 500 DKP · " + dkpNum(player.overflow) + " Überstunden · " + (player.active ? "aktiv" : "inaktiv"),
+      ]);
+      const actions = document.createElement("div");
+      actions.className = "flex flex-col gap-2 sm:flex-row";
+      actions.append(
+        dkpAdminButton("dkp-edit-player", player.id, "Ändern", false),
+        dkpAdminButton("dkp-delete-player", player.id, "Löschen", true)
+      );
+      li.appendChild(actions);
+      list.appendChild(li);
+    });
+  }
+
+  function renderDkpTypeAdmin() {
+    const list = document.getElementById("dkp-type-list");
+    if (!list) return;
+    list.replaceChildren();
+    const rows = sortedDkpTypes(false);
+    if (!rows.length) {
+      const li = document.createElement("li");
+      li.className = "text-sm text-slate-500";
+      li.textContent = "Noch keine Aktivitäten angelegt.";
+      list.appendChild(li);
+      return;
+    }
+    rows.forEach(function (row) {
+      const li = dkpAdminShell(row.name || "Aktivität", [
+        dkpNum(row.points) + " DKP · Reihenfolge " + dkpNum(row.sort_order) + " · " + (row.active ? "aktiv" : "inaktiv"),
+      ]);
+      const actions = document.createElement("div");
+      actions.className = "flex flex-col gap-2 sm:flex-row";
+      actions.append(
+        dkpAdminButton("dkp-edit-type", row.id, "Ändern", false),
+        dkpAdminButton("dkp-delete-type", row.id, "Löschen", true)
+      );
+      li.appendChild(actions);
+      list.appendChild(li);
+    });
+  }
+
+  function renderDkpItemAdmin() {
+    const list = document.getElementById("dkp-item-list");
+    if (!list) return;
+    list.replaceChildren();
+    const rows = sortedDkpItems(false);
+    if (!rows.length) {
+      const li = document.createElement("li");
+      li.className = "text-sm text-slate-500";
+      li.textContent = "Noch keine Gegenstände angelegt.";
+      list.appendChild(li);
+      return;
+    }
+    rows.forEach(function (row) {
+      const lines = [dkpNum(row.cost) + " DKP · " + (row.active ? "aktiv" : "inaktiv")];
+      if (row.note) lines.push(row.note);
+      const li = dkpAdminShell(row.name || "Gegenstand", lines);
+      const actions = document.createElement("div");
+      actions.className = "flex flex-col gap-2 sm:flex-row";
+      actions.append(
+        dkpAdminButton("dkp-edit-item", row.id, "Ändern", false),
+        dkpAdminButton("dkp-delete-item", row.id, "Löschen", true)
+      );
+      li.appendChild(actions);
+      list.appendChild(li);
+    });
+  }
+
+  function renderDkp() {
+    renderDkpScores();
+    renderDkpHistory();
+    renderDkpOfficer();
+    if (dkpBusy) setDkpBusy(true);
+  }
+
+  function showDkpTab(name) {
+    const known = { activity: 1, transfer: 1, item: 1, adjust: 1, players: 1, types: 1, items: 1 };
+    if (!known[name]) name = "activity";
+    dkpOfficerTab = name;
+    document.querySelectorAll("[data-action='dkp-tab']").forEach(function (tab) {
+      const on = tab.dataset.tab === name;
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+      tab.className = on ? DKP_TAB_ON : DKP_TAB_OFF;
+    });
+    Object.keys(known).forEach(function (id) {
+      const panel = document.getElementById("dkp-panel-" + id);
+      if (panel) panel.hidden = id !== name;
+    });
+  }
+
+  function handleDkpChange(event) {
+    const target = event.target;
+    if (!target || !target.id && target.name !== "dkp-award-player") return false;
+    if (target.id === "dkp-show-inactive") {
+      dkpShowInactive = !!target.checked;
+      renderDkpScores();
+      return true;
+    }
+    if (target.id === "dkp-history-player") {
+      dkpHistoryPlayerId = isDkpUuid(target.value) ? target.value : "";
+      if (!isDkpUuid(target.value)) target.value = "";
+      reloadDkpHistory();
+      return true;
+    }
+    if (target.id === "dkp-show-setup") {
+      dkpShowSetup = !!target.checked;
+      reloadDkpHistory();
+      return true;
+    }
+    if (target.id === "dkp-activity-type") {
+      syncDkpActivityPoints(true);
+      return true;
+    }
+    if (target.name === "dkp-award-player") {
+      const id = target.dataset.id;
+      if (!isDkpUuid(id)) return true;
+      if (target.checked) dkpSelectedIds[id] = true;
+      else delete dkpSelectedIds[id];
+      updateDkpSelectedCount();
+      return true;
+    }
+    if (target.id === "dkp-transfer-player" || target.id === "dkp-item-player" || target.id === "dkp-adjust-player" || target.id === "dkp-item-id") {
+      renderDkpHints();
+      return true;
+    }
+    return false;
+  }
+
+  function filterDkpHistoryToPlayer(id) {
+    if (!isDkpUuid(id)) return;
+    dkpHistoryPlayerId = id;
+    const select = document.getElementById("dkp-history-player");
+    if (select) select.value = id;
+    reloadDkpHistory();
+    const history = document.getElementById("dkp-history");
+    if (history) history.scrollIntoView({ behavior: motion(), block: "start" });
+  }
+
+  function selectAllDkpPlayers() {
+    visibleAwardPlayers().forEach(function (player) {
+      dkpSelectedIds[player.id] = true;
+    });
+    renderDkpAwardPlayers();
+  }
+
+  function selectNoDkpPlayers() {
+    dkpSelectedIds = {};
+    renderDkpAwardPlayers();
+  }
+
+  function resetDkpPlayerForm() {
+    const form = document.getElementById("dkp-player-form");
+    if (form) form.reset();
+    const id = document.getElementById("dkp-player-id");
+    if (id) id.value = "";
+    const active = document.getElementById("dkp-player-active");
+    if (active) active.checked = true;
+    const submit = document.getElementById("dkp-player-submit");
+    if (submit) submit.textContent = "Spieler anlegen";
+  }
+
+  function resetDkpTypeForm() {
+    const form = document.getElementById("dkp-type-form");
+    if (form) form.reset();
+    const id = document.getElementById("dkp-type-id");
+    if (id) id.value = "";
+    const order = document.getElementById("dkp-type-order");
+    if (order) order.value = "0";
+    const active = document.getElementById("dkp-type-active");
+    if (active) active.checked = true;
+    const submit = document.getElementById("dkp-type-submit");
+    if (submit) submit.textContent = "Aktivität anlegen";
+  }
+
+  function resetDkpItemForm() {
+    const form = document.getElementById("dkp-item-admin-form");
+    if (form) form.reset();
+    const id = document.getElementById("dkp-item-admin-id");
+    if (id) id.value = "";
+    const active = document.getElementById("dkp-item-admin-active");
+    if (active) active.checked = true;
+    const submit = document.getElementById("dkp-item-admin-submit");
+    if (submit) submit.textContent = "Gegenstand anlegen";
+  }
+
+  function editDkpPlayer(id) {
+    const player = dkpPlayerById(id);
+    if (!player) return;
+    showDkpTab("players");
+    const hidden = document.getElementById("dkp-player-id");
+    const name = document.getElementById("dkp-player-name");
+    const member = document.getElementById("dkp-player-member");
+    const active = document.getElementById("dkp-player-active");
+    const submit = document.getElementById("dkp-player-submit");
+    if (hidden) hidden.value = player.id;
+    if (name) name.value = player.char_name || "";
+    if (member) {
+      if (isDkpUuid(player.member_id) && !Array.prototype.some.call(member.options, function (option) { return option.value === player.member_id; })) {
+        member.appendChild(dkpOption(player.member_id, "Verknüpftes Mitglied"));
+      }
+      member.value = isDkpUuid(player.member_id) ? player.member_id : "";
+    }
+    if (active) active.checked = !!player.active;
+    if (submit) submit.textContent = "Änderungen speichern";
+    if (name) name.focus();
+  }
+
+  function editDkpType(id) {
+    const row = dkpById(dkpActivityTypes, id);
+    if (!row) return;
+    showDkpTab("types");
+    const hidden = document.getElementById("dkp-type-id");
+    const name = document.getElementById("dkp-type-name");
+    const points = document.getElementById("dkp-type-points");
+    const order = document.getElementById("dkp-type-order");
+    const active = document.getElementById("dkp-type-active");
+    const submit = document.getElementById("dkp-type-submit");
+    if (hidden) hidden.value = row.id;
+    if (name) name.value = row.name || "";
+    if (points) points.value = String(row.points);
+    if (order) order.value = String(row.sort_order);
+    if (active) active.checked = !!row.active;
+    if (submit) submit.textContent = "Änderungen speichern";
+    if (name) name.focus();
+  }
+
+  function editDkpItem(id) {
+    const row = dkpById(dkpItems, id);
+    if (!row) return;
+    showDkpTab("items");
+    const hidden = document.getElementById("dkp-item-admin-id");
+    const name = document.getElementById("dkp-item-admin-name");
+    const cost = document.getElementById("dkp-item-admin-cost");
+    const note = document.getElementById("dkp-item-admin-note");
+    const active = document.getElementById("dkp-item-admin-active");
+    const submit = document.getElementById("dkp-item-admin-submit");
+    if (hidden) hidden.value = row.id;
+    if (name) name.value = row.name || "";
+    if (cost) cost.value = String(row.cost);
+    if (note) note.value = row.note || "";
+    if (active) active.checked = !!row.active;
+    if (submit) submit.textContent = "Änderungen speichern";
+    if (name) name.focus();
+  }
+
+  function handleDkpAction(action, el) {
+    if (action === "dkp-tab") {
+      showDkpTab(el.dataset.tab || "activity");
+      return;
+    }
+    if (action === "dkp-sort") {
+      const key = el.dataset.sort === "name" || el.dataset.sort === "overflow" ? el.dataset.sort : "dkp";
+      if (dkpSort.key === key) dkpSort.dir = dkpSort.dir === "asc" ? "desc" : "asc";
+      else dkpSort = { key: key, dir: key === "name" ? "asc" : "desc" };
+      renderDkpScores();
+      return;
+    }
+    if (action === "dkp-filter-player") {
+      filterDkpHistoryToPlayer(el.dataset.id || "");
+      return;
+    }
+    if (action === "dkp-select-all") {
+      selectAllDkpPlayers();
+      return;
+    }
+    if (action === "dkp-select-none") {
+      selectNoDkpPlayers();
+      return;
+    }
+    if (action === "dkp-history-more") {
+      loadMoreDkpHistory();
+      return;
+    }
+    if (action === "dkp-reverse") {
+      const id = el.dataset.id || "";
+      if (!isDkpUuid(id) || dkpBusy) return;
+      if (!window.confirm("Diesen Verlaufseintrag wirklich stornieren?")) return;
+      dkpReverseId = id;
+      renderDkpHistory();
+      return;
+    }
+    if (action === "dkp-reverse-cancel") {
+      dkpReverseId = "";
+      renderDkpHistory();
+      return;
+    }
+    if (action === "dkp-player-cancel") {
+      resetDkpPlayerForm();
+      setDkpStatus("dkp-player-status", "");
+      return;
+    }
+    if (action === "dkp-type-cancel") {
+      resetDkpTypeForm();
+      setDkpStatus("dkp-type-status", "");
+      return;
+    }
+    if (action === "dkp-item-cancel") {
+      resetDkpItemForm();
+      setDkpStatus("dkp-item-admin-status", "");
+      return;
+    }
+    if (action === "dkp-edit-player") {
+      editDkpPlayer(el.dataset.id || "");
+      return;
+    }
+    if (action === "dkp-edit-type") {
+      editDkpType(el.dataset.id || "");
+      return;
+    }
+    if (action === "dkp-edit-item") {
+      editDkpItem(el.dataset.id || "");
+      return;
+    }
+    if (action === "dkp-delete-player") {
+      deleteDkpPlayer(el.dataset.id || "");
+      return;
+    }
+    if (action === "dkp-delete-type") {
+      deleteDkpType(el.dataset.id || "");
+      return;
+    }
+    if (action === "dkp-delete-item") {
+      deleteDkpItem(el.dataset.id || "");
+    }
+  }
+
+  function dkpNamePreview(players) {
+    const names = players.map(function (player) { return player.char_name || "Spieler"; });
+    if (names.length <= 8) return names.join(", ");
+    return names.slice(0, 8).join(", ") + " und " + (names.length - 8) + " weitere";
+  }
+
+  function dkpAwardSummary(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const count = list.length;
+    let text = count + (count === 1 ? " Spieler hat Punkte bekommen." : " Spieler haben Punkte bekommen.");
+    const overtime = list.filter(function (row) { return Number(row.overflow_change) > 0; });
+    if (!overtime.length) {
+      text += " Niemand hat Punkte auf das Überstundenkonto bekommen.";
+    } else {
+      text += " Überstunden: " + overtime.map(function (row) {
+        return (row.char_name || "Spieler") + " " + dkpSigned(row.overflow_change);
+      }).join(", ") + ".";
+    }
+    return text;
+  }
+
+  function dkpBalanceSummary(row, lead) {
+    if (!row) return lead;
+    let text = lead;
+    if (Number(row.overflow_change)) text += " Überstunden " + dkpSigned(row.overflow_change) + ".";
+    text += " Neuer Stand: " + dkpNum(row.dkp) + " / 500 DKP, " + dkpNum(row.overflow) + " Überstunden.";
+    return text;
+  }
+
+  function submitDkpActivity() {
+    const type = dkpById(dkpActivityTypes, (document.getElementById("dkp-activity-type") || {}).value);
+    if (!type) {
+      setDkpStatus("dkp-activity-status", "Bitte eine Aktivität auswählen.");
+      return;
+    }
+    const pointsInput = readDkpInt((document.getElementById("dkp-activity-points") || {}).value);
+    if (!pointsInput.empty && (pointsInput.invalid || pointsInput.value < 1 || pointsInput.value > 500)) {
+      setDkpStatus("dkp-activity-status", "Die Punkte müssen zwischen 1 und 500 liegen.");
+      return;
+    }
+    const reason = dkpOptionalText((document.getElementById("dkp-activity-reason") || {}).value, 300);
+    if (reason.error) {
+      setDkpStatus("dkp-activity-status", "Der Grund ist zu lang (höchstens 300 Zeichen).");
+      return;
+    }
+    const chosen = sortedDkpPlayers(true).filter(function (player) { return !!dkpSelectedIds[player.id]; });
+    if (!chosen.length) {
+      setDkpStatus("dkp-activity-status", "Bitte mindestens einen Spieler auswählen.");
+      return;
+    }
+    if (chosen.length > 100) {
+      setDkpStatus("dkp-activity-status", "Höchstens 100 Spieler auf einmal.");
+      return;
+    }
+    const pointsLabel = pointsInput.empty ? Number(type.points) : pointsInput.value;
+    const summary = "Aktivität „" + (type.name || "") + "“ mit " + pointsLabel + " Punkten an " + chosen.length + " Spieler vergeben?\n\n" + dkpNamePreview(chosen);
+    if (!window.confirm(summary)) return;
+    const ids = [];
+    chosen.forEach(function (player) {
+      if (ids.indexOf(player.id) === -1) ids.push(player.id);
+    });
+    runDkpWrite("dkp-activity-status", function () {
+      return dkpRpc("dkp_award_activity", {
+        p_player_ids: ids,
+        p_activity_type_id: type.id,
+        p_points: pointsInput.empty ? null : pointsInput.value,
+        p_reason: reason.value,
+      }).then(function (data) {
+        dkpSelectedIds = {};
+        const reasonInput = document.getElementById("dkp-activity-reason");
+        if (reasonInput) reasonInput.value = "";
+        return dkpAwardSummary(data);
+      });
+    });
+  }
+
+  function submitDkpTransfer() {
+    const player = dkpPlayerById((document.getElementById("dkp-transfer-player") || {}).value);
+    if (!player) {
+      setDkpStatus("dkp-transfer-status", "Bitte einen Spieler auswählen.");
+      return;
+    }
+    const pointsInput = readDkpInt((document.getElementById("dkp-transfer-points") || {}).value);
+    if (!pointsInput.empty && (pointsInput.invalid || pointsInput.value < 1)) {
+      setDkpStatus("dkp-transfer-status", "Bitte mindestens 1 Punkt übertragen.");
+      return;
+    }
+    const reason = dkpOptionalText((document.getElementById("dkp-transfer-reason") || {}).value, 300);
+    if (reason.error) {
+      setDkpStatus("dkp-transfer-status", "Der Grund ist zu lang (höchstens 300 Zeichen).");
+      return;
+    }
+    runDkpWrite("dkp-transfer-status", function () {
+      return dkpRpc("dkp_transfer_overflow", {
+        p_player_id: player.id,
+        p_points: pointsInput.empty ? null : pointsInput.value,
+        p_reason: reason.value,
+      }).then(function (data) {
+        const row = Array.isArray(data) ? data[0] : null;
+        const moved = row ? Number(row.dkp_change) || 0 : 0;
+        const pointsField = document.getElementById("dkp-transfer-points");
+        const reasonField = document.getElementById("dkp-transfer-reason");
+        if (pointsField) pointsField.value = "";
+        if (reasonField) reasonField.value = "";
+        return dkpBalanceSummary(row, moved + " Punkte von den Überstunden auf das DKP-Konto von " + ((row && row.char_name) || player.char_name) + " übertragen.");
+      });
+    });
+  }
+
+  function submitDkpItemAward() {
+    const item = dkpById(dkpItems, (document.getElementById("dkp-item-id") || {}).value);
+    const player = dkpPlayerById((document.getElementById("dkp-item-player") || {}).value);
+    if (!item) {
+      setDkpStatus("dkp-item-status", "Bitte einen Gegenstand auswählen.");
+      return;
+    }
+    if (!player) {
+      setDkpStatus("dkp-item-status", "Bitte einen Spieler auswählen.");
+      return;
+    }
+    const costInput = readDkpInt((document.getElementById("dkp-item-cost") || {}).value);
+    if (!costInput.empty && (costInput.invalid || costInput.value < 0 || costInput.value > 500)) {
+      setDkpStatus("dkp-item-status", "Die Kosten müssen zwischen 0 und 500 DKP liegen.");
+      return;
+    }
+    const reason = dkpOptionalText((document.getElementById("dkp-item-reason") || {}).value, 300);
+    if (reason.error) {
+      setDkpStatus("dkp-item-status", "Der Grund ist zu lang (höchstens 300 Zeichen).");
+      return;
+    }
+    runDkpWrite("dkp-item-status", function () {
+      return dkpRpc("dkp_award_item", {
+        p_player_id: player.id,
+        p_item_id: item.id,
+        p_cost: costInput.empty ? null : costInput.value,
+        p_reason: reason.value,
+      }).then(function (data) {
+        const row = Array.isArray(data) ? data[0] : null;
+        const costField = document.getElementById("dkp-item-cost");
+        const reasonField = document.getElementById("dkp-item-reason");
+        if (costField) costField.value = "";
+        if (reasonField) reasonField.value = "";
+        const spent = row ? Math.abs(Number(row.dkp_change) || 0) : (costInput.empty ? Number(item.cost) : costInput.value);
+        return dkpBalanceSummary(row, "Gegenstand „" + (item.name || "") + "“ an " + ((row && row.char_name) || player.char_name) + " vergeben, " + dkpNum(spent) + " DKP abgezogen.");
+      });
+    });
+  }
+
+  function submitDkpAdjust() {
+    const player = dkpPlayerById((document.getElementById("dkp-adjust-player") || {}).value);
+    if (!player) {
+      setDkpStatus("dkp-adjust-status", "Bitte einen Spieler auswählen.");
+      return;
+    }
+    const pointsInput = readDkpInt((document.getElementById("dkp-adjust-points") || {}).value);
+    if (pointsInput.empty || pointsInput.invalid || pointsInput.value < 1 || pointsInput.value > 10000) {
+      setDkpStatus("dkp-adjust-status", "Bitte eine Punktzahl ungleich 0 eingeben (zwischen -10000 und 10000).");
+      return;
+    }
+    const mode = (document.getElementById("dkp-adjust-mode") || {}).value === "penalty" ? "penalty" : "bonus";
+    const account = (document.getElementById("dkp-adjust-account") || {}).value === "overflow" ? "overflow" : "dkp";
+    const points = mode === "penalty" ? -pointsInput.value : pointsInput.value;
+    const reason = dkpOptionalText((document.getElementById("dkp-adjust-reason") || {}).value, 300);
+    if (!reason.value || reason.value.length < 3) {
+      setDkpStatus("dkp-adjust-status", "Bitte einen Grund angeben (mindestens 3 Zeichen).");
+      return;
+    }
+    runDkpWrite("dkp-adjust-status", function () {
+      return dkpRpc("dkp_adjust", {
+        p_player_id: player.id,
+        p_points: points,
+        p_reason: reason.value,
+        p_account: account,
+      }).then(function (data) {
+        const row = Array.isArray(data) ? data[0] : null;
+        const pointsField = document.getElementById("dkp-adjust-points");
+        const reasonField = document.getElementById("dkp-adjust-reason");
+        if (pointsField) pointsField.value = "";
+        if (reasonField) reasonField.value = "";
+        const label = points > 0 ? "Bonus" : "Abzug";
+        return dkpBalanceSummary(row, label + " für " + ((row && row.char_name) || player.char_name) + " gebucht (" + dkpSigned(points) + ").");
+      });
+    });
+  }
+
+  function submitDkpPlayer() {
+    const name = String((document.getElementById("dkp-player-name") || {}).value || "").trim();
+    if (name.length < 2 || name.length > 40) {
+      setDkpStatus("dkp-player-status", "Bitte einen Namen mit 2 bis 40 Zeichen eingeben.");
+      return;
+    }
+    const hidden = String((document.getElementById("dkp-player-id") || {}).value || "");
+    const id = hidden ? (isDkpUuid(hidden) ? hidden : null) : null;
+    if (hidden && !id) {
+      setDkpStatus("dkp-player-status", "Dieser Spieler ist ungültig. Bitte die Liste neu laden.");
+      return;
+    }
+    const memberRaw = String((document.getElementById("dkp-player-member") || {}).value || "");
+    if (memberRaw && !isDkpUuid(memberRaw)) {
+      setDkpStatus("dkp-player-status", "Das Gildenmitglied wurde nicht gefunden.");
+      return;
+    }
+    const active = !!((document.getElementById("dkp-player-active") || {}).checked);
+    runDkpWrite("dkp-player-status", function () {
+      return dkpRpc("dkp_save_player", {
+        p_char_name: name,
+        p_id: id,
+        p_member_id: memberRaw || null,
+        p_active: active,
+      }).then(function () {
+        resetDkpPlayerForm();
+        return id ? "Spieler gespeichert." : "Spieler angelegt.";
+      });
+    });
+  }
+
+  function submitDkpType() {
+    const name = String((document.getElementById("dkp-type-name") || {}).value || "").trim();
+    if (name.length < 2 || name.length > 60) {
+      setDkpStatus("dkp-type-status", "Bitte einen Namen mit 2 bis 60 Zeichen eingeben.");
+      return;
+    }
+    const pointsInput = readDkpInt((document.getElementById("dkp-type-points") || {}).value);
+    if (pointsInput.empty || pointsInput.invalid || pointsInput.value < 1 || pointsInput.value > 500) {
+      setDkpStatus("dkp-type-status", "Die Punkte müssen zwischen 1 und 500 liegen.");
+      return;
+    }
+    const orderInput = readDkpInt((document.getElementById("dkp-type-order") || {}).value);
+    if (!orderInput.empty && (orderInput.invalid || orderInput.value < -100000 || orderInput.value > 100000)) {
+      setDkpStatus("dkp-type-status", "Bitte eine ganze Zahl als Reihenfolge eingeben.");
+      return;
+    }
+    const hidden = String((document.getElementById("dkp-type-id") || {}).value || "");
+    const id = hidden ? (isDkpUuid(hidden) ? hidden : null) : null;
+    if (hidden && !id) {
+      setDkpStatus("dkp-type-status", "Diese Aktivität ist ungültig. Bitte die Liste neu laden.");
+      return;
+    }
+    const active = !!((document.getElementById("dkp-type-active") || {}).checked);
+    runDkpWrite("dkp-type-status", function () {
+      return dkpRpc("dkp_save_activity_type", {
+        p_name: name,
+        p_points: pointsInput.value,
+        p_id: id,
+        p_active: active,
+        p_sort_order: orderInput.empty ? 0 : orderInput.value,
+      }).then(function () {
+        resetDkpTypeForm();
+        return id ? "Aktivität gespeichert." : "Aktivität angelegt.";
+      });
+    });
+  }
+
+  function submitDkpItemAdmin() {
+    const name = String((document.getElementById("dkp-item-admin-name") || {}).value || "").trim();
+    if (name.length < 2 || name.length > 80) {
+      setDkpStatus("dkp-item-admin-status", "Bitte einen Namen mit 2 bis 80 Zeichen eingeben.");
+      return;
+    }
+    const costInput = readDkpInt((document.getElementById("dkp-item-admin-cost") || {}).value);
+    if (costInput.empty || costInput.invalid || costInput.value < 0 || costInput.value > 500) {
+      setDkpStatus("dkp-item-admin-status", "Die Kosten müssen zwischen 0 und 500 DKP liegen.");
+      return;
+    }
+    const note = dkpOptionalText((document.getElementById("dkp-item-admin-note") || {}).value, 200);
+    if (note.error) {
+      setDkpStatus("dkp-item-admin-status", "Die Notiz ist zu lang (höchstens 200 Zeichen).");
+      return;
+    }
+    const hidden = String((document.getElementById("dkp-item-admin-id") || {}).value || "");
+    const id = hidden ? (isDkpUuid(hidden) ? hidden : null) : null;
+    if (hidden && !id) {
+      setDkpStatus("dkp-item-admin-status", "Dieser Gegenstand ist ungültig. Bitte die Liste neu laden.");
+      return;
+    }
+    const active = !!((document.getElementById("dkp-item-admin-active") || {}).checked);
+    runDkpWrite("dkp-item-admin-status", function () {
+      return dkpRpc("dkp_save_item", {
+        p_name: name,
+        p_cost: costInput.value,
+        p_id: id,
+        p_active: active,
+        p_note: note.value,
+      }).then(function () {
+        resetDkpItemForm();
+        return id ? "Gegenstand gespeichert." : "Gegenstand angelegt.";
+      });
+    });
+  }
+
+  function submitDkpReverse(form) {
+    const id = dkpReverseId;
+    if (!isDkpUuid(id)) return;
+    const reason = dkpOptionalText((form.querySelector("[name='reason']") || {}).value, 300);
+    if (!reason.value || reason.value.length < 3) {
+      setDkpStatus("dkp-history-status", "Bitte einen Grund angeben (mindestens 3 Zeichen).");
+      notify("Bitte einen Grund angeben (mindestens 3 Zeichen).", "error");
+      return;
+    }
+    runDkpWrite("dkp-history-status", function () {
+      return dkpRpc("dkp_reverse_entry", {
+        p_history_id: id,
+        p_reason: reason.value,
+      }).then(function () {
+        dkpReverseId = "";
+        return "Die Buchung wurde storniert.";
+      });
+    });
+  }
+
+  function deleteDkpPlayer(id) {
+    const player = dkpPlayerById(id);
+    if (!player || dkpBusy) return;
+    if (!window.confirm("Spieler „" + (player.char_name || "") + "“ wirklich löschen? Das geht nur ohne Punkteverlauf. Sonst bitte auf inaktiv setzen.")) return;
+    runDkpWrite("dkp-player-status", function () {
+      return dkpRpc("dkp_delete_player", { p_id: player.id }).then(function () {
+        if (dkpHistoryPlayerId === player.id) dkpHistoryPlayerId = "";
+        if ((document.getElementById("dkp-player-id") || {}).value === player.id) resetDkpPlayerForm();
+        return "Spieler gelöscht.";
+      });
+    });
+  }
+
+  function deleteDkpType(id) {
+    const row = dkpById(dkpActivityTypes, id);
+    if (!row || dkpBusy) return;
+    if (!window.confirm("Aktivität „" + (row.name || "") + "“ wirklich löschen? Im Verlauf bleibt der Name stehen.")) return;
+    runDkpWrite("dkp-type-status", function () {
+      return dkpRpc("dkp_delete_activity_type", { p_id: row.id }).then(function () {
+        if ((document.getElementById("dkp-type-id") || {}).value === row.id) resetDkpTypeForm();
+        return "Aktivität gelöscht.";
+      });
+    });
+  }
+
+  function deleteDkpItem(id) {
+    const row = dkpById(dkpItems, id);
+    if (!row || dkpBusy) return;
+    if (!window.confirm("Gegenstand „" + (row.name || "") + "“ wirklich löschen? Im Verlauf bleibt der Name stehen.")) return;
+    runDkpWrite("dkp-item-admin-status", function () {
+      return dkpRpc("dkp_delete_item", { p_id: row.id }).then(function () {
+        if ((document.getElementById("dkp-item-admin-id") || {}).value === row.id) resetDkpItemForm();
+        return "Gegenstand gelöscht.";
+      });
+    });
+  }
+
+  function submitDkpForm(form) {
+    if (form.id === "dkp-activity-form") submitDkpActivity();
+    else if (form.id === "dkp-transfer-form") submitDkpTransfer();
+    else if (form.id === "dkp-item-form") submitDkpItemAward();
+    else if (form.id === "dkp-adjust-form") submitDkpAdjust();
+    else if (form.id === "dkp-player-form") submitDkpPlayer();
+    else if (form.id === "dkp-type-form") submitDkpType();
+    else if (form.id === "dkp-item-admin-form") submitDkpItemAdmin();
+    else if (form.id === "dkp-reverse-form") submitDkpReverse(form);
+  }
+
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));

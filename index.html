@@ -379,6 +379,311 @@
         </div>
         <ul id="forever-members-list" class="grid max-h-[500px] grid-cols-1 gap-3 overflow-y-auto pr-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Forever-Mitglieder"></ul>
       </section>
+
+      <section id="forever-dkp" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
+        <div class="border-b border-slate-800 pb-4">
+          <h2 class="flex items-center gap-3 text-2xl font-black text-white">
+            <i class="fa-solid fa-coins text-amber-400" aria-hidden="true"></i> DKP-Punkte
+          </h2>
+          <p class="mt-2 max-w-3xl text-sm text-slate-400">Jeder Spieler hat ein DKP-Konto von 0 bis 500. Punkte darüber verfallen nicht, sie landen auf dem Überstundenkonto. Offiziere können sie zurückholen, aber nur bis 500. Gegenstände kosten DKP. Reicht das Konto nicht, wird die Vergabe abgelehnt. Das Überstundenkonto zahlt nicht mit, und unter 0 fällt das Konto nie.</p>
+          <p class="mt-2 max-w-3xl text-sm text-slate-400">Punkte und Verlauf sind öffentlich. Jeder sieht, auch ohne Anmeldung, wer wie viele Punkte bekommen oder ausgegeben hat, mit Grund, Datum und Offizier.</p>
+        </div>
+
+        <p id="dkp-load-status" class="text-sm text-amber-200" hidden role="status"></p>
+
+        <div class="space-y-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h3 class="text-lg font-black text-white">Punkteliste</h3>
+            <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+              <label for="dkp-search" class="sr-only">Spieler suchen</label>
+              <input type="search" id="dkp-search" placeholder="Spieler suchen…" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500 sm:w-64">
+              <label class="inline-flex min-h-11 items-center gap-2 text-sm text-slate-300" for="dkp-show-inactive">
+                <input type="checkbox" id="dkp-show-inactive" class="h-4 w-4 accent-amber-500">
+                Inaktive anzeigen
+              </label>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500">Ein Klick auf den Namen filtert den Verlauf. Die Spalten lassen sich sortieren.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <caption class="sr-only">DKP-Punkteliste</caption>
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-300">
+                  <th scope="col" aria-sort="none" class="p-0">
+                    <button type="button" data-action="dkp-sort" data-sort="name" class="inline-flex min-h-11 w-full items-center gap-1 px-2 text-left font-bold hover:text-white">Spieler<span data-sort-mark></span></button>
+                  </th>
+                  <th scope="col" aria-sort="descending" class="p-0">
+                    <button type="button" data-action="dkp-sort" data-sort="dkp" class="inline-flex min-h-11 w-full items-center gap-1 px-2 text-left font-bold hover:text-white">DKP<span data-sort-mark> ↓</span></button>
+                  </th>
+                  <th scope="col" aria-sort="none" class="p-0">
+                    <button type="button" data-action="dkp-sort" data-sort="overflow" class="inline-flex min-h-11 w-full items-center gap-1 px-2 text-left font-bold hover:text-white">Überstunden<span data-sort-mark></span></button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="dkp-score-body">
+                <tr>
+                  <td colspan="3" class="px-2 py-6 text-center text-slate-500">DKP werden geladen…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="dkp-history" class="space-y-4 border-t border-slate-800 pt-6">
+          <h3 class="text-lg font-black text-white">Verlauf</h3>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div class="w-full sm:max-w-xs">
+              <label for="dkp-history-player" class="mb-1 block text-xs font-semibold text-slate-400">Spieler</label>
+              <select id="dkp-history-player" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                <option value="">Alle Spieler</option>
+              </select>
+            </div>
+            <label class="inline-flex min-h-11 items-center gap-2 text-sm text-slate-300" for="dkp-show-setup">
+              <input type="checkbox" id="dkp-show-setup" class="h-4 w-4 accent-amber-500">
+              Einstellungen anzeigen
+            </label>
+          </div>
+          <p id="dkp-history-status" class="text-sm text-amber-200" hidden role="status"></p>
+          <ul id="dkp-history-list" class="space-y-3" aria-label="DKP-Verlauf"></ul>
+          <button type="button" id="dkp-history-more" data-action="dkp-history-more" data-dkp-write hidden class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Mehr laden</button>
+        </div>
+
+        <div id="dkp-officer" data-perm="officer" hidden class="space-y-4 rounded-2xl border border-amber-500/30 bg-slate-950/50 p-4">
+          <div>
+            <h3 class="text-lg font-black text-white">DKP verwalten</h3>
+            <p class="mt-1 text-sm text-slate-400">Nur für Offiziere und Administratoren. Die Datenbank prüft jede Buchung noch einmal und lehnt ungültige Punkte ab.</p>
+          </div>
+          <div role="tablist" aria-label="DKP verwalten" class="flex flex-wrap gap-2">
+            <button type="button" role="tab" id="dkp-tab-activity" data-action="dkp-tab" data-tab="activity" aria-controls="dkp-panel-activity" aria-selected="true" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-sm font-extrabold text-slate-950">Aktivität</button>
+            <button type="button" role="tab" id="dkp-tab-transfer" data-action="dkp-tab" data-tab="transfer" aria-controls="dkp-panel-transfer" aria-selected="false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700">Überstunden</button>
+            <button type="button" role="tab" id="dkp-tab-item" data-action="dkp-tab" data-tab="item" aria-controls="dkp-panel-item" aria-selected="false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700">Gegenstand</button>
+            <button type="button" role="tab" id="dkp-tab-adjust" data-action="dkp-tab" data-tab="adjust" aria-controls="dkp-panel-adjust" aria-selected="false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700">Bonus / Abzug</button>
+            <button type="button" role="tab" id="dkp-tab-players" data-action="dkp-tab" data-tab="players" aria-controls="dkp-panel-players" aria-selected="false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700">Spieler</button>
+            <button type="button" role="tab" id="dkp-tab-types" data-action="dkp-tab" data-tab="types" aria-controls="dkp-panel-types" aria-selected="false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700">Aktivitäten</button>
+            <button type="button" role="tab" id="dkp-tab-items" data-action="dkp-tab" data-tab="items" aria-controls="dkp-panel-items" aria-selected="false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700">Gegenstände</button>
+          </div>
+
+          <div id="dkp-panel-activity" role="tabpanel" aria-labelledby="dkp-tab-activity" class="space-y-4">
+            <div>
+              <h4 class="text-base font-black text-white">Aktivität vergeben</h4>
+              <p class="mt-1 text-sm text-slate-400">Punkte über 500 wandern automatisch auf das Überstundenkonto. Es zählen nur aktive Spieler.</p>
+            </div>
+            <form id="dkp-activity-form" novalidate class="space-y-4">
+              <div>
+                <label for="dkp-activity-type" class="mb-1 block text-xs font-semibold text-slate-400">Aktivität</label>
+                <select id="dkp-activity-type" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+              </div>
+              <div>
+                <label for="dkp-activity-points" class="mb-1 block text-xs font-semibold text-slate-400">Punkte (leer = Standard der Aktivität, 1 bis 500)</label>
+                <input type="number" id="dkp-activity-points" min="1" max="500" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div>
+                <label for="dkp-activity-reason" class="mb-1 block text-xs font-semibold text-slate-400">Grund (optional)</label>
+                <input type="text" id="dkp-activity-reason" maxlength="300" autocomplete="off" placeholder="z.B. Geschmolzener Kern, 12.11." class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div>
+                <label for="dkp-activity-search" class="mb-1 block text-xs font-semibold text-slate-400">Spieler suchen</label>
+                <input type="search" id="dkp-activity-search" autocomplete="off" placeholder="Name filtern…" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button type="button" data-action="dkp-select-all" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">Alle auswählen</button>
+                <button type="button" data-action="dkp-select-none" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700">Keine</button>
+                <p id="dkp-activity-count" class="text-sm text-amber-200" aria-live="polite">0 ausgewählt</p>
+              </div>
+              <div id="dkp-activity-players" class="max-h-72 space-y-1 overflow-y-auto rounded-xl border border-slate-800 p-2"></div>
+              <p id="dkp-activity-status" class="text-sm text-amber-200" hidden role="status"></p>
+              <button type="submit" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Aktivität vergeben</button>
+            </form>
+          </div>
+
+          <div id="dkp-panel-transfer" role="tabpanel" aria-labelledby="dkp-tab-transfer" hidden class="space-y-4">
+            <div>
+              <h4 class="text-base font-black text-white">Überstunden übertragen</h4>
+              <p class="mt-1 text-sm text-slate-400">Leer lassen heißt: so viel wie möglich. Mehr als bis 500 passt, wird nicht übertragen.</p>
+            </div>
+            <form id="dkp-transfer-form" novalidate class="space-y-4">
+              <div>
+                <label for="dkp-transfer-player" class="mb-1 block text-xs font-semibold text-slate-400">Spieler</label>
+                <select id="dkp-transfer-player" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+                <p id="dkp-transfer-balance" class="mt-2 text-sm text-slate-300"></p>
+              </div>
+              <div>
+                <label for="dkp-transfer-points" class="mb-1 block text-xs font-semibold text-slate-400">Punkte (leer = so viel wie möglich)</label>
+                <input type="number" id="dkp-transfer-points" min="1" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div>
+                <label for="dkp-transfer-reason" class="mb-1 block text-xs font-semibold text-slate-400">Grund (optional)</label>
+                <input type="text" id="dkp-transfer-reason" maxlength="300" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <p id="dkp-transfer-status" class="text-sm text-amber-200" hidden role="status"></p>
+              <button type="submit" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Überstunden übertragen</button>
+            </form>
+          </div>
+
+          <div id="dkp-panel-item" role="tabpanel" aria-labelledby="dkp-tab-item" hidden class="space-y-4">
+            <div>
+              <h4 class="text-base font-black text-white">Gegenstand vergeben</h4>
+              <p class="mt-1 text-sm text-slate-400">Die Kosten gehen nur vom DKP-Konto ab. Fehlen Punkte, bleibt alles unverändert.</p>
+            </div>
+            <form id="dkp-item-form" novalidate class="space-y-4">
+              <div>
+                <label for="dkp-item-id" class="mb-1 block text-xs font-semibold text-slate-400">Gegenstand</label>
+                <select id="dkp-item-id" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+                <p id="dkp-item-hint" class="mt-2 text-sm text-slate-300"></p>
+              </div>
+              <div>
+                <label for="dkp-item-cost" class="mb-1 block text-xs font-semibold text-slate-400">Kosten (leer = hinterlegte Kosten, 0 bis 500)</label>
+                <input type="number" id="dkp-item-cost" min="0" max="500" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div>
+                <label for="dkp-item-player" class="mb-1 block text-xs font-semibold text-slate-400">Spieler</label>
+                <select id="dkp-item-player" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+                <p id="dkp-item-balance" class="mt-2 text-sm text-slate-300"></p>
+              </div>
+              <div>
+                <label for="dkp-item-reason" class="mb-1 block text-xs font-semibold text-slate-400">Grund (optional)</label>
+                <input type="text" id="dkp-item-reason" maxlength="300" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <p id="dkp-item-status" class="text-sm text-amber-200" hidden role="status"></p>
+              <button type="submit" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Gegenstand vergeben</button>
+            </form>
+          </div>
+
+          <div id="dkp-panel-adjust" role="tabpanel" aria-labelledby="dkp-tab-adjust" hidden class="space-y-4">
+            <div>
+              <h4 class="text-base font-black text-white">Bonus / Abzug</h4>
+              <p class="mt-1 text-sm text-slate-400">Bonus auf dem DKP-Konto über 500 geht auf das Überstundenkonto. Ein Abzug unter 0 wird abgelehnt. Der Grund ist Pflicht.</p>
+            </div>
+            <form id="dkp-adjust-form" novalidate class="space-y-4">
+              <div>
+                <label for="dkp-adjust-player" class="mb-1 block text-xs font-semibold text-slate-400">Spieler</label>
+                <select id="dkp-adjust-player" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+                <p id="dkp-adjust-balance" class="mt-2 text-sm text-slate-300"></p>
+              </div>
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="dkp-adjust-mode" class="mb-1 block text-xs font-semibold text-slate-400">Art</label>
+                  <select id="dkp-adjust-mode" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                    <option value="bonus">Bonus</option>
+                    <option value="penalty">Abzug</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="dkp-adjust-points" class="mb-1 block text-xs font-semibold text-slate-400">Punkte (1 bis 10000)</label>
+                  <input type="number" id="dkp-adjust-points" min="1" max="10000" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                </div>
+              </div>
+              <div>
+                <label for="dkp-adjust-account" class="mb-1 block text-xs font-semibold text-slate-400">Konto</label>
+                <select id="dkp-adjust-account" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                  <option value="dkp">DKP</option>
+                  <option value="overflow">Überstundenkonto</option>
+                </select>
+              </div>
+              <div>
+                <label for="dkp-adjust-reason" class="mb-1 block text-xs font-semibold text-slate-400">Grund</label>
+                <input type="text" id="dkp-adjust-reason" maxlength="300" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <p id="dkp-adjust-status" class="text-sm text-amber-200" hidden role="status"></p>
+              <button type="submit" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Bonus oder Abzug buchen</button>
+            </form>
+          </div>
+
+          <div id="dkp-panel-players" role="tabpanel" aria-labelledby="dkp-tab-players" hidden class="space-y-4">
+            <div>
+              <h4 class="text-base font-black text-white">Spieler verwalten</h4>
+              <p class="mt-1 text-sm text-slate-400">Neue Spieler starten bei 0. Löschen geht nur ohne Punkteverlauf, sonst den Spieler auf inaktiv setzen.</p>
+            </div>
+            <form id="dkp-player-form" novalidate class="space-y-4">
+              <input type="hidden" id="dkp-player-id" value="">
+              <div>
+                <label for="dkp-player-name" class="mb-1 block text-xs font-semibold text-slate-400">Name (2 bis 40 Zeichen)</label>
+                <input type="text" id="dkp-player-name" maxlength="40" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div>
+                <label for="dkp-player-member" class="mb-1 block text-xs font-semibold text-slate-400">Gildenmitglied (optional)</label>
+                <select id="dkp-player-member" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+              </div>
+              <label class="inline-flex min-h-11 items-center gap-2 text-sm text-slate-300" for="dkp-player-active">
+                <input type="checkbox" id="dkp-player-active" checked class="h-4 w-4 accent-amber-500">
+                Aktiv
+              </label>
+              <p id="dkp-player-status" class="text-sm text-amber-200" hidden role="status"></p>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <button type="submit" id="dkp-player-submit" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Spieler anlegen</button>
+                <button type="button" data-action="dkp-player-cancel" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700 sm:w-auto">Abbrechen</button>
+              </div>
+            </form>
+            <ul id="dkp-player-list" class="space-y-2" aria-label="DKP-Spieler"></ul>
+          </div>
+
+          <div id="dkp-panel-types" role="tabpanel" aria-labelledby="dkp-tab-types" hidden class="space-y-4">
+            <div>
+              <h4 class="text-base font-black text-white">Aktivitäten verwalten</h4>
+              <p class="mt-1 text-sm text-slate-400">Name, Standardpunkte und Reihenfolge. Gelöschte Namen bleiben im Verlauf stehen.</p>
+            </div>
+            <form id="dkp-type-form" novalidate class="space-y-4">
+              <input type="hidden" id="dkp-type-id" value="">
+              <div>
+                <label for="dkp-type-name" class="mb-1 block text-xs font-semibold text-slate-400">Name (2 bis 60 Zeichen)</label>
+                <input type="text" id="dkp-type-name" maxlength="60" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="dkp-type-points" class="mb-1 block text-xs font-semibold text-slate-400">Punkte (1 bis 500)</label>
+                  <input type="number" id="dkp-type-points" min="1" max="500" step="1" inputmode="numeric" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                </div>
+                <div>
+                  <label for="dkp-type-order" class="mb-1 block text-xs font-semibold text-slate-400">Reihenfolge</label>
+                  <input type="number" id="dkp-type-order" step="1" inputmode="numeric" value="0" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                </div>
+              </div>
+              <label class="inline-flex min-h-11 items-center gap-2 text-sm text-slate-300" for="dkp-type-active">
+                <input type="checkbox" id="dkp-type-active" checked class="h-4 w-4 accent-amber-500">
+                Aktiv
+              </label>
+              <p id="dkp-type-status" class="text-sm text-amber-200" hidden role="status"></p>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <button type="submit" id="dkp-type-submit" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Aktivität anlegen</button>
+                <button type="button" data-action="dkp-type-cancel" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700 sm:w-auto">Abbrechen</button>
+              </div>
+            </form>
+            <ul id="dkp-type-list" class="space-y-2" aria-label="Aktivitäten"></ul>
+          </div>
+
+          <div id="dkp-panel-items" role="tabpanel" aria-labelledby="dkp-tab-items" hidden class="space-y-4">
+            <div>
+              <h4 class="text-base font-black text-white">Gegenstände verwalten</h4>
+              <p class="mt-1 text-sm text-slate-400">Name, Kosten und eine kurze Notiz. Gelöschte Namen bleiben im Verlauf stehen.</p>
+            </div>
+            <form id="dkp-item-admin-form" novalidate class="space-y-4">
+              <input type="hidden" id="dkp-item-admin-id" value="">
+              <div>
+                <label for="dkp-item-admin-name" class="mb-1 block text-xs font-semibold text-slate-400">Name (2 bis 80 Zeichen)</label>
+                <input type="text" id="dkp-item-admin-name" maxlength="80" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div>
+                <label for="dkp-item-admin-cost" class="mb-1 block text-xs font-semibold text-slate-400">Kosten (0 bis 500)</label>
+                <input type="number" id="dkp-item-admin-cost" min="0" max="500" step="1" inputmode="numeric" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <div>
+                <label for="dkp-item-admin-note" class="mb-1 block text-xs font-semibold text-slate-400">Notiz (optional, höchstens 200 Zeichen)</label>
+                <input type="text" id="dkp-item-admin-note" maxlength="200" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <label class="inline-flex min-h-11 items-center gap-2 text-sm text-slate-300" for="dkp-item-admin-active">
+                <input type="checkbox" id="dkp-item-admin-active" checked class="h-4 w-4 accent-amber-500">
+                Aktiv
+              </label>
+              <p id="dkp-item-admin-status" class="text-sm text-amber-200" hidden role="status"></p>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <button type="submit" id="dkp-item-admin-submit" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Gegenstand anlegen</button>
+                <button type="button" data-action="dkp-item-cancel" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700 sm:w-auto">Abbrechen</button>
+              </div>
+            </form>
+            <ul id="dkp-item-list" class="space-y-2" aria-label="Gegenstände"></ul>
+          </div>
+        </div>
+      </section>
     </div>
 
     <section id="galerie" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8">
