@@ -61,6 +61,7 @@
     { href: "#retail-kader", label: "Raidkader", icon: "fa-shield", tone: "text-red-500" },
     { href: "#retail-mplus", label: "M+ Planer", icon: "fa-stopwatch", tone: "text-amber-400" },
     { href: "#retail-mitglieder", label: "Mitglieder", icon: "fa-users", tone: "text-red-500" },
+    { href: "#forever-umfrage", label: "Forever-Umfrage", icon: "fa-clipboard-list", tone: "text-amber-400" },
     { href: "#galerie", label: "Galerie", icon: "fa-image", tone: "text-amber-400" },
     { href: "#bewerbung", label: "Bewerbung", icon: "fa-scroll", tone: "text-amber-400" },
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
@@ -71,6 +72,7 @@
     { href: "#forever-kader", label: "Classic Kader", icon: "fa-shield-cat", tone: "text-amber-400" },
     { href: "#forever-mitglieder", label: "Classic Mitglieder", icon: "fa-users", tone: "text-amber-400" },
     { href: "#forever-dkp", label: "DKP", icon: "fa-coins", tone: "text-amber-400" },
+    { href: "#forever-umfrage", label: "Forever-Umfrage", icon: "fa-clipboard-list", tone: "text-amber-400" },
     { href: "#galerie", label: "Galerie", icon: "fa-image", tone: "text-amber-400" },
     { href: "#bewerbung", label: "Bewerbung", icon: "fa-scroll", tone: "text-amber-400" },
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
@@ -104,6 +106,15 @@
   const guildInfo = clone(DEFAULTS.guildInfo || { col1: "", col2: "", col3: "" });
   let currentUser = null;
   let approvalEnforced = false;
+  let foreverPollRows = [];
+  let foreverPollOwn = null;
+  let foreverPollSending = false;
+
+  const FOREVER_POLL_CLASSES = ["Krieger", "Paladin", "Jäger", "Schurke", "Priester", "Schamane", "Magier", "Hexenmeister", "Druide"];
+  const FOREVER_POLL_TWINK = FOREVER_POLL_CLASSES.concat(["Noch unklar"]);
+  const FOREVER_POLL_ROLES = ["Tank", "Heiler", "Schaden"];
+  const FOREVER_POLL_RACES = ["Skyborne", "Orc", "Untoter", "Tauren", "Troll"];
+  const FOREVER_POLL_COLUMNS = "id, char_name, main_class, main_role, twink_class, twink_role, race, comment, created_at, updated_at";
 
   const DKP_HISTORY_COLUMNS = "id, created_at, kind, player_id, char_name, activity_type_id, activity_name, item_id, item_name, dkp_change, overflow_change, dkp_after, overflow_after, reason, batch_id, reverses_id, officer_name";
   const DKP_PAGE_SIZE = 50;
@@ -154,6 +165,7 @@
     renderChat();
     renderLeadership();
     loadGuildInfoView();
+    renderForeverPoll();
     updateAuthUI();
     loadRemote();
     const hash = location.hash.replace(/^#/, "");
@@ -359,6 +371,11 @@
       deleteGalleryImage(el.dataset.id, el.dataset.path);
       return;
     }
+    if (action === "delete-forever-poll") {
+      event.preventDefault();
+      deleteForeverPoll(el.dataset.id);
+      return;
+    }
     if (action === "close-lightbox") {
       closeLightbox();
       return;
@@ -419,6 +436,9 @@
       saveLeadership(form);
     } else if (form.id === "gallery-upload-form") {
       event.preventDefault();
+    } else if (form.id === "forever-poll-form") {
+      event.preventDefault();
+      submitForeverPoll(form);
     } else if (form.id && form.id.indexOf("dkp-") === 0) {
       event.preventDefault();
       submitDkpForm(form);
@@ -2932,6 +2952,7 @@
     renderChat();
     renderLeadership();
     renderGallery();
+    renderForeverPoll();
     renderDkp();
   }
 
@@ -3269,6 +3290,340 @@
     });
   }
 
+  function pollChoice(value, allowed) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    return allowed.indexOf(text) >= 0 ? text : null;
+  }
+
+  function normalizePollRow(row) {
+    if (!row || row.id == null) return null;
+    const id = String(row.id);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+    return {
+      id: id,
+      char_name: String(row.char_name || "").trim(),
+      main_class: String(row.main_class || ""),
+      main_role: row.main_role ? String(row.main_role) : "",
+      twink_class: row.twink_class ? String(row.twink_class) : "",
+      twink_role: row.twink_role ? String(row.twink_role) : "",
+      race: row.race ? String(row.race) : "",
+      comment: row.comment ? String(row.comment) : "",
+    };
+  }
+
+  function pollClassRole(className, role) {
+    if (!className) return "—";
+    if (role) return className + " (" + role + ")";
+    return className;
+  }
+
+  function pollTotalLabel(count) {
+    if (count === 1) return "1 Antwort";
+    if (count > 1) return count + " Antworten";
+    return "Noch keine Antwort";
+  }
+
+  function showForeverPollStatus(message, kind, toast) {
+    const el = document.getElementById("forever-poll-status");
+    if (el) {
+      if (!message) {
+        el.hidden = true;
+        el.textContent = "";
+      } else {
+        el.hidden = false;
+        el.textContent = message;
+        el.className = "text-sm " + (kind === "error" ? "text-red-400" : "text-emerald-400");
+      }
+    }
+    if (toast && message) notify(message, kind === "error" ? "error" : "info");
+  }
+
+  function setPollField(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  }
+
+  function setForeverPollSubmitLabel(changing) {
+    const label = document.getElementById("forever-poll-submit-label");
+    if (label) label.textContent = changing ? "Antwort ändern" : "Antwort senden";
+  }
+
+  function applyForeverPollOwn(row) {
+    const same = !!(foreverPollOwn && row && foreverPollOwn.id === row.id);
+    foreverPollOwn = row;
+    setForeverPollSubmitLabel(!!row);
+    if (!row || same) return;
+    setPollField("forever-poll-name", row.char_name);
+    setPollField("forever-poll-main-class", row.main_class);
+    setPollField("forever-poll-main-role", row.main_role);
+    setPollField("forever-poll-twink-class", row.twink_class);
+    setPollField("forever-poll-twink-role", row.twink_role);
+    setPollField("forever-poll-race", row.race);
+    setPollField("forever-poll-comment", row.comment);
+  }
+
+  function clearForeverPollOwn() {
+    const had = !!foreverPollOwn;
+    foreverPollOwn = null;
+    setForeverPollSubmitLabel(false);
+    if (!had) return;
+    const form = document.getElementById("forever-poll-form");
+    if (form) form.reset();
+    showForeverPollStatus("", "");
+  }
+
+  function appendPollBars(container, labels, counts) {
+    if (!container) return;
+    container.replaceChildren();
+    let max = 0;
+    labels.forEach(function (label) {
+      if (counts[label] > max) max = counts[label];
+    });
+    labels.forEach(function (label) {
+      const count = counts[label] || 0;
+      const row = document.createElement("div");
+      const head = document.createElement("div");
+      head.className = "mb-1 flex items-center justify-between gap-3 text-sm";
+      const name = document.createElement("span");
+      name.className = "text-slate-300";
+      name.textContent = label;
+      const num = document.createElement("span");
+      num.className = "font-bold text-amber-400";
+      num.textContent = String(count);
+      head.append(name, num);
+      const track = document.createElement("div");
+      track.className = "h-3 overflow-hidden rounded-full bg-slate-800";
+      const bar = document.createElement("div");
+      bar.className = "h-full rounded-full bg-gradient-to-r from-red-600 to-amber-500";
+      const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+      bar.style.width = pct + "%";
+      track.appendChild(bar);
+      row.append(head, track);
+      row.setAttribute("role", "img");
+      row.setAttribute("aria-label", label + ": " + count);
+      container.appendChild(row);
+    });
+  }
+
+  function renderForeverPoll() {
+    const total = document.getElementById("forever-poll-total");
+    if (total) total.textContent = pollTotalLabel(foreverPollRows.length);
+    const mainCounts = {};
+    const twinkCounts = {};
+    FOREVER_POLL_CLASSES.forEach(function (label) {
+      mainCounts[label] = 0;
+    });
+    FOREVER_POLL_TWINK.forEach(function (label) {
+      twinkCounts[label] = 0;
+    });
+    foreverPollRows.forEach(function (row) {
+      if (Object.prototype.hasOwnProperty.call(mainCounts, row.main_class)) mainCounts[row.main_class] += 1;
+      if (row.twink_class && Object.prototype.hasOwnProperty.call(twinkCounts, row.twink_class)) twinkCounts[row.twink_class] += 1;
+    });
+    appendPollBars(document.getElementById("forever-poll-main-bars"), FOREVER_POLL_CLASSES, mainCounts);
+    appendPollBars(document.getElementById("forever-poll-twink-bars"), FOREVER_POLL_TWINK, twinkCounts);
+
+    const list = document.getElementById("forever-poll-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!foreverPollRows.length) {
+      const empty = document.createElement("p");
+      empty.className = "text-sm text-slate-500";
+      empty.textContent = "Noch keine Antwort.";
+      list.appendChild(empty);
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "overflow-x-auto";
+    const table = document.createElement("table");
+    table.className = "w-full border-collapse text-left text-sm text-slate-300";
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    headRow.className = "border-b border-slate-800 text-xs uppercase tracking-wider text-slate-500";
+    ["Name", "Main", "Twink", "Rasse", "Kommentar"].forEach(function (title) {
+      const th = document.createElement("th");
+      th.className = "px-2 py-2 font-semibold";
+      th.scope = "col";
+      th.textContent = title;
+      headRow.appendChild(th);
+    });
+    const actionTh = document.createElement("th");
+    actionTh.className = "px-2 py-2 font-semibold";
+    actionTh.scope = "col";
+    actionTh.dataset.perm = "officer";
+    actionTh.hidden = !isOfficer();
+    const actionLabel = document.createElement("span");
+    actionLabel.className = "sr-only";
+    actionLabel.textContent = "Löschen";
+    actionTh.appendChild(actionLabel);
+    headRow.appendChild(actionTh);
+    thead.appendChild(headRow);
+    const tbody = document.createElement("tbody");
+    foreverPollRows.forEach(function (row) {
+      const tr = document.createElement("tr");
+      tr.className = "border-b border-slate-800";
+      [row.char_name, pollClassRole(row.main_class, row.main_role), pollClassRole(row.twink_class, row.twink_role), row.race || "—", row.comment || "—"].forEach(function (value) {
+        const td = document.createElement("td");
+        td.className = "break-words px-2 py-2";
+        td.textContent = value;
+        tr.appendChild(td);
+      });
+      const action = document.createElement("td");
+      action.className = "px-2 py-2";
+      action.dataset.perm = "officer";
+      action.hidden = !isOfficer();
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.dataset.action = "delete-forever-poll";
+      remove.dataset.id = row.id;
+      remove.dataset.perm = "officer";
+      remove.hidden = !isOfficer();
+      remove.className = "inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-red-400 hover:text-white";
+      remove.textContent = "Löschen";
+      remove.setAttribute("aria-label", "Eintrag löschen: " + row.char_name);
+      action.appendChild(remove);
+      tr.appendChild(action);
+      tbody.appendChild(tr);
+    });
+    table.append(thead, tbody);
+    wrap.appendChild(table);
+    list.appendChild(wrap);
+  }
+
+  function foreverPollErrorText(error) {
+    const msg = String((error && error.message) || "").replace(/^ERROR:\s*/i, "").trim();
+    if (!msg || /failed to fetch|network|jwt|schema cache|permission denied|PGRST/i.test(msg)) {
+      return "Die Antwort konnte nicht gespeichert werden.";
+    }
+    return msg;
+  }
+
+  function loadForeverPoll() {
+    if (!remote || typeof remote.from !== "function") return Promise.resolve();
+    let request;
+    try {
+      request = remote.from("forever_poll").select(FOREVER_POLL_COLUMNS).order("created_at", { ascending: true });
+    } catch (err) {
+      return Promise.resolve();
+    }
+    return Promise.resolve(request).then(function (result) {
+      if (!result || result.error) {
+        showForeverPollStatus("Die Antworten konnten nicht geladen werden.", "error", false);
+        return;
+      }
+      foreverPollRows = (result.data || []).map(normalizePollRow).filter(Boolean);
+      renderForeverPoll();
+    }).catch(function () {
+      showForeverPollStatus("Die Antworten konnten nicht geladen werden.", "error", false);
+    });
+  }
+
+  function loadMyForeverPoll() {
+    if (!remote || !currentUser || typeof remote.rpc !== "function") return Promise.resolve();
+    return remote.rpc("my_forever_poll").then(function (result) {
+      if (!currentUser || !result || result.error) return;
+      const rows = Array.isArray(result.data) ? result.data : [];
+      const own = rows.length ? normalizePollRow(rows[0]) : null;
+      if (own) applyForeverPollOwn(own);
+      else {
+        foreverPollOwn = null;
+        setForeverPollSubmitLabel(false);
+      }
+    }).catch(function () { /* Ohne eigenen Eintrag bleibt das Formular leer. */ });
+  }
+
+  function submitForeverPoll(form) {
+    if (foreverPollSending) return;
+    const honeypot = document.getElementById("forever-poll-website");
+    if (honeypot && honeypot.value.trim()) return;
+    if (!remote || typeof remote.rpc !== "function") {
+      showForeverPollStatus("Die Umfrage ist gerade nicht erreichbar.", "error", true);
+      return;
+    }
+    const name = fieldValue("forever-poll-name").trim();
+    const mainClass = pollChoice(fieldValue("forever-poll-main-class"), FOREVER_POLL_CLASSES);
+    const mainRole = pollChoice(fieldValue("forever-poll-main-role"), FOREVER_POLL_ROLES);
+    const twinkClass = pollChoice(fieldValue("forever-poll-twink-class"), FOREVER_POLL_TWINK);
+    const twinkRole = pollChoice(fieldValue("forever-poll-twink-role"), FOREVER_POLL_ROLES);
+    const race = pollChoice(fieldValue("forever-poll-race"), FOREVER_POLL_RACES);
+    const comment = fieldValue("forever-poll-comment").trim();
+    if (name.length < 2 || name.length > 40) {
+      showForeverPollStatus("Bitte einen Namen mit 2 bis 40 Zeichen eingeben.", "error", true);
+      return;
+    }
+    if (!mainClass || mainRole === null || twinkClass === null || twinkRole === null || race === null) {
+      showForeverPollStatus("Bitte Klasse, Rolle und Rasse aus der Liste wählen.", "error", true);
+      return;
+    }
+    if (comment.length > 300) {
+      showForeverPollStatus("Der Kommentar ist zu lang (höchstens 300 Zeichen).", "error", true);
+      return;
+    }
+    const button = document.getElementById("forever-poll-submit");
+    const changing = !!(currentUser && foreverPollOwn);
+    foreverPollSending = true;
+    if (button) button.disabled = true;
+    remote.rpc("submit_forever_poll", {
+      p_char_name: name,
+      p_main_class: mainClass,
+      p_main_role: mainRole,
+      p_twink_class: twinkClass,
+      p_twink_role: twinkRole,
+      p_race: race,
+      p_comment: comment,
+    }).then(function (result) {
+      if (!result || result.error) {
+        showForeverPollStatus(foreverPollErrorText(result && result.error), "error", true);
+        return;
+      }
+      const saved = Array.isArray(result.data) ? result.data : [];
+      const row = saved.length ? normalizePollRow(saved[0]) : null;
+      if (currentUser && row) applyForeverPollOwn(row);
+      else setForeverPollSubmitLabel(false);
+      showForeverPollStatus(changing ? "Deine Antwort wurde geändert." : "Danke. Deine Antwort ist gespeichert.", "info", true);
+      return loadForeverPoll();
+    }).catch(function () {
+      showForeverPollStatus("Die Antwort konnte nicht gespeichert werden.", "error", true);
+    }).then(function () {
+      foreverPollSending = false;
+      if (button) button.disabled = false;
+    });
+  }
+
+  function deleteForeverPoll(id) {
+    if (!isOfficer()) {
+      showForeverPollStatus("Nur Offiziere und Administratoren dürfen Einträge löschen.", "error", true);
+      return;
+    }
+    if (!remote || typeof remote.from !== "function") {
+      showForeverPollStatus("Löschen ist gerade nicht möglich.", "error", true);
+      return;
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || "")) return;
+    const row = foreverPollRows.filter(function (item) { return item.id === id; })[0];
+    const who = row ? row.char_name : "diesen Eintrag";
+    if (!window.confirm("Den Eintrag von „" + who + "“ wirklich löschen?")) return;
+    remote.from("forever_poll").delete().eq("id", id).then(function (result) {
+      if (!result || result.error) {
+        showForeverPollStatus("Der Eintrag konnte nicht gelöscht werden.", "error", true);
+        return null;
+      }
+      return loadForeverPoll();
+    }).then(function (loaded) {
+      if (loaded === null) return;
+      const still = foreverPollRows.some(function (item) { return item.id === id; });
+      if (still) {
+        showForeverPollStatus("Der Eintrag konnte nicht gelöscht werden.", "error", true);
+        return;
+      }
+      if (foreverPollOwn && foreverPollOwn.id === id) clearForeverPollOwn();
+      showForeverPollStatus("Eintrag gelöscht.", "info", true);
+    }).catch(function () {
+      showForeverPollStatus("Der Eintrag konnte nicht gelöscht werden.", "error", true);
+    });
+  }
+
   function createRemote() {
     const lib = window.supabase;
     const config = arcConfig();
@@ -3362,6 +3717,7 @@
     }
     loadGallery();
     loadDkp();
+    loadForeverPoll();
     probeApproval().then(function () {
       if (!authReady) {
         authReady = true;
@@ -3369,6 +3725,7 @@
           if (event === "SIGNED_OUT") {
             currentUser = null;
             if (approvalEnforced) replaceItems(chatMessages, []);
+            clearForeverPollOwn();
             updateAuthUI();
             renderPermissionSurfaces();
             return;
@@ -3377,6 +3734,7 @@
           adoptSession(session).then(function () {
             updateAuthUI();
             renderPermissionSurfaces();
+            if (event !== "TOKEN_REFRESHED") loadMyForeverPoll();
             if (remoteReady && event !== "TOKEN_REFRESHED") refreshChat();
           }).catch(function () {
             updateAuthUI();
@@ -3397,6 +3755,7 @@
       remoteReady = true;
       renderGuild();
       updateAuthUI();
+      loadMyForeverPoll();
       subscribeLive();
       if (currentUser && approvalEnforced) refreshChat();
     }).catch(function () {

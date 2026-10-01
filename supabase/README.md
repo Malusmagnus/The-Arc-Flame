@@ -51,6 +51,16 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/gallery.sql
 
 Danach gibt es den öffentlichen Bucket `gallery` (höchstens 10 MB, JPEG, PNG, WebP, GIF) und die Tabelle `public.gallery_images`. Jeder darf die Bilder sehen. Hochladen und Löschen dürfen nur freigeschaltete Profile mit der Rolle `officer` oder `admin` (`public.is_officer()` und `public.is_approved()`). `gallery.sql` bricht ab, wenn `public.is_approved()` noch fehlt.
 
+## Forever-Umfrage
+
+`forever_poll.sql` einmal ausführen, wenn `schema.sql` schon auf dem Projekt liegt und der Umfrage-Block darin noch nicht gelaufen ist. Ein komplettes erneutes Ausführen von `schema.sql` enthält dieselben Anweisungen. Beides kann wiederholt werden.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/forever_poll.sql
+```
+
+Danach gibt es die Tabelle `public.forever_poll`. Lesen dürfen alle Besucher, aber nur die sichtbaren Spalten: `id`, `char_name`, `main_class`, `main_role`, `twink_class`, `twink_role`, `race`, `comment`, `created_at`, `updated_at`. Die Spalte `user_id` bleibt verborgen, deshalb die Spalten einzeln auswählen. Schreiben geht nur über `public.submit_forever_poll`. Angemeldete Konten haben einen Eintrag und ändern ihn beim erneuten Absenden. Ohne Anmeldung gilt ein Name einmal. Den eigenen Eintrag liefert `public.my_forever_poll`. Löschen dürfen freigeschaltete Offiziere und Administratoren (`public.is_officer()` und `public.is_approved()`).
+
 ## DKP
 
 `dkp.sql` einmal ausführen, wenn `schema.sql` schon auf dem Projekt liegt und der DKP-Block darin noch nicht gelaufen ist. Ein komplettes erneutes Ausführen von `schema.sql` enthält dieselben Anweisungen. Beides kann wiederholt werden. Vorhandene Punkte bleiben erhalten. Die Start-Aktivitäten werden nur angelegt, solange `dkp_activity_types` leer ist.
