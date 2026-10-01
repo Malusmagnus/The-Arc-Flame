@@ -12,7 +12,8 @@
 --   wird die Vergabe abgelehnt. Das Überstundenkonto zahlt keine Gegenstände,
 --   Offiziere schieben Punkte bei Bedarf zurück (nie über 500).
 --
--- Lesen: alle (anon + authenticated). dkp_history ohne officer_id.
+-- Lesen: nur angemeldete, freigeschaltete Konten (public.is_approved()).
+--   Besucher ohne Anmeldung (anon) haben kein Leserecht. dkp_history ohne officer_id.
 -- Schreiben: nur über die dkp_*-Funktionen, nur freigeschaltete Offiziere und
 --   Administratoren (public.is_officer() und public.is_approved()).
 --   Jede Änderung schreibt eine Zeile in public.dkp_history.
@@ -794,29 +795,31 @@ alter table public.dkp_players force row level security;
 alter table public.dkp_history enable row level security;
 alter table public.dkp_history force row level security;
 
+-- Lesen nur für angemeldete, freigeschaltete Konten. Ohne Anmeldung: kein Zugriff.
+-- (select ...) wertet die Prüfung einmal pro Abfrage aus, nicht pro Zeile.
 drop policy if exists dkp_activity_types_select on public.dkp_activity_types;
 create policy dkp_activity_types_select on public.dkp_activity_types
-  for select to anon, authenticated using (true);
+  for select to authenticated using ((select public.is_approved()));
 drop policy if exists dkp_items_select on public.dkp_items;
 create policy dkp_items_select on public.dkp_items
-  for select to anon, authenticated using (true);
+  for select to authenticated using ((select public.is_approved()));
 drop policy if exists dkp_players_select on public.dkp_players;
 create policy dkp_players_select on public.dkp_players
-  for select to anon, authenticated using (true);
+  for select to authenticated using ((select public.is_approved()));
 drop policy if exists dkp_history_select on public.dkp_history;
 create policy dkp_history_select on public.dkp_history
-  for select to anon, authenticated using (true);
+  for select to authenticated using ((select public.is_approved()));
 
 revoke all on table public.dkp_activity_types from public, anon, authenticated;
 revoke all on table public.dkp_items from public, anon, authenticated;
 revoke all on table public.dkp_players from public, anon, authenticated;
 revoke all on table public.dkp_history from public, anon, authenticated;
-grant select on table public.dkp_activity_types to anon, authenticated;
-grant select on table public.dkp_items to anon, authenticated;
-grant select on table public.dkp_players to anon, authenticated;
+grant select on table public.dkp_activity_types to authenticated;
+grant select on table public.dkp_items to authenticated;
+grant select on table public.dkp_players to authenticated;
 grant select (id, created_at, kind, player_id, char_name, activity_type_id, activity_name, item_id, item_name,
               dkp_change, overflow_change, dkp_after, overflow_after, reason, batch_id, reverses_id, officer_name)
-  on table public.dkp_history to anon, authenticated;
+  on table public.dkp_history to authenticated;
 
 -- Interne Funktionen: niemand außer dem Besitzer.
 revoke all on function public.dkp_require_officer() from public, anon, authenticated;
