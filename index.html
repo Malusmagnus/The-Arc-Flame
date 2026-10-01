@@ -383,12 +383,20 @@
       <section id="forever-dkp" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="border-b border-slate-800 pb-4">
           <h2 class="flex items-center gap-3 text-2xl font-black text-white">
-            <i class="fa-solid fa-coins text-amber-400" aria-hidden="true"></i> DKP-Punkte
+            <i class="fa-solid fa-coins text-amber-400" aria-hidden="true"></i>
+            <span id="dkp-heading-text">Gilden-Aktivitäten</span>
           </h2>
-          <p class="mt-2 max-w-3xl text-sm text-slate-400">Jeder Spieler hat ein DKP-Konto von 0 bis 500. Punkte darüber verfallen nicht, sie landen auf dem Überstundenkonto. Offiziere können sie zurückholen, aber nur bis 500. Gegenstände kosten DKP. Reicht das Konto nicht, wird die Vergabe abgelehnt. Das Überstundenkonto zahlt nicht mit, und unter 0 fällt das Konto nie.</p>
-          <p class="mt-2 max-w-3xl text-sm text-slate-400">Punkte und Verlauf sind öffentlich. Jeder sieht, auch ohne Anmeldung, wer wie viele Punkte bekommen oder ausgegeben hat, mit Grund, Datum und Offizier.</p>
+          <div id="dkp-gate" class="mt-4 max-w-3xl">
+            <p id="dkp-gate-text" class="text-sm text-slate-400">Unser Gilden-Aktivitäten-System: Punkte für Raids, Dungeons und Gildenevents. Nur für registrierte Mitglieder.</p>
+            <button type="button" id="dkp-gate-login" data-action="open-auth" class="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 sm:w-auto">Anmelden oder registrieren</button>
+          </div>
+          <div id="dkp-intro" hidden>
+            <p class="mt-2 max-w-3xl text-sm text-slate-400">Jeder Spieler hat ein DKP-Konto von 0 bis 500. Punkte darüber verfallen nicht, sie landen auf dem Überstundenkonto. Offiziere können sie zurückholen, aber nur bis 500. Gegenstände kosten DKP. Reicht das Konto nicht, wird die Vergabe abgelehnt. Das Überstundenkonto zahlt nicht mit, und unter 0 fällt das Konto nie.</p>
+            <p class="mt-2 max-w-3xl text-sm text-slate-400">Punkte und Verlauf sehen nur freigeschaltete Mitglieder. Jeder Eintrag zeigt, wer wie viele Punkte bekommen oder ausgegeben hat, mit Grund, Datum und Offizier.</p>
+          </div>
         </div>
 
+        <div id="dkp-body" hidden class="space-y-6">
         <p id="dkp-load-status" class="text-sm text-amber-200" hidden role="status"></p>
 
         <div class="space-y-4">
@@ -713,6 +721,7 @@
             </form>
             <ul id="dkp-item-list" class="space-y-2" aria-label="Gegenstände"></ul>
           </div>
+        </div>
         </div>
       </section>
     </div>

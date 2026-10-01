@@ -541,7 +541,15 @@
       const at = items.findIndex(function (item) { return item.href === "#bewerbung"; });
       items.splice(at < 0 ? items.length : at, 0, entry);
     }
-    return items;
+    return items.map(function (item) {
+      if (item.href !== "#forever-dkp") return item;
+      return {
+        href: item.href,
+        label: canReadDkp() ? "DKP" : "Gilden-Aktivitäten",
+        icon: item.icon,
+        tone: item.tone,
+      };
+    });
   }
 
   function updateQuickNav() {
@@ -640,6 +648,7 @@
     }
     syncPermissions();
     prefillChatAuthor();
+    updateQuickNav();
   }
 
   function syncPermissions() {
@@ -844,6 +853,7 @@
   function logoutUser() {
     const finish = function () {
       currentUser = null;
+      clearDkpData();
       updateAuthUI();
       renderPermissionSurfaces();
       notify("Du wurdest abgemeldet.", "info");
@@ -3738,13 +3748,10 @@
     remote = createRemote();
     if (!remote) {
       notify(OFFLINE_MSG, "error");
-      dkpLoadFailed = true;
-      setDkpLoadStatus(DKP_LOAD_FAIL);
       renderDkp();
       return;
     }
     loadGallery();
-    loadDkp();
     loadForeverPoll();
     probeApproval().then(function () {
       if (!authReady) {
@@ -3754,6 +3761,7 @@
             currentUser = null;
             if (approvalEnforced) replaceItems(chatMessages, []);
             clearForeverPollOwn();
+            clearDkpData();
             updateAuthUI();
             renderPermissionSurfaces();
             return;
@@ -3762,10 +3770,12 @@
           adoptSession(session).then(function () {
             updateAuthUI();
             renderPermissionSurfaces();
+            if (!(event === "TOKEN_REFRESHED" && dkpLoaded && canReadDkp())) syncDkpAccess();
             if (event !== "TOKEN_REFRESHED") loadMyForeverPoll();
             if (remoteReady && event !== "TOKEN_REFRESHED") refreshChat();
           }).catch(function () {
             updateAuthUI();
+            clearDkpData();
           });
         });
       }
@@ -3783,6 +3793,7 @@
       remoteReady = true;
       renderGuild();
       updateAuthUI();
+      syncDkpAccess();
       loadMyForeverPoll();
       subscribeLive();
       if (currentUser && approvalEnforced) refreshChat();
@@ -4108,7 +4119,68 @@
     });
   }
 
+  function canReadDkp() {
+    return isApproved();
+  }
+
+  function clearDkpData() {
+    dkpEpoch += 1;
+    dkpHistoryEpoch += 1;
+    dkpPlayers = [];
+    dkpActivityTypes = [];
+    dkpItems = [];
+    dkpHistory = [];
+    dkpHistoryHasMore = false;
+    dkpLoaded = false;
+    dkpLoadFailed = false;
+    dkpSelectedIds = {};
+    dkpReverseId = "";
+    dkpHistoryPlayerId = "";
+    if (dkpBusy) setDkpBusy(false);
+    setDkpLoadStatus("");
+    renderDkp();
+  }
+
+  function syncDkpAccess() {
+    if (!canReadDkp()) {
+      clearDkpData();
+      return Promise.resolve();
+    }
+    return loadDkp();
+  }
+
+  function syncDkpChrome() {
+    const open = canReadDkp();
+    const heading = document.getElementById("dkp-heading-text");
+    const gate = document.getElementById("dkp-gate");
+    const gateText = document.getElementById("dkp-gate-text");
+    const gateLogin = document.getElementById("dkp-gate-login");
+    const intro = document.getElementById("dkp-intro");
+    const body = document.getElementById("dkp-body");
+    if (heading) heading.textContent = open ? "DKP-Punkte" : "Gilden-Aktivitäten";
+    if (gate) gate.hidden = open;
+    if (intro) intro.hidden = !open;
+    if (body) body.hidden = !open;
+    if (!open && gateText) {
+      if (!currentUser) {
+        gateText.textContent = "Unser Gilden-Aktivitäten-System: Punkte für Raids, Dungeons und Gildenevents. Nur für registrierte Mitglieder.";
+      } else if (currentUser.status === "rejected") {
+        gateText.textContent = "Deine Registrierung wurde abgelehnt. Ein Offizier muss das Konto freischalten.";
+      } else {
+        gateText.textContent = "Dein Konto muss zuerst von einem Offizier freigeschaltet werden.";
+      }
+    }
+    if (gateLogin) gateLogin.hidden = !!currentUser;
+    const label = open ? "DKP" : "Gilden-Aktivitäten";
+    const current = document.querySelector("#quick-nav a[href='#forever-dkp'], #mobile-nav-links a[href='#forever-dkp']");
+    if (!current || current.getAttribute("aria-label") !== label) updateQuickNav();
+  }
+
   function loadDkp() {
+    if (!canReadDkp()) {
+      clearDkpData();
+      return Promise.resolve();
+    }
     if (!remote || typeof remote.from !== "function") {
       dkpLoaded = false;
       dkpLoadFailed = true;
@@ -4147,7 +4219,7 @@
   }
 
   function reloadDkpHistory() {
-    if (!remote) return Promise.resolve();
+    if (!canReadDkp() || !remote) return Promise.resolve();
     const historyEpoch = ++dkpHistoryEpoch;
     return fetchDkpHistoryPage(0).then(function (page) {
       if (historyEpoch !== dkpHistoryEpoch) return;
@@ -4162,7 +4234,7 @@
   }
 
   function loadMoreDkpHistory() {
-    if (dkpBusy || !dkpHistoryHasMore || !remote) return;
+    if (!canReadDkp() || dkpBusy || !dkpHistoryHasMore || !remote) return;
     const historyEpoch = dkpHistoryEpoch;
     const from = dkpHistory.length;
     setDkpBusy(true);
@@ -4810,6 +4882,7 @@
   }
 
   function renderDkp() {
+    syncDkpChrome();
     renderDkpScores();
     renderDkpHistory();
     renderDkpOfficer();
