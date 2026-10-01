@@ -381,6 +381,116 @@
       </section>
     </div>
 
+    <section id="forever-umfrage" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8">
+      <div class="border-b border-slate-800 pb-4">
+        <span class="text-xs font-bold uppercase tracking-widest text-amber-400">WoW Forever</span>
+        <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
+          <i class="fa-solid fa-clipboard-list text-amber-400" aria-hidden="true"></i> Forever-Umfrage
+        </h2>
+        <p class="mt-1 max-w-3xl text-sm text-slate-400">Welche Klasse spielst du als Main, welche als Twink? Die Umfrage geht ohne Anmeldung. Mit Konto kannst du deine Antwort später ändern.</p>
+      </div>
+      <form id="forever-poll-form" class="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div class="space-y-4">
+          <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;">
+            <label for="forever-poll-website">Website</label>
+            <input type="text" id="forever-poll-website" name="website" tabindex="-1" autocomplete="off">
+          </div>
+          <div>
+            <label for="forever-poll-name" class="mb-1 block text-xs font-semibold text-slate-400">Charaktername / Name</label>
+            <input type="text" id="forever-poll-name" name="char_name" autocomplete="off" placeholder="z.B. Charaktername" minlength="2" maxlength="40" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="forever-poll-main-class" class="mb-1 block text-xs font-semibold text-slate-400">Main-Klasse</label>
+            <select id="forever-poll-main-class" name="main_class" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Bitte wählen</option>
+              <option value="Krieger">Krieger</option>
+              <option value="Paladin">Paladin</option>
+              <option value="Jäger">Jäger</option>
+              <option value="Schurke">Schurke</option>
+              <option value="Priester">Priester</option>
+              <option value="Schamane">Schamane</option>
+              <option value="Magier">Magier</option>
+              <option value="Hexenmeister">Hexenmeister</option>
+              <option value="Druide">Druide</option>
+            </select>
+          </div>
+          <div>
+            <label for="forever-poll-main-role" class="mb-1 block text-xs font-semibold text-slate-400">Main-Rolle <span class="font-normal text-slate-500">(optional)</span></label>
+            <select id="forever-poll-main-role" name="main_role" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Keine Angabe</option>
+              <option value="Tank">Tank</option>
+              <option value="Heiler">Heiler</option>
+              <option value="Schaden">Schaden</option>
+            </select>
+          </div>
+          <div>
+            <label for="forever-poll-twink-class" class="mb-1 block text-xs font-semibold text-slate-400">Twink-Klasse <span class="font-normal text-slate-500">(optional)</span></label>
+            <select id="forever-poll-twink-class" name="twink_class" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Keine Angabe</option>
+              <option value="Krieger">Krieger</option>
+              <option value="Paladin">Paladin</option>
+              <option value="Jäger">Jäger</option>
+              <option value="Schurke">Schurke</option>
+              <option value="Priester">Priester</option>
+              <option value="Schamane">Schamane</option>
+              <option value="Magier">Magier</option>
+              <option value="Hexenmeister">Hexenmeister</option>
+              <option value="Druide">Druide</option>
+              <option value="Noch unklar">Noch unklar</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex flex-col justify-between space-y-4">
+          <div>
+            <label for="forever-poll-twink-role" class="mb-1 block text-xs font-semibold text-slate-400">Twink-Rolle <span class="font-normal text-slate-500">(optional)</span></label>
+            <select id="forever-poll-twink-role" name="twink_role" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Keine Angabe</option>
+              <option value="Tank">Tank</option>
+              <option value="Heiler">Heiler</option>
+              <option value="Schaden">Schaden</option>
+            </select>
+          </div>
+          <div>
+            <label for="forever-poll-race" class="mb-1 block text-xs font-semibold text-slate-400">Rasse <span class="font-normal text-slate-500">(optional)</span></label>
+            <select id="forever-poll-race" name="race" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Keine Angabe</option>
+              <option value="Skyborne">Skyborne</option>
+              <option value="Orc">Orc</option>
+              <option value="Untoter">Untoter</option>
+              <option value="Tauren">Tauren</option>
+              <option value="Troll">Troll</option>
+            </select>
+          </div>
+          <div>
+            <label for="forever-poll-comment" class="mb-1 block text-xs font-semibold text-slate-400">Kommentar <span class="font-normal text-slate-500">(optional)</span></label>
+            <textarea id="forever-poll-comment" name="comment" rows="3" maxlength="300" placeholder="Kurz etwas dazu…" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
+          </div>
+          <p id="forever-poll-status" class="text-sm text-emerald-400" hidden role="status"></p>
+          <button type="submit" id="forever-poll-submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 py-3 font-black text-white shadow-lg transition hover:opacity-90">
+            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+            <span id="forever-poll-submit-label">Antwort senden</span>
+          </button>
+        </div>
+      </form>
+      <div class="space-y-4 border-t border-slate-800 pt-2">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <h3 class="text-2xl font-black text-white">Auswertung</h3>
+          <p id="forever-poll-total" class="text-sm font-semibold text-amber-400" aria-live="polite">Noch keine Antwort</p>
+        </div>
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <h4 class="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">Main-Klasse</h4>
+            <div id="forever-poll-main-bars" class="space-y-2"></div>
+          </div>
+          <div>
+            <h4 class="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">Twink-Klasse</h4>
+            <div id="forever-poll-twink-bars" class="space-y-2"></div>
+          </div>
+        </div>
+        <div id="forever-poll-list"></div>
+      </div>
+    </section>
+
     <section id="galerie" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8">
       <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-end">
         <div class="min-w-0">

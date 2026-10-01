@@ -1,6 +1,6 @@
 # The Arc Flame
 
-Statische Gildenhomepage für **The Arc Flame** (World of Warcraft, Horde). Die Seite zeigt Retail und WoW Forever (Classic): Gildenleitung, Raidkader, Mitglieder, M+-Planer, Classic-Planer, Bewerbung, Gilden-Chat und die bearbeitbare Gildeninfo.
+Statische Gildenhomepage für **The Arc Flame** (World of Warcraft, Horde). Die Seite zeigt Retail und WoW Forever (Classic): Gildenleitung, Raidkader, Mitglieder, M+-Planer, Classic-Planer, Forever-Umfrage, Bewerbung, Gilden-Chat und die bearbeitbare Gildeninfo.
 
 Sie wird über GitHub Pages unter [https://thearcflame.github.io/](https://thearcflame.github.io/) ausgeliefert. Eigene Dateien sind relativ verlinkt.
 
@@ -65,6 +65,12 @@ galleryImages: [
 
 3. Auf `main` pushen. Diese Dateien haben kein **Löschen** auf der Seite.
 
+## Forever-Umfrage
+
+Der Abschnitt **Forever-Umfrage** steht in der Navigation von Retail und Forever und hat die Adresse `#forever-umfrage`. Main-Klasse, Twink-Klasse, Rolle und Rasse kann jeder eintragen, auch ohne Anmeldung. Ohne Konto gilt ein Name nur einmal. Angemeldete Mitglieder sehen ihre Antwort im Formular und können sie ändern. Offiziere und Administratoren löschen Einträge.
+
+Die Tabelle ist `public.forever_poll`. Einmal `supabase/forever_poll.sql` ausführen, falls der Block in `schema.sql` noch nicht gelaufen ist. Siehe `supabase/README.md`.
+
 ## Videos von Malusmagnus
 
 Der Abschnitt bleibt **komplett ausgeblendet**, solange `youtubeChannelUrl` und `youtubeVideoIds` in `js/config.js` beide leer sind.
@@ -113,6 +119,7 @@ js/app.js           Verhalten
 supabase/schema.sql Tabellen, Rechte, Startdaten, Galerie und Freischaltung
 supabase/approval.sql Freischaltung (erneut ausführbar, auch in schema.sql)
 supabase/gallery.sql Galerie-Bucket, Tabelle und Rechte (erneut ausführbar)
+supabase/forever_poll.sql Forever-Umfrage, Tabelle und Rechte (erneut ausführbar)
 supabase/README.md  Einstellungen im Supabase-Dashboard
 assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
 assets/gallery/     Screenshots für die Galerie
