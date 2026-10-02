@@ -739,6 +739,74 @@
       </section>
     </div>
 
+    <section id="raidplanung" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8">
+      <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-end">
+        <div class="min-w-0">
+          <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Termine</span>
+          <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
+            <i class="fa-solid fa-calendar-days text-amber-400" aria-hidden="true"></i> Raid-Planung
+          </h2>
+          <p class="mt-1 max-w-3xl text-sm text-slate-400">Die nächsten Raids für Forever und Retail. Die Uhrzeit ist immer Berliner Zeit. Zum Zusagen anmelden. Es werden keine E-Mails gezeigt.</p>
+        </div>
+        <div id="raid-filter" class="grid w-full grid-cols-2 gap-2 md:w-auto" role="tablist" aria-label="Raids nach Spiel">
+          <button type="button" role="tab" id="raid-filter-forever" data-action="raid-filter" data-front="forever" aria-selected="false" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-4 py-3 text-base font-bold text-white">Forever</button>
+          <button type="button" role="tab" id="raid-filter-retail" data-action="raid-filter" data-front="retail" aria-selected="true" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-500 px-4 py-3 text-base font-extrabold text-slate-950">Retail</button>
+        </div>
+      </div>
+
+      <form id="raid-plan-form" data-perm="officer" hidden class="space-y-4 rounded-2xl border border-amber-500/30 bg-slate-950/50 p-4">
+        <h3 id="raid-plan-heading" class="text-xl font-black text-white">Neuen Raid anlegen</h3>
+        <p class="text-sm text-slate-400">Wähle das Spiel, den Raid und wann ihr loszieht.</p>
+        <input type="hidden" id="raid-plan-id" value="">
+        <div>
+          <p class="mb-2 text-sm font-bold text-slate-300" id="raid-plan-front-label">Spiel</p>
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2" role="group" aria-labelledby="raid-plan-front-label">
+            <button type="button" data-action="raid-plan-front" data-front="forever" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-4 py-3 text-base font-bold text-white">Forever</button>
+            <button type="button" data-action="raid-plan-front" data-front="retail" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-500 px-4 py-3 text-base font-extrabold text-slate-950">Retail</button>
+          </div>
+        </div>
+        <div>
+          <label for="raid-plan-title" class="mb-1 block text-sm font-bold text-slate-300">Raid</label>
+          <select id="raid-plan-title" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-slate-200 focus:border-amber-500"></select>
+        </div>
+        <div>
+          <label for="raid-plan-custom" class="mb-1 block text-sm font-bold text-slate-300">Eigener Name <span class="font-normal text-slate-500">(wenn der Raid nicht in der Liste steht)</span></label>
+          <input type="text" id="raid-plan-custom" maxlength="80" autocomplete="off" placeholder="Name des Raids" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-slate-200 focus:border-amber-500">
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="raid-plan-date" class="mb-1 block text-sm font-bold text-slate-300">Datum</label>
+            <input type="date" id="raid-plan-date" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="raid-plan-time" class="mb-1 block text-sm font-bold text-slate-300">Uhrzeit (Berlin)</label>
+            <input type="time" id="raid-plan-time" required value="20:00" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <div>
+          <label for="raid-plan-note" class="mb-1 block text-sm font-bold text-slate-300">Notiz <span class="font-normal text-slate-500">(optional)</span></label>
+          <textarea id="raid-plan-note" rows="2" maxlength="500" placeholder="Zum Beispiel: wir starten pünktlich" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-base text-slate-200 focus:border-amber-500"></textarea>
+        </div>
+        <div>
+          <label for="raid-plan-size" class="mb-1 block text-sm font-bold text-slate-300">Wie viele Plätze?</label>
+          <div class="mb-2 flex gap-2">
+            <button type="button" data-action="raid-plan-size" data-size="20" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-3 text-base font-bold text-white">20</button>
+            <button type="button" data-action="raid-plan-size" data-size="30" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-3 text-base font-bold text-white">30</button>
+            <button type="button" data-action="raid-plan-size" data-size="40" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-3 text-base font-bold text-white">40</button>
+          </div>
+          <input type="number" id="raid-plan-size" min="1" max="40" step="1" value="20" required inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-slate-200 focus:border-amber-500">
+        </div>
+        <p id="raid-plan-status" class="text-sm text-amber-200" hidden role="status"></p>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <button type="submit" id="raid-plan-submit" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-3 text-base font-extrabold text-slate-950 sm:w-auto">Raid anlegen</button>
+          <button type="button" id="raid-plan-cancel" data-action="raid-edit-cancel" hidden class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-4 py-3 text-base font-bold text-white sm:w-auto">Abbrechen</button>
+        </div>
+      </form>
+
+      <p id="raid-list-status" class="text-sm text-amber-200" hidden role="status"></p>
+      <div id="raid-list" class="space-y-4" aria-live="polite"></div>
+    </section>
+
     <section id="forever-umfrage" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8">
       <div class="border-b border-slate-800 pb-4">
         <span class="text-xs font-bold uppercase tracking-widest text-amber-400">WoW Forever</span>

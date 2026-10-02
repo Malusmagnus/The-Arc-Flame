@@ -84,6 +84,18 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/dkp_private.sql
 
 Danach gibt es `public.dkp_players`, `public.dkp_activity_types`, `public.dkp_items` und `public.dkp_history`. Lesen dürfen nur angemeldete, freigeschaltete Mitglieder (`public.is_approved()`: Status `approved` oder Rolle `officer` / `admin`). Ohne Anmeldung gibt es kein Leserecht. Angemeldete Konten ohne Freischaltung bekommen keine Zeilen. Im Verlauf ist die Offiziers-ID verborgen, sichtbar ist nur der Name. Schreiben aus dem Browser ist gesperrt. Änderungen laufen nur über die Funktionen `dkp_save_player`, `dkp_delete_player`, `dkp_save_activity_type`, `dkp_delete_activity_type`, `dkp_save_item`, `dkp_delete_item`, `dkp_award_activity`, `dkp_transfer_overflow`, `dkp_award_item`, `dkp_adjust` und `dkp_reverse_entry`. Aufrufen dürfen das nur freigeschaltete Offiziere und Administratoren (`public.is_officer()` und `public.is_approved()`).
 
+## Raid-Planung
+
+`raids.sql` einmal ausführen, wenn `schema.sql` schon auf dem Projekt liegt und der Raid-Block darin noch nicht gelaufen ist. Ein komplettes erneutes Ausführen von `schema.sql` enthält dieselben Anweisungen. Beides kann wiederholt werden.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/raids.sql
+```
+
+Danach gibt es `public.raids` und `public.raid_signups`. Termine lesen alle Besucher, aber ohne Notiz. Die Zahl der Anmeldungen (Zusage und Vielleicht) liefert `public.raid_public_counts()`. Namen, Rolle und Notiz sehen nur freigeschaltete Konten (`public.is_approved()`). E-Mail-Spalten gibt es hier nicht. Anlegen, ändern, absagen und löschen dürfen freigeschaltete Offiziere und Administratoren. Zusagen darf nur das eigene freigeschaltete Konto, nur bis zum Raid-Start.
+
+Discord läuft in der Datenbank, nicht im Browser. Der Trigger liest `vault.decrypted_secrets` mit dem Namen `discord_raid_webhook` und, falls der fehlt oder leer ist, `discord_chat_webhook`. Beide Geheimnisse legt ihr im Vault an. Die Webhook-Adresse steht nicht in `raids.sql`. Schlägt der Versand fehl, bleibt der Raid trotzdem gespeichert.
+
 ## Realtime
 
 `schema.sql` hängt `chat_messages` und `roster` an die Publication `supabase_realtime`. Unter **Database → Publications** sollten beide Tabellen dort stehen, damit Chat und Kader live mitlaufen.

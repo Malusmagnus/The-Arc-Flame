@@ -816,6 +816,27 @@ button.gallery-tile {
   }
 }
 
+.raid-card.is-linked {
+  border-color: #ffd100;
+  box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.45), 0 0 28px rgba(196, 40, 16, 0.35);
+}
+
+.raid-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .raid-actions {
+    flex-direction: row;
+  }
+
+  .raid-actions > * {
+    flex: 1 1 0%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-embers {
     display: none !important;

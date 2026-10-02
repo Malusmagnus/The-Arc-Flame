@@ -59,6 +59,7 @@
   const RETAIL_NAV = [
     { href: "#retail-leitung", label: "Leitung", icon: "fa-crown", tone: "text-amber-400" },
     { href: "#retail-kader", label: "Raidkader", icon: "fa-shield", tone: "text-red-500" },
+    { href: "#raidplanung", label: "Raids", icon: "fa-calendar-days", tone: "text-amber-400" },
     { href: "#retail-mplus", label: "M+ Planer", icon: "fa-stopwatch", tone: "text-amber-400" },
     { href: "#retail-mitglieder", label: "Mitglieder", icon: "fa-users", tone: "text-red-500" },
     { href: "#forever-umfrage", label: "Forever-Umfrage", icon: "fa-clipboard-list", tone: "text-amber-400" },
@@ -68,6 +69,7 @@
   ];
   const FOREVER_NAV = [
     { href: "#forever-uebersicht", label: "Übersicht", icon: "fa-hourglass-start", tone: "text-amber-400" },
+    { href: "#raidplanung", label: "Raids", icon: "fa-calendar-days", tone: "text-amber-400" },
     { href: "#forever-planer", label: "Classic Planer", icon: "fa-skull", tone: "text-amber-400" },
     { href: "#forever-kader", label: "Classic Kader", icon: "fa-shield-cat", tone: "text-amber-400" },
     { href: "#forever-mitglieder", label: "Classic Mitglieder", icon: "fa-users", tone: "text-amber-400" },
@@ -126,6 +128,29 @@
   let foreverPollOwn = null;
   let foreverPollSending = false;
   let foreverPollReadable = false;
+
+  const RAID_TITLES = {
+    forever: ["Geschmolzener Kern", "Onyxias Hort", "Pechschwingenhort", "Zul'Gurub", "Ruinen von Ahn'Qiraj", "Tempel von Ahn'Qiraj", "Naxxramas"],
+    retail: ["Die Leerenspitze", "Der Traumriss", "Marsch auf Quel'Danas", "Nerub-ar-Palast", "Befreiung von Lorenhall", "Manaschmiede Omega"],
+  };
+  const RAID_PUBLIC_COLUMNS = "id, front, title, starts_at, max_size, status";
+  const RAID_MEMBER_COLUMNS = RAID_PUBLIC_COLUMNS + ", note";
+  const RAID_SIGNUP_COLUMNS = "id, raid_id, user_id, status, role, character_name";
+  const RAID_STATUSES = ["Zusage", "Vielleicht", "Absage"];
+  const RAID_ROLES = ["Tank", "Heiler", "Schaden"];
+  const RAID_BTN = "inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 py-3 text-base font-extrabold transition";
+  const RAID_BTN_OFF = RAID_BTN + " bg-slate-800 font-bold text-white hover:bg-slate-700";
+  const RAID_BTN_PICK = RAID_BTN + " bg-amber-500 text-slate-950";
+  let raidRows = [];
+  let raidSignups = [];
+  let raidCounts = {};
+  let raidFront = "retail";
+  let raidState = "loading";
+  let raidEditingId = "";
+  let raidPlanFront = "retail";
+  let raidBusy = false;
+  let raidEpoch = 0;
+  let raidNamesReady = false;
 
   const FOREVER_POLL_CLASSES = ["Krieger", "Paladin", "Jäger", "Schurke", "Priester", "Schamane", "Magier", "Hexenmeister", "Druide"];
   const FOREVER_POLL_TWINK = FOREVER_POLL_CLASSES.concat(["Noch unklar"]);
@@ -192,7 +217,10 @@
     const hash = location.hash.replace(/^#/, "");
     if (FOREVER_IDS.has(hash)) switchFront("forever");
     else switchFront("retail");
-    if (hash && document.getElementById(hash)) {
+    resetRaidForm();
+    if (hash.indexOf("raid-") === 0) {
+      /* Der Termin kommt erst aus der Datenbank. Danach scrollt focusLinkedRaid. */
+    } else if (hash && document.getElementById(hash)) {
       goTo(hash, { updateHistory: false, behavior: "instant" });
     }
   }
@@ -479,6 +507,52 @@
       deleteForeverPoll(el.dataset.id);
       return;
     }
+    if (action === "raid-filter") {
+      raidFront = front;
+      renderRaids();
+      return;
+    }
+    if (action === "raid-plan-front") {
+      setRaidPlanFront(front);
+      return;
+    }
+    if (action === "raid-plan-size") {
+      setRaidPlanSize(el.dataset.size);
+      return;
+    }
+    if (action === "raid-edit-cancel") {
+      resetRaidForm();
+      return;
+    }
+    if (action === "raid-edit") {
+      beginRaidEdit(el.dataset.id);
+      return;
+    }
+    if (action === "raid-abort") {
+      cancelRaid(el.dataset.id);
+      return;
+    }
+    if (action === "raid-delete") {
+      deleteRaid(el.dataset.id);
+      return;
+    }
+    if (action === "raid-signup") {
+      saveRaidSignup(el.dataset.id, el.dataset.status);
+      return;
+    }
+    if (action === "raid-role") {
+      chooseRaidRole(el);
+      return;
+    }
+    if (action === "raid-save-name") {
+      const own = ownRaidSignup(el.dataset.id);
+      if (!own) {
+        notify("Tippe zuerst auf Zusage, Vielleicht oder Absage.", "info");
+        return;
+      }
+      saveRaidSignup(el.dataset.id, own.status);
+      return;
+    }
     if (action === "close-lightbox") {
       closeLightbox();
       return;
@@ -560,6 +634,9 @@
     } else if (form.id === "forever-poll-form") {
       event.preventDefault();
       submitForeverPoll(form);
+    } else if (form.id === "raid-plan-form") {
+      event.preventDefault();
+      submitRaidPlan(form);
     } else if (form.id && form.id.indexOf("dkp-") === 0) {
       event.preventDefault();
       submitDkpForm(form);
@@ -621,6 +698,8 @@
     retailBtn.setAttribute("aria-selected", retailOn ? "true" : "false");
     foreverBtn.setAttribute("aria-selected", retailOn ? "false" : "true");
     refreshReveal(document.getElementById(activeFront === "retail" ? "content-retail" : "content-forever"));
+    raidFront = activeFront;
+    renderRaids();
     updateQuickNav();
 
     if (options && options.scroll) {
@@ -674,6 +753,10 @@
   }
 
   function goTo(id, options) {
+    if (id && id.indexOf("raid-") === 0) {
+      focusLinkedRaid(options);
+      return;
+    }
     if (FOREVER_IDS.has(id)) switchFront("forever");
     else if (RETAIL_IDS.has(id)) switchFront("retail");
     const el = document.getElementById(id);
@@ -3771,6 +3854,7 @@
     renderGallery();
     renderForeverPoll();
     renderDkp();
+    renderRaids();
   }
 
   function renderLeadership() {
@@ -4674,6 +4758,8 @@
     if (!remote) {
       notify(OFFLINE_MSG, "error");
       renderDkp();
+      raidState = "error";
+      renderRaids();
       return;
     }
     loadGallery();
@@ -4687,8 +4773,12 @@
             if (approvalEnforced) replaceItems(chatMessages, []);
             clearForeverPollOwn();
             clearDkpData();
+            raidSignups = [];
+            raidNamesReady = false;
+            resetRaidForm();
             updateAuthUI();
             renderPermissionSurfaces();
+            if (remoteReady) loadRaids();
             return;
           }
           if (!session || (event !== "SIGNED_IN" && event !== "INITIAL_SESSION" && event !== "TOKEN_REFRESHED")) return;
@@ -4697,6 +4787,7 @@
             renderPermissionSurfaces();
             if (!(event === "TOKEN_REFRESHED" && dkpLoaded && canReadDkp())) syncDkpAccess();
             if (event !== "TOKEN_REFRESHED") loadMyForeverPoll();
+            if (remoteReady && event === "SIGNED_IN") loadRaids();
             if (remoteReady && event !== "TOKEN_REFRESHED") refreshChat();
           }).catch(function () {
             updateAuthUI();
@@ -4720,12 +4811,14 @@
       updateAuthUI();
       syncDkpAccess();
       loadMyForeverPoll();
+      loadRaids();
       subscribeLive();
       if (currentUser && approvalEnforced) refreshChat();
     }).catch(function () {
       remoteReady = false;
       notify(OFFLINE_MSG, "error");
       updateAuthUI();
+      loadRaids();
     });
   }
 
@@ -6817,5 +6910,819 @@
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+
+  let raidHashDone = "";
+
+  function raidById(id) {
+    for (let i = 0; i < raidRows.length; i += 1) {
+      if (raidRows[i] && raidRows[i].id === id) return raidRows[i];
+    }
+    return null;
+  }
+
+  function mapRaid(row) {
+    if (!row || !isDkpUuid(row.id)) return null;
+    if (row.front !== "forever" && row.front !== "retail") return null;
+    const title = String(row.title || "").trim();
+    if (title.length < 2) return null;
+    const starts = new Date(row.starts_at);
+    if (Number.isNaN(starts.getTime())) return null;
+    const size = Number(row.max_size);
+    return {
+      id: row.id,
+      front: row.front,
+      title: title.slice(0, 80),
+      startsAt: starts.toISOString(),
+      note: raidNoteText(row.note),
+      maxSize: Number.isFinite(size) ? Math.max(1, Math.min(40, Math.round(size))) : 40,
+      status: row.status === "cancelled" ? "cancelled" : "scheduled",
+    };
+  }
+
+  function mapRaidSignup(row) {
+    if (!row || !isDkpUuid(row.id) || !isDkpUuid(row.raid_id)) return null;
+    if (RAID_STATUSES.indexOf(row.status) === -1 || RAID_ROLES.indexOf(row.role) === -1) return null;
+    return {
+      id: row.id,
+      raidId: row.raid_id,
+      userId: row.user_id || "",
+      status: row.status,
+      role: row.role,
+      characterName: raidPublicName(row.character_name),
+    };
+  }
+
+  function raidPublicName(value) {
+    const text = String(value || "").trim();
+    if (!text || text.indexOf("@") !== -1) return "";
+    return text.slice(0, 40);
+  }
+
+  function raidTitleText(value) {
+    const text = String(value || "").replace(/[\r\n]+/g, " ").trim();
+    if (!text || text.indexOf("@") !== -1) return "";
+    return text.slice(0, 80);
+  }
+
+  function raidNoteText(value) {
+    const text = String(value || "").trim();
+    if (!text || text.indexOf("@") !== -1) return "";
+    return text.slice(0, 500);
+  }
+
+  function berlinHour(value) {
+    return value === "24" ? "00" : value;
+  }
+
+  function raidIsUpcoming(raid) {
+    return !!raid && new Date(raid.startsAt).getTime() > Date.now();
+  }
+
+  function linkedRaidId() {
+    const hash = location.hash.replace(/^#/, "");
+    if (hash.indexOf("raid-") !== 0) return "";
+    const id = hash.slice(5);
+    return isDkpUuid(id) ? id : "";
+  }
+
+  function visibleRaids() {
+    const linked = linkedRaidId();
+    return raidRows.filter(function (raid) {
+      if (raid.front !== raidFront) return false;
+      const pinned = linked && raid.id === linked;
+      if (!pinned && !raidIsUpcoming(raid)) return false;
+      if (raid.status === "cancelled" && !isApproved()) return false;
+      return raid.status === "scheduled" || raid.status === "cancelled";
+    }).sort(function (a, b) {
+      return a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : 0;
+    });
+  }
+
+  function raidSignupsFor(raidId) {
+    return raidSignups.filter(function (signup) { return signup.raidId === raidId; });
+  }
+
+  function ownRaidSignup(raidId) {
+    if (!currentUser) return null;
+    const rows = raidSignupsFor(raidId);
+    for (let i = 0; i < rows.length; i += 1) {
+      if (rows[i].userId === currentUser.id) return rows[i];
+    }
+    return null;
+  }
+
+  function raidComingCount(raid) {
+    if (isApproved() && raidNamesReady) {
+      return raidSignupsFor(raid.id).filter(function (signup) {
+        return signup.status === "Zusage" || signup.status === "Vielleicht";
+      }).length;
+    }
+    return raidCounts[raid.id] || 0;
+  }
+
+  function raidCountLabel(count) {
+    if (!count) return "Noch keine Anmeldung";
+    if (count === 1) return "1 Anmeldung";
+    return count + " Anmeldungen";
+  }
+
+  function formatRaidWhen(iso) {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    const weekday = date.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", weekday: "long" });
+    const day = date.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = date.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    const label = weekday ? weekday.charAt(0).toUpperCase() + weekday.slice(1) : "";
+    return label + ", " + day + " um " + time + " Uhr";
+  }
+
+  function berlinFields(iso) {
+    const date = new Date(iso);
+    const fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const map = {};
+    fmt.formatToParts(date).forEach(function (part) {
+      if (part.type !== "literal") map[part.type] = part.value;
+    });
+    return { date: map.year + "-" + map.month + "-" + map.day, time: berlinHour(map.hour) + ":" + map.minute };
+  }
+
+  function berlinWall(ms) {
+    const fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    });
+    const map = {};
+    fmt.formatToParts(new Date(ms)).forEach(function (part) {
+      if (part.type !== "literal") map[part.type] = part.value;
+    });
+    return Date.UTC(Number(map.year), Number(map.month) - 1, Number(map.day), Number(berlinHour(map.hour)), Number(map.minute), Number(map.second));
+  }
+
+  function berlinInstant(dateStr, timeStr) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || ""));
+    const clock = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(String(timeStr || ""));
+    if (!match || !clock) return null;
+    const y = Number(match[1]);
+    const mo = Number(match[2]);
+    const d = Number(match[3]);
+    const h = Number(clock[1]);
+    const mi = Number(clock[2]);
+    if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59) return null;
+    const wanted = Date.UTC(y, mo - 1, d, h, mi, 0);
+    let utc = wanted;
+    utc = utc - (berlinWall(utc) - wanted);
+    utc = utc - (berlinWall(utc) - wanted);
+    if (berlinWall(utc) !== wanted) return null;
+    return new Date(utc).toISOString();
+  }
+
+  function raidMissing(error) {
+    if (!error) return false;
+    const code = String(error.code || "");
+    const message = String(error.message || error.details || "").toLowerCase();
+    if (code === "42P01" || code === "PGRST205" || code === "PGRST202") return true;
+    return message.indexOf("raid") !== -1 && (message.indexOf("does not exist") !== -1 || message.indexOf("schema cache") !== -1 || message.indexOf("could not find") !== -1);
+  }
+
+  function raidErrorText(error, fallback) {
+    if (raidMissing(error)) return "Die Raid-Planung ist noch nicht eingerichtet.";
+    const msg = String((error && (error.message || error.details)) || "").replace(/^\s*ERROR:\s*/i, "").trim();
+    if (!msg || /failed to fetch|network|jwt|schema cache|permission denied|PGRST|row-level security/i.test(msg)) return fallback;
+    return msg;
+  }
+
+  function setRaidStatus(id, message, kind) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+    el.className = kind === "ok" ? "text-sm text-emerald-300" : "text-sm text-amber-200";
+  }
+
+  function raidNode(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function raidChoiceClass(on, tone) {
+    if (!on) return RAID_BTN_OFF;
+    if (tone === "yes") return RAID_BTN + " bg-emerald-600 font-extrabold text-white";
+    if (tone === "no") return RAID_BTN + " bg-red-600 font-extrabold text-white";
+    return RAID_BTN_PICK;
+  }
+
+  function fillRaidTitles(selected) {
+    const select = document.getElementById("raid-plan-title");
+    if (!select) return;
+    const names = RAID_TITLES[raidPlanFront] || [];
+    const previous = selected == null ? select.value : selected;
+    select.replaceChildren();
+    const placeholder = raidNode("option", "", "Bitte wählen");
+    placeholder.value = "";
+    select.appendChild(placeholder);
+    names.forEach(function (name) {
+      const option = raidNode("option", "", name);
+      option.value = name;
+      select.appendChild(option);
+    });
+    select.value = names.indexOf(previous) === -1 ? "" : previous;
+  }
+
+  function paintRaidPlanFront() {
+    document.querySelectorAll("[data-action='raid-plan-front']").forEach(function (button) {
+      const on = button.dataset.front === raidPlanFront;
+      button.className = raidChoiceClass(on, "pick");
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  function paintRaidSizes() {
+    const input = document.getElementById("raid-plan-size");
+    const current = input ? String(input.value || "") : "";
+    document.querySelectorAll("[data-action='raid-plan-size']").forEach(function (button) {
+      const on = button.dataset.size === current;
+      button.className = "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 py-3 text-base " + (on ? "bg-amber-500 font-extrabold text-slate-950" : "bg-slate-800 font-bold text-white");
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  function setRaidPlanFront(front) {
+    raidPlanFront = front === "forever" ? "forever" : "retail";
+    const size = document.getElementById("raid-plan-size");
+    if (size && !raidEditingId) size.value = raidPlanFront === "forever" ? "40" : "20";
+    fillRaidTitles(null);
+    paintRaidPlanFront();
+    paintRaidSizes();
+  }
+
+  function setRaidPlanSize(size) {
+    const input = document.getElementById("raid-plan-size");
+    const number = Number(size);
+    if (input && number >= 1 && number <= 40) input.value = String(number);
+    paintRaidSizes();
+  }
+
+  function resetRaidForm() {
+    raidEditingId = "";
+    raidPlanFront = activeFront === "forever" ? "forever" : "retail";
+    const custom = document.getElementById("raid-plan-custom");
+    if (custom) custom.value = "";
+    const note = document.getElementById("raid-plan-note");
+    if (note) note.value = "";
+    const date = document.getElementById("raid-plan-date");
+    if (date) date.value = "";
+    const time = document.getElementById("raid-plan-time");
+    if (time) time.value = "20:00";
+    const size = document.getElementById("raid-plan-size");
+    if (size) size.value = raidPlanFront === "forever" ? "40" : "20";
+    const heading = document.getElementById("raid-plan-heading");
+    if (heading) heading.textContent = "Neuen Raid anlegen";
+    const submit = document.getElementById("raid-plan-submit");
+    if (submit) submit.textContent = "Raid anlegen";
+    const cancel = document.getElementById("raid-plan-cancel");
+    if (cancel) cancel.hidden = true;
+    setRaidStatus("raid-plan-status", "");
+    fillRaidTitles("");
+    paintRaidPlanFront();
+    paintRaidSizes();
+    setRaidFormBusy(false);
+  }
+
+  function setRaidFormBusy(busy) {
+    const form = document.getElementById("raid-plan-form");
+    if (!form) return;
+    form.querySelectorAll("button, input, select, textarea").forEach(function (el) {
+      if (el.id === "raid-plan-cancel" && el.hidden) return;
+      el.disabled = busy;
+    });
+  }
+
+  function beginRaidEdit(id) {
+    if (!isOfficer() || !isDkpUuid(id)) return;
+    const raid = raidById(id);
+    if (!raid) return;
+    raidEditingId = raid.id;
+    raidPlanFront = raid.front;
+    const when = berlinFields(raid.startsAt);
+    const known = (RAID_TITLES[raid.front] || []).indexOf(raid.title) !== -1;
+    fillRaidTitles(known ? raid.title : "");
+    const custom = document.getElementById("raid-plan-custom");
+    if (custom) custom.value = known ? "" : raid.title;
+    const date = document.getElementById("raid-plan-date");
+    if (date) date.value = when.date;
+    const time = document.getElementById("raid-plan-time");
+    if (time) time.value = when.time;
+    const note = document.getElementById("raid-plan-note");
+    if (note) note.value = raid.note || "";
+    const size = document.getElementById("raid-plan-size");
+    if (size) size.value = String(raid.maxSize);
+    const heading = document.getElementById("raid-plan-heading");
+    if (heading) heading.textContent = "Raid ändern";
+    const submit = document.getElementById("raid-plan-submit");
+    if (submit) submit.textContent = "Änderungen speichern";
+    const cancel = document.getElementById("raid-plan-cancel");
+    if (cancel) cancel.hidden = false;
+    paintRaidPlanFront();
+    paintRaidSizes();
+    setRaidStatus("raid-plan-status", "");
+    const form = document.getElementById("raid-plan-form");
+    if (form) form.scrollIntoView({ behavior: motion(), block: "start" });
+  }
+
+  function submitRaidPlan(form) {
+    if (!isOfficer() || raidBusy || !remote) {
+      setRaidStatus("raid-plan-status", "Nur Offiziere können Raids anlegen.", "err");
+      return;
+    }
+    const custom = raidTitleText((document.getElementById("raid-plan-custom") || {}).value);
+    const picked = String((document.getElementById("raid-plan-title") || {}).value || "").trim();
+    const title = custom || picked;
+    if (title.length < 2 || title.length > 80) {
+      setRaidStatus("raid-plan-status", "Bitte einen Raid aus der Liste wählen oder einen Namen eintragen.", "err");
+      return;
+    }
+    const date = (document.getElementById("raid-plan-date") || {}).value || "";
+    const time = (document.getElementById("raid-plan-time") || {}).value || "";
+    const startsAt = berlinInstant(date, time);
+    if (!startsAt) {
+      setRaidStatus("raid-plan-status", "Bitte Datum und Uhrzeit prüfen. Die Zeit ist Berliner Zeit.", "err");
+      return;
+    }
+    if (new Date(startsAt).getTime() <= Date.now()) {
+      setRaidStatus("raid-plan-status", "Bitte einen Termin in der Zukunft wählen.", "err");
+      return;
+    }
+    const size = Number((document.getElementById("raid-plan-size") || {}).value);
+    if (!Number.isInteger(size) || size < 1 || size > 40) {
+      setRaidStatus("raid-plan-status", "Die Gruppengröße muss zwischen 1 und 40 liegen.", "err");
+      return;
+    }
+    const noteRaw = String((document.getElementById("raid-plan-note") || {}).value || "").trim();
+    if (noteRaw.length > 500) {
+      setRaidStatus("raid-plan-status", "Die Notiz ist zu lang (höchstens 500 Zeichen).", "err");
+      return;
+    }
+    const payload = {
+      front: raidPlanFront,
+      title: title,
+      starts_at: startsAt,
+      note: noteRaw || null,
+      max_size: size,
+    };
+    raidBusy = true;
+    setRaidFormBusy(true);
+    const editing = raidEditingId;
+    const request = editing
+      ? remote.from("raids").update(payload).eq("id", editing).select(RAID_MEMBER_COLUMNS).single()
+      : remote.from("raids").insert(payload).select(RAID_MEMBER_COLUMNS).single();
+    Promise.resolve(request).then(function (result) {
+      raidBusy = false;
+      setRaidFormBusy(false);
+      if (!result || result.error) {
+        setRaidStatus("raid-plan-status", raidErrorText(result && result.error, "Der Raid konnte nicht gespeichert werden."), "err");
+        return;
+      }
+      resetRaidForm();
+      notify(editing ? "Der Raid ist gespeichert." : "Der Raid ist angelegt.", "info");
+      return loadRaids();
+    }).catch(function () {
+      raidBusy = false;
+      setRaidFormBusy(false);
+      setRaidStatus("raid-plan-status", "Der Raid konnte nicht gespeichert werden.", "err");
+    });
+  }
+
+  function cancelRaid(id) {
+    const raid = raidById(id);
+    if (!isOfficer() || !raid || raidBusy || !remote) return;
+    if (raid.status === "cancelled") return;
+    if (!window.confirm("„" + raid.title + "“ wirklich absagen?")) return;
+    raidBusy = true;
+    remote.from("raids").update({ status: "cancelled" }).eq("id", raid.id).then(function (result) {
+      raidBusy = false;
+      if (!result || result.error) {
+        notify(raidErrorText(result && result.error, "Der Raid konnte nicht abgesagt werden."), "error");
+        return;
+      }
+      notify("Der Raid ist abgesagt.", "info");
+      loadRaids();
+    }).catch(function () {
+      raidBusy = false;
+      notify("Der Raid konnte nicht abgesagt werden.", "error");
+    });
+  }
+
+  function deleteRaid(id) {
+    const raid = raidById(id);
+    if (!isOfficer() || !raid || raidBusy || !remote) return;
+    if (!window.confirm("„" + raid.title + "“ wirklich löschen?")) return;
+    raidBusy = true;
+    remote.from("raids").delete().eq("id", raid.id).then(function (result) {
+      raidBusy = false;
+      if (!result || result.error) {
+        notify(raidErrorText(result && result.error, "Der Raid konnte nicht gelöscht werden."), "error");
+        return;
+      }
+      if (raidEditingId === raid.id) resetRaidForm();
+      notify("Der Raid ist gelöscht.", "info");
+      loadRaids();
+    }).catch(function () {
+      raidBusy = false;
+      notify("Der Raid konnte nicht gelöscht werden.", "error");
+    });
+  }
+
+  function selectedRaidRole(card, signup) {
+    if (!card) return signup ? signup.role : "Schaden";
+    const pressed = card.querySelector("[data-action='raid-role'][aria-pressed='true']");
+    if (pressed && RAID_ROLES.indexOf(pressed.dataset.role) !== -1) return pressed.dataset.role;
+    return signup ? signup.role : "Schaden";
+  }
+
+  function raidNameFromCard(card, signup) {
+    const input = card ? card.querySelector("[data-raid-name]") : null;
+    if (input) return raidPublicName(input.value);
+    return signup ? signup.characterName : raidPublicName(currentUser && currentUser.displayName);
+  }
+
+  function chooseRaidRole(button) {
+    const card = button.closest(".raid-card");
+    if (!card || raidBusy) return;
+    const role = button.dataset.role;
+    if (RAID_ROLES.indexOf(role) === -1) return;
+    card.querySelectorAll("[data-action='raid-role']").forEach(function (item) {
+      const on = item === button;
+      item.setAttribute("aria-pressed", on ? "true" : "false");
+      item.className = raidChoiceClass(on, "pick");
+    });
+    const raid = raidById(button.dataset.id);
+    const own = raid ? ownRaidSignup(raid.id) : null;
+    if (own && raid) saveRaidSignup(raid.id, own.status);
+  }
+
+  function saveRaidSignup(id, status) {
+    const raid = raidById(id);
+    if (!raid || !isApproved() || !currentUser || raidBusy || !remote) return;
+    if (RAID_STATUSES.indexOf(status) === -1) return;
+    if (raid.status !== "scheduled" || !raidIsUpcoming(raid)) {
+      notify("Für diesen Raid kannst du dich nicht mehr anmelden.", "error");
+      return;
+    }
+    const card = document.getElementById("raid-" + raid.id);
+    const own = ownRaidSignup(raid.id);
+    const role = selectedRaidRole(card, own);
+    const name = raidNameFromCard(card, own);
+    const typed = card ? card.querySelector("[data-raid-name]") : null;
+    if (typed && typed.value.trim() && !name) {
+      notify("Bitte einen Charakternamen ohne E-Mail eintragen.", "error");
+      return;
+    }
+    const payload = { status: status, role: role, character_name: name || null };
+    raidBusy = true;
+    const request = own
+      ? remote.from("raid_signups").update(payload).eq("id", own.id).eq("user_id", currentUser.id).select(RAID_SIGNUP_COLUMNS).single()
+      : remote.from("raid_signups").insert({
+        raid_id: raid.id,
+        user_id: currentUser.id,
+        status: status,
+        role: role,
+        character_name: name || null,
+      }).select(RAID_SIGNUP_COLUMNS).single();
+    Promise.resolve(request).then(function (result) {
+      if (result && result.error && String(result.error.code || "") === "23505" && !own) {
+        return loadRaids().then(function () {
+          const again = ownRaidSignup(raid.id);
+          if (!again) return result;
+          return remote.from("raid_signups").update(payload).eq("id", again.id).eq("user_id", currentUser.id).select(RAID_SIGNUP_COLUMNS).single();
+        });
+      }
+      return result;
+    }).then(function (result) {
+      raidBusy = false;
+      if (!result || result.error) {
+        notify(raidErrorText(result && result.error, "Die Anmeldung konnte nicht gespeichert werden."), "error");
+        return;
+      }
+      notify(status + " gespeichert.", "info");
+      return loadRaids();
+    }).catch(function () {
+      raidBusy = false;
+      notify("Die Anmeldung konnte nicht gespeichert werden.", "error");
+    });
+  }
+
+  function focusLinkedRaid(options) {
+    const hash = location.hash.replace(/^#/, "");
+    if (hash.indexOf("raid-") !== 0) return;
+    const force = !!(options && options.force);
+    if (!force && raidHashDone === hash) return;
+    const raid = raidById(hash.slice(5));
+    if (raid && activeFront !== raid.front) switchFront(raid.front);
+    else {
+      if (raid) raidFront = raid.front;
+      renderRaids();
+    }
+    const el = document.getElementById(hash);
+    raidHashDone = hash;
+    if (!el) {
+      const section = document.getElementById("raidplanung");
+      if (section) section.scrollIntoView({ behavior: (options && options.behavior) || motion(), block: "start" });
+      return;
+    }
+    const updateHistory = !options || options.updateHistory !== false;
+    if (updateHistory && location.hash !== "#" + hash) history.pushState(null, "", "#" + hash);
+    const behavior = (options && options.behavior) || motion();
+    el.scrollIntoView({ behavior: behavior, block: "start" });
+  }
+
+  function renderRaidFilter() {
+    ["forever", "retail"].forEach(function (front) {
+      const button = document.getElementById("raid-filter-" + front);
+      if (!button) return;
+      const on = raidFront === front;
+      const count = raidRows.filter(function (raid) {
+        return raid.front === front && raid.status === "scheduled" && raidIsUpcoming(raid);
+      }).length;
+      button.className = raidChoiceClass(on, "pick");
+      button.setAttribute("aria-selected", on ? "true" : "false");
+      button.textContent = (front === "forever" ? "Forever" : "Retail") + " (" + count + ")";
+    });
+  }
+
+  function appendRaidPeople(parent, raid) {
+    const rows = raidSignupsFor(raid.id);
+    const wrap = raidNode("div", "space-y-3");
+    const counts = raidNode("p", "text-sm font-bold text-slate-200");
+    const parts = RAID_STATUSES.map(function (status) {
+      const n = rows.filter(function (signup) { return signup.status === status; }).length;
+      return status + " " + n;
+    });
+    counts.textContent = parts.join(" · ");
+    wrap.appendChild(counts);
+    const yesRows = rows.filter(function (signup) { return signup.status === "Zusage"; });
+    const roles = raidNode("p", "text-sm text-slate-300");
+    roles.textContent = "Rollen bei Zusage: " + RAID_ROLES.map(function (role) {
+      const n = yesRows.filter(function (signup) { return signup.role === role; }).length;
+      return role + " " + n;
+    }).join(" · ");
+    wrap.appendChild(roles);
+    if (!rows.length) {
+      wrap.appendChild(raidNode("p", "text-sm text-slate-500", "Noch niemand hat geantwortet."));
+      parent.appendChild(wrap);
+      return;
+    }
+    RAID_STATUSES.forEach(function (status) {
+      const group = rows.filter(function (signup) { return signup.status === status; });
+      if (!group.length) return;
+      const block = raidNode("div");
+      block.appendChild(raidNode("h4", "text-sm font-bold text-amber-400", status));
+      const list = raidNode("ul", "mt-1 space-y-1");
+      group.sort(function (a, b) {
+        const role = RAID_ROLES.indexOf(a.role) - RAID_ROLES.indexOf(b.role);
+        if (role) return role;
+        return a.characterName.localeCompare(b.characterName, "de");
+      }).forEach(function (signup) {
+        const item = raidNode("li", "text-base text-slate-100");
+        const who = signup.characterName || "Ohne Namen";
+        const mine = currentUser && signup.userId === currentUser.id;
+        item.textContent = who + " · " + signup.role + (mine ? " (du)" : "");
+        list.appendChild(item);
+      });
+      block.appendChild(list);
+      wrap.appendChild(block);
+    });
+    parent.appendChild(wrap);
+  }
+
+  function appendRaidSignup(parent, raid) {
+    const open = raid.status === "scheduled" && raidIsUpcoming(raid);
+    if (!currentUser) {
+      const button = raidNode("button", RAID_BTN_PICK, "Anmelden, um mitzumachen");
+      button.type = "button";
+      button.dataset.action = "open-auth";
+      parent.appendChild(button);
+      return;
+    }
+    if (!isApproved()) {
+      parent.appendChild(raidNode("p", "text-sm text-amber-200", accessNotice()));
+      return;
+    }
+    if (!open) {
+      parent.appendChild(raidNode("p", "text-sm font-bold text-amber-200", raid.status === "cancelled" ? "Dieser Raid ist abgesagt." : "Dieser Raid ist vorbei."));
+      return;
+    }
+    const own = ownRaidSignup(raid.id);
+    const roleNow = own ? own.role : "Schaden";
+    const statusNow = own ? own.status : "";
+    parent.appendChild(raidNode("p", "text-sm font-bold text-slate-300", "Kommst du mit?"));
+    const statusRow = raidNode("div", "raid-actions");
+    RAID_STATUSES.forEach(function (status) {
+      const tone = status === "Zusage" ? "yes" : status === "Absage" ? "no" : "pick";
+      const button = raidNode("button", raidChoiceClass(statusNow === status, tone), status);
+      button.type = "button";
+      button.dataset.action = "raid-signup";
+      button.dataset.id = raid.id;
+      button.dataset.status = status;
+      button.setAttribute("aria-pressed", statusNow === status ? "true" : "false");
+      statusRow.appendChild(button);
+    });
+    parent.appendChild(statusRow);
+    parent.appendChild(raidNode("p", "text-sm font-bold text-slate-300", "Deine Rolle"));
+    const roleRow = raidNode("div", "raid-actions");
+    RAID_ROLES.forEach(function (role) {
+      const button = raidNode("button", raidChoiceClass(roleNow === role, "pick"), role);
+      button.type = "button";
+      button.dataset.action = "raid-role";
+      button.dataset.id = raid.id;
+      button.dataset.role = role;
+      button.setAttribute("aria-pressed", roleNow === role ? "true" : "false");
+      roleRow.appendChild(button);
+    });
+    parent.appendChild(roleRow);
+    const nameLabel = raidNode("label", "block text-sm font-bold text-slate-300", "Charaktername (optional)");
+    nameLabel.htmlFor = "raid-name-" + raid.id;
+    const name = document.createElement("input");
+    name.id = "raid-name-" + raid.id;
+    name.type = "text";
+    name.maxLength = 40;
+    name.autocomplete = "off";
+    name.dataset.raidName = "1";
+    name.dataset.id = raid.id;
+    name.className = "mt-1 min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-slate-200 focus:border-amber-500";
+    name.placeholder = "Dein Charakter";
+    const prefill = own && own.characterName ? own.characterName : raidPublicName(currentUser.displayName);
+    name.value = prefill;
+    name.dataset.saved = prefill;
+    parent.appendChild(nameLabel);
+    parent.appendChild(name);
+    const saveName = raidNode("button", RAID_BTN_OFF, "Namen speichern");
+    saveName.type = "button";
+    saveName.dataset.action = "raid-save-name";
+    saveName.dataset.id = raid.id;
+    parent.appendChild(saveName);
+    parent.appendChild(raidNode("p", "text-sm text-slate-500", "Ein Tipp auf Zusage, Vielleicht oder Absage speichert. Bis zum Start kannst du es ändern."));
+  }
+
+  function appendRaidOfficer(parent, raid) {
+    if (!isOfficer()) return;
+    const row = raidNode("div", "flex flex-col gap-2 sm:flex-row");
+    const edit = raidNode("button", RAID_BTN_OFF + " sm:w-auto", "Ändern");
+    edit.type = "button";
+    edit.dataset.action = "raid-edit";
+    edit.dataset.id = raid.id;
+    row.appendChild(edit);
+    if (raid.status === "scheduled") {
+      const abort = raidNode("button", raidChoiceClass(true, "no") + " sm:w-auto", "Absagen");
+      abort.type = "button";
+      abort.dataset.action = "raid-abort";
+      abort.dataset.id = raid.id;
+      row.appendChild(abort);
+    }
+    const remove = raidNode("button", RAID_BTN_OFF + " sm:w-auto", "Löschen");
+    remove.type = "button";
+    remove.dataset.action = "raid-delete";
+    remove.dataset.id = raid.id;
+    row.appendChild(remove);
+    parent.appendChild(row);
+  }
+
+  function renderRaidCard(raid) {
+    const linked = linkedRaidId() === raid.id;
+    const card = raidNode("article", "raid-card space-y-4 rounded-2xl border border-slate-800 bg-slate-950 p-4" + (linked ? " is-linked" : ""));
+    card.id = "raid-" + raid.id;
+    card.tabIndex = -1;
+    const title = raidNode("h3", "text-2xl font-black text-white", raid.title);
+    title.id = "raid-title-" + raid.id;
+    card.setAttribute("aria-labelledby", title.id);
+    card.appendChild(title);
+    const meta = raidNode("p", "text-base font-bold text-amber-400");
+    meta.textContent = (raid.front === "forever" ? "Forever" : "Retail") + " · " + formatRaidWhen(raid.startsAt);
+    card.appendChild(meta);
+    card.appendChild(raidNode("p", "text-base text-slate-200", raidCountLabel(raidComingCount(raid)) + " · " + raid.maxSize + " Plätze"));
+    if (raid.status === "cancelled") card.appendChild(raidNode("p", "text-base font-extrabold text-red-300", "Abgesagt"));
+    else if (!raidIsUpcoming(raid)) card.appendChild(raidNode("p", "text-base font-bold text-slate-400", "Vorbei"));
+    if (currentUser && raid.note) card.appendChild(raidNode("p", "text-sm text-slate-300", raid.note));
+    if (isApproved() && raidNamesReady) appendRaidPeople(card, raid);
+    else if (isApproved()) card.appendChild(raidNode("p", "text-sm text-amber-200", "Die Namen konnten gerade nicht geladen werden."));
+    appendRaidSignup(card, raid);
+    appendRaidOfficer(card, raid);
+    return card;
+  }
+
+  function renderRaids() {
+    renderRaidFilter();
+    const list = document.getElementById("raid-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (raidState === "loading") {
+      setRaidStatus("raid-list-status", "Raids werden geladen…", "err");
+      return;
+    }
+    if (raidState === "missing") {
+      setRaidStatus("raid-list-status", "Die Raid-Planung ist noch nicht eingerichtet. Alles andere auf der Seite geht weiter.", "err");
+      return;
+    }
+    if (raidState === "error") {
+      setRaidStatus("raid-list-status", "Die Termine konnten gerade nicht geladen werden.", "err");
+      return;
+    }
+    const linked = linkedRaidId();
+    if (linked && !raidById(linked)) setRaidStatus("raid-list-status", "Diesen Raid gibt es hier nicht.", "err");
+    else setRaidStatus("raid-list-status", "");
+    const rows = visibleRaids();
+    if (!rows.length) {
+      list.appendChild(raidNode("p", "text-base text-slate-400", "Noch kein Raid geplant."));
+      return;
+    }
+    rows.forEach(function (raid) { list.appendChild(renderRaidCard(raid)); });
+  }
+
+  function loadRaids() {
+    if (!remote || typeof remote.from !== "function") {
+      raidState = "error";
+      renderRaids();
+      return Promise.resolve();
+    }
+    const epoch = raidEpoch + 1;
+    raidEpoch = epoch;
+    const columns = currentUser ? RAID_MEMBER_COLUMNS : RAID_PUBLIC_COLUMNS;
+    let raidsReq;
+    let countReq;
+    let signupReq;
+    try {
+      raidsReq = remote.from("raids").select(columns).order("starts_at", { ascending: true });
+      countReq = remote.rpc("raid_public_counts");
+      signupReq = isApproved()
+        ? remote.from("raid_signups").select(RAID_SIGNUP_COLUMNS)
+        : Promise.resolve({ data: [], error: null });
+    } catch (err) {
+      raidState = "error";
+      renderRaids();
+      return Promise.resolve();
+    }
+    return Promise.resolve(raidsReq).catch(function (error) {
+      return { data: null, error: error };
+    }).then(function (raidsResult) {
+      if (epoch !== raidEpoch) return null;
+      if (!raidsResult || raidsResult.error) {
+        raidRows = [];
+        raidSignups = [];
+        raidCounts = {};
+        raidNamesReady = false;
+        raidState = raidMissing(raidsResult && raidsResult.error) ? "missing" : "error";
+        renderRaids();
+        focusLinkedRaid({ updateHistory: false, behavior: "instant" });
+        return null;
+      }
+      raidRows = (raidsResult.data || []).map(mapRaid).filter(Boolean);
+      return Promise.all([
+        Promise.resolve(countReq).catch(function (error) { return { data: null, error: error }; }),
+        Promise.resolve(signupReq).catch(function (error) { return { data: null, error: error }; }),
+      ]);
+    }).then(function (results) {
+      if (!results || epoch !== raidEpoch) return;
+      raidCounts = {};
+      const countResult = results[0] || {};
+      if (!countResult.error) {
+        (countResult.data || []).forEach(function (row) {
+          if (!row) return;
+          const id = row.raid_id;
+          const count = Number(row.signup_count);
+          if (id && Number.isFinite(count)) raidCounts[id] = count;
+        });
+      }
+      const signupResult = results[1] || {};
+      raidNamesReady = !!(isApproved() && signupResult && !signupResult.error);
+      raidSignups = raidNamesReady ? (signupResult.data || []).map(mapRaidSignup).filter(Boolean) : [];
+      raidState = "ready";
+      renderRaids();
+      focusLinkedRaid({ updateHistory: false, behavior: "instant" });
+    }).catch(function () {
+      if (epoch !== raidEpoch) return;
+      raidState = "error";
+      renderRaids();
+    });
   }
 })();
