@@ -109,6 +109,19 @@
   let profileDirectory = [];
   let profileGameFilter = "all";
   const profileGameSaving = {};
+  let approvedProfiles = [];
+  let approvedProfilesState = "idle";
+  let approvedProfilesEpoch = 0;
+  let approvedProfileWaiters = [];
+  let memberPickQuery = "";
+  let memberPickSelected = {};
+  let memberPickBusy = false;
+  let raidPickQuery = "";
+  let raidPickSelected = {};
+  let raidPickBusy = false;
+  let dkpPickQuery = "";
+  let dkpPickSelected = {};
+  let leadershipPickQuery = "";
   let foreverPollRows = [];
   let foreverPollOwn = null;
   let foreverPollSending = false;
@@ -264,6 +277,33 @@
         syncDkpImportRow(field);
       });
     }
+    bindPickSearch("member-pick-search", function (value) {
+      memberPickQuery = value;
+      renderMemberPicker();
+    });
+    bindPickSearch("raid-pick-search", function (value) {
+      raidPickQuery = value;
+      renderRaidPicker();
+    });
+    bindPickSearch("dkp-player-pick-search", function (value) {
+      dkpPickQuery = value;
+      renderDkpPlayerPicker();
+    });
+    bindPickSearch("leadership-pick-search", function (value) {
+      leadershipPickQuery = value;
+      renderLeadershipPicker();
+    });
+  }
+
+  function bindPickSearch(id, onInput) {
+    const field = document.getElementById(id);
+    if (!field) return;
+    field.addEventListener("input", function () {
+      onInput(field.value);
+    });
+    field.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") event.preventDefault();
+    });
   }
 
   function onClick(event) {
@@ -311,8 +351,36 @@
       openAddMemberModal(front);
       return;
     }
+    if (action === "member-pick-one") {
+      addPickedMembers([el.dataset.pickKey]);
+      return;
+    }
+    if (action === "member-pick-selected") {
+      addPickedMembers(selectedPickKeys(memberPickSelected));
+      return;
+    }
     if (action === "open-raid-modal") {
       openAddRaidModal(front);
+      return;
+    }
+    if (action === "raid-pick-one") {
+      addPickedRaid([el.dataset.pickKey]);
+      return;
+    }
+    if (action === "raid-pick-selected") {
+      addPickedRaid(selectedPickKeys(raidPickSelected));
+      return;
+    }
+    if (action === "dkp-pick-one") {
+      addPickedDkpPlayers([el.dataset.pickKey]);
+      return;
+    }
+    if (action === "dkp-pick-selected") {
+      addPickedDkpPlayers(selectedPickKeys(dkpPickSelected));
+      return;
+    }
+    if (action === "leadership-pick") {
+      applyLeadershipPick(el.dataset.pickKey);
       return;
     }
     if (action === "open-mplus-modal") {
@@ -427,6 +495,19 @@
   }
 
   function onChange(event) {
+    const pickBox = event.target;
+    if (pickBox && pickBox.name === "member-pick") {
+      togglePickKey(memberPickSelected, pickBox);
+      return;
+    }
+    if (pickBox && pickBox.name === "raid-pick") {
+      togglePickKey(raidPickSelected, pickBox);
+      return;
+    }
+    if (pickBox && pickBox.name === "dkp-player-pick") {
+      togglePickKey(dkpPickSelected, pickBox);
+      return;
+    }
     const roleInput = event.target.closest('[data-action="raid-role"]');
     if (roleInput) {
       updateRaidRole(
@@ -606,6 +687,7 @@
   }
 
   function updateAuthUI() {
+    if (!isOfficer()) clearPersonPickers();
     const headerAuth = document.getElementById("auth-header-section");
     if (!headerAuth) return;
     const editOpen = document.getElementById("info-edit-mode");
@@ -1106,6 +1188,695 @@
     });
   }
 
+  const PICK_ADD_RED = "inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto";
+  const PICK_ADD_AMBER = "inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto";
+
+  function selectedPickKeys(map) {
+    return Object.keys(map).filter(function (key) { return map[key]; });
+  }
+
+  function togglePickKey(map, box) {
+    const key = box.dataset.pickKey || "";
+    if (!key) return;
+    if (box.checked) map[key] = true;
+    else delete map[key];
+  }
+
+  function setPickStatus(id, message) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+  }
+
+  function pickNote(parent, text) {
+    const note = document.createElement("p");
+    note.className = "px-2 py-3 text-sm text-slate-500";
+    note.textContent = text;
+    parent.appendChild(note);
+  }
+
+  function pickWaitText(fallback) {
+    if (approvedProfilesState === "error" || !remote || !remoteReady) return fallback;
+    return "Konten werden geladen…";
+  }
+
+  function pickMatches(query, parts) {
+    const needle = String(query || "").trim().toLocaleLowerCase("de");
+    if (!needle) return true;
+    return parts.join(" ").toLocaleLowerCase("de").indexOf(needle) !== -1;
+  }
+
+  function personNameKey(value) {
+    return String(value == null ? "" : value).trim().toLocaleLowerCase("de");
+  }
+
+  function personNameKeys(value) {
+    const raw = personNameKey(value);
+    if (!raw) return [];
+    const cleaned = personNameKey(suggestDkpName(value));
+    if (cleaned && cleaned !== raw) return [raw, cleaned];
+    return [raw];
+  }
+
+  function namesOverlap(a, b) {
+    const left = personNameKeys(a);
+    const right = personNameKeys(b);
+    for (let i = 0; i < left.length; i += 1) {
+      if (right.indexOf(left[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function personListed(list, name) {
+    return list.some(function (item) {
+      return item && namesOverlap(item.name, name);
+    });
+  }
+
+  function pickGameRank(game, preferred) {
+    const value = profileGameValue(game);
+    if (value === preferred || value === "both") return 0;
+    if (!value) return 1;
+    return 2;
+  }
+
+  function modalFront(id) {
+    return (document.getElementById(id) || {}).value === "forever" ? "forever" : "retail";
+  }
+
+  function clearPersonPickers() {
+    approvedProfilesEpoch += 1;
+    const waiters = approvedProfileWaiters.slice();
+    approvedProfileWaiters = [];
+    approvedProfiles = [];
+    approvedProfilesState = "idle";
+    memberPickSelected = {};
+    raidPickSelected = {};
+    dkpPickSelected = {};
+    memberPickBusy = false;
+    raidPickBusy = false;
+    waiters.forEach(function (fn) { fn([]); });
+    renderMemberPicker();
+    renderRaidPicker();
+    renderDkpPlayerPicker();
+    renderLeadershipPicker();
+  }
+
+  function refreshOpenPickers() {
+    const memberModal = document.getElementById("member-modal");
+    if (memberModal && !memberModal.hidden) renderMemberPicker();
+    const raidModal = document.getElementById("raid-modal");
+    if (raidModal && !raidModal.hidden) renderRaidPicker();
+    const leadModal = document.getElementById("leadership-modal");
+    if (leadModal && !leadModal.hidden) renderLeadershipPicker();
+    if (isOfficer() && canReadDkp()) renderDkpPlayerPicker();
+  }
+
+  function loadApprovedProfiles(force) {
+    if (!isOfficer() || !remote || !remoteReady) return Promise.resolve([]);
+    if (!force && (approvedProfilesState === "ready" || approvedProfilesState === "error")) {
+      return Promise.resolve(approvedProfiles);
+    }
+    if (approvedProfilesState === "loading") {
+      return new Promise(function (resolve) { approvedProfileWaiters.push(resolve); });
+    }
+    approvedProfilesState = "loading";
+    const epoch = approvedProfilesEpoch;
+    return remote.from("profiles").select("id, display_name, game, status").order("display_name").then(function (result) {
+      if (epoch !== approvedProfilesEpoch || !isOfficer()) return [];
+      if (!result || result.error) {
+        approvedProfiles = [];
+        approvedProfilesState = "error";
+      } else {
+        approvedProfiles = (result.data || []).filter(function (row) {
+          return row && row.status === "approved" && String(row.display_name || "").trim();
+        });
+        approvedProfilesState = "ready";
+      }
+      const waiters = approvedProfileWaiters.slice();
+      approvedProfileWaiters = [];
+      waiters.forEach(function (fn) { fn(approvedProfiles); });
+      refreshOpenPickers();
+      return approvedProfiles;
+    }).catch(function () {
+      if (epoch !== approvedProfilesEpoch || !isOfficer()) return [];
+      approvedProfiles = [];
+      approvedProfilesState = "error";
+      const waiters = approvedProfileWaiters.slice();
+      approvedProfileWaiters = [];
+      waiters.forEach(function (fn) { fn([]); });
+      refreshOpenPickers();
+      return [];
+    });
+  }
+
+  function appendPickRow(parent, spec) {
+    const row = document.createElement("div");
+    row.className = "flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:flex-row sm:items-center sm:justify-between" + (spec.muted ? " opacity-70" : "");
+    const label = document.createElement(spec.checkName ? "label" : "div");
+    label.className = "flex min-h-11 min-w-0 flex-1 items-center gap-3 text-sm text-slate-200";
+    if (spec.checkName) {
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.name = spec.checkName;
+      box.className = "h-4 w-4 shrink-0 accent-amber-500";
+      box.checked = !!spec.checked;
+      box.disabled = !!spec.disabled;
+      box.dataset.pickKey = spec.key;
+      label.appendChild(box);
+    }
+    const text = document.createElement("span");
+    text.className = "min-w-0";
+    const nameRow = document.createElement("span");
+    nameRow.className = "flex min-w-0 flex-wrap items-center gap-2";
+    const name = document.createElement("span");
+    name.className = "break-words font-bold text-white";
+    name.textContent = spec.name;
+    nameRow.appendChild(name);
+    const badge = spec.game ? gameBadge(spec.game) : null;
+    if (badge) nameRow.appendChild(badge);
+    text.appendChild(nameRow);
+    if (spec.detail) {
+      const detail = document.createElement("span");
+      detail.className = "mt-1 block break-words text-xs text-slate-400";
+      detail.textContent = spec.detail;
+      text.appendChild(detail);
+    }
+    label.appendChild(text);
+    row.appendChild(label);
+    if (spec.buttonLabel) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = spec.buttonClass || PICK_ADD_RED;
+      button.textContent = spec.buttonLabel;
+      button.disabled = !!spec.disabled;
+      button.dataset.action = spec.action;
+      button.dataset.pickKey = spec.key;
+      if (spec.dkpWrite) button.dataset.dkpWrite = "1";
+      row.appendChild(button);
+    }
+    parent.appendChild(row);
+  }
+
+  function memberPickEntries(front) {
+    const preferred = front === "forever" ? "forever" : "retail";
+    return approvedProfiles.filter(function (profile) {
+      return !personListed(membersOf(front), profile.display_name);
+    }).slice().sort(function (a, b) {
+      const byGame = pickGameRank(a.game, preferred) - pickGameRank(b.game, preferred);
+      if (byGame) return byGame;
+      return personNameKey(a.display_name).localeCompare(personNameKey(b.display_name), "de");
+    });
+  }
+
+  function renderMemberPicker() {
+    const list = document.getElementById("member-pick-list");
+    const batch = document.getElementById("member-pick-selected");
+    if (!list) return;
+    if (batch) batch.disabled = memberPickBusy;
+    if (!isOfficer()) {
+      list.replaceChildren();
+      return;
+    }
+    list.replaceChildren();
+    if (!approvedProfiles.length) {
+      pickNote(list, approvedProfilesState === "ready"
+        ? "Noch keine freigegebenen Konten."
+        : pickWaitText("Die Konten konnten nicht geladen werden. Den Namen kannst du unten von Hand eintragen."));
+      return;
+    }
+    const front = modalFront("modal-front");
+    const rows = memberPickEntries(front).filter(function (profile) {
+      return pickMatches(memberPickQuery, [profile.display_name, gameLabel(profile.game)]);
+    });
+    if (!rows.length) {
+      pickNote(list, memberPickEntries(front).length
+        ? "Kein Konto passt zur Suche."
+        : "Alle freigegebenen Konten stehen schon in der Liste.");
+      return;
+    }
+    rows.forEach(function (profile) {
+      const id = String(profile.id || "");
+      appendPickRow(list, {
+        key: id,
+        name: String(profile.display_name || "").trim(),
+        game: profile.game,
+        checkName: "member-pick",
+        checked: !!memberPickSelected[id],
+        disabled: memberPickBusy,
+        action: "member-pick-one",
+        buttonLabel: "Hinzufügen",
+        buttonClass: PICK_ADD_RED,
+      });
+    });
+  }
+
+  function insertMember(front, name, rank) {
+    const list = membersOf(front);
+    return remote.from("members").insert({
+      front: front,
+      name: name,
+      rank: rank,
+      sort_order: nextSort(list),
+    }).select("id, front, name, rank, sort_order").single().then(function (result) {
+      if (result.error || !result.data) return Promise.reject(result.error || new Error("save"));
+      const mapped = mapMember(result.data);
+      list.push(mapped);
+      return mapped;
+    });
+  }
+
+  function addPickedMembers(ids) {
+    if (memberPickBusy) return;
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Mitglieder bearbeiten.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
+    const front = modalFront("modal-front");
+    const rank = String((document.getElementById("modal-char-rank") || {}).value || "").trim() || "Frischefunke";
+    const names = [];
+    ids.forEach(function (id) {
+      const profile = approvedProfiles.find(function (row) { return row && String(row.id) === id; });
+      const name = profile ? String(profile.display_name || "").trim() : "";
+      if (!name || personListed(membersOf(front), name)) return;
+      if (names.some(function (existing) { return namesOverlap(existing, name); })) return;
+      names.push(name);
+    });
+    if (!names.length) {
+      setPickStatus("member-pick-status", "Bitte mindestens ein Konto auswählen.");
+      return;
+    }
+    memberPickBusy = true;
+    memberPickSelected = {};
+    renderMemberPicker();
+    let added = 0;
+    function next(index) {
+      if (index >= names.length) {
+        memberPickBusy = false;
+        renderMembers(front);
+        renderMemberPicker();
+        setPickStatus("member-pick-status", added === 1 ? "1 Mitglied hinzugefügt." : added + " Mitglieder hinzugefügt.");
+        return;
+      }
+      insertMember(front, names[index], rank).then(function () {
+        added += 1;
+        next(index + 1);
+      }).catch(function () {
+        memberPickBusy = false;
+        renderMembers(front);
+        renderMemberPicker();
+        notify(SAVE_FAIL, "error");
+        if (added) {
+          setPickStatus("member-pick-status", added + " hinzugefügt. Der Rest konnte nicht gespeichert werden.");
+        }
+      });
+    }
+    next(0);
+  }
+
+  function raidPickEntries(front) {
+    const rows = [];
+    const preferred = front === "forever" ? "forever" : "retail";
+    membersOf(front).forEach(function (member) {
+      if (!member || !member.id || !String(member.name || "").trim()) return;
+      if (personListed(kaderOf(front), member.name)) return;
+      rows.push({
+        key: "m:" + member.id,
+        name: String(member.name).trim(),
+        detail: member.rank ? String(member.rank).trim() : "",
+        game: front,
+        group: 0,
+      });
+    });
+    approvedProfiles.forEach(function (profile) {
+      const name = String(profile.display_name || "").trim();
+      if (!name || personListed(kaderOf(front), name)) return;
+      if (rows.some(function (row) { return namesOverlap(row.name, name); })) return;
+      rows.push({
+        key: "p:" + profile.id,
+        name: name,
+        detail: "Konto",
+        game: profile.game,
+        group: 1 + pickGameRank(profile.game, preferred),
+      });
+    });
+    rows.sort(function (a, b) {
+      return a.group - b.group || personNameKey(a.name).localeCompare(personNameKey(b.name), "de");
+    });
+    return rows;
+  }
+
+  function raidPickByKey(front, key) {
+    const rows = raidPickEntries(front);
+    for (let i = 0; i < rows.length; i += 1) {
+      if (rows[i].key === key) return rows[i];
+    }
+    return null;
+  }
+
+  function renderRaidPicker() {
+    const list = document.getElementById("raid-pick-list");
+    const batch = document.getElementById("raid-pick-selected");
+    if (!list) return;
+    if (batch) batch.disabled = raidPickBusy;
+    if (!isOfficer()) {
+      list.replaceChildren();
+      return;
+    }
+    list.replaceChildren();
+    const front = modalFront("modal-raid-front");
+    const available = raidPickEntries(front);
+    if (!available.length && !approvedProfiles.length && approvedProfilesState !== "ready") {
+      pickNote(list, pickWaitText("Die Konten konnten nicht geladen werden. Einen Namen kannst du unten von Hand eintragen."));
+      return;
+    }
+    const rows = available.filter(function (row) {
+      return pickMatches(raidPickQuery, [row.name, row.detail, gameLabel(row.game)]);
+    });
+    if (!rows.length) {
+      if (available.length) pickNote(list, "Kein Name passt zur Suche.");
+      else if (kaderOf(front).length) pickNote(list, "Alle passenden Namen stehen schon im Kader.");
+      else pickNote(list, "Noch keine Namen zum Auswählen.");
+      return;
+    }
+    rows.forEach(function (row) {
+      appendPickRow(list, {
+        key: row.key,
+        name: row.name,
+        detail: row.detail,
+        game: row.game,
+        checkName: "raid-pick",
+        checked: !!raidPickSelected[row.key],
+        disabled: raidPickBusy,
+        action: "raid-pick-one",
+        buttonLabel: "Hinzufügen",
+        buttonClass: PICK_ADD_RED,
+      });
+    });
+  }
+
+  function insertRoster(front, name, role) {
+    const kader = kaderOf(front);
+    return remote.from("roster").insert({
+      front: front,
+      name: name,
+      role: role,
+      sort_order: nextSort(kader),
+    }).select("id, front, name, role, sort_order").single().then(function (result) {
+      if (result.error || !result.data) return Promise.reject(result.error || new Error("save"));
+      const mapped = mapRoster(result.data);
+      kader.push(mapped);
+      return mapped;
+    });
+  }
+
+  function addPickedRaid(keys) {
+    if (raidPickBusy) return;
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen den Raidkader verwalten.", "error");
+      return;
+    }
+    if (!requireRemote()) return;
+    const front = modalFront("modal-raid-front");
+    const role = String((document.getElementById("modal-raid-role") || {}).value || "").trim() || "Tank";
+    const names = [];
+    keys.forEach(function (key) {
+      const row = raidPickByKey(front, key);
+      if (!row || personListed(kaderOf(front), row.name)) return;
+      if (names.some(function (existing) { return namesOverlap(existing, row.name); })) return;
+      names.push(row.name);
+    });
+    if (!names.length) {
+      setPickStatus("raid-pick-status", "Bitte mindestens einen Namen auswählen.");
+      return;
+    }
+    raidPickBusy = true;
+    raidPickSelected = {};
+    renderRaidPicker();
+    let added = 0;
+    function next(index) {
+      if (index >= names.length) {
+        raidPickBusy = false;
+        renderRaidKader(front);
+        renderRaidPicker();
+        setPickStatus("raid-pick-status", added === 1 ? "1 Spieler eingetragen." : added + " Spieler eingetragen.");
+        return;
+      }
+      insertRoster(front, names[index], role).then(function () {
+        added += 1;
+        next(index + 1);
+      }).catch(function () {
+        raidPickBusy = false;
+        renderRaidKader(front);
+        renderRaidPicker();
+        notify(SAVE_FAIL, "error");
+        if (added) {
+          setPickStatus("raid-pick-status", added + " eingetragen. Der Rest konnte nicht gespeichert werden.");
+        }
+      });
+    }
+    next(0);
+  }
+
+  function guildPickEntries() {
+    const rows = [];
+    function pushRow(key, name, detail, game) {
+      const clean = String(name || "").trim();
+      if (!clean) return;
+      if (rows.some(function (row) { return namesOverlap(row.name, clean); })) return;
+      rows.push({ key: key, name: clean, detail: detail, game: game });
+    }
+    foreverMembers.forEach(function (member) {
+      if (!member || !member.id) return;
+      pushRow("m:" + member.id, member.name, member.rank ? String(member.rank).trim() : "", "forever");
+    });
+    retailMembers.forEach(function (member) {
+      if (!member || !member.id) return;
+      pushRow("r:" + member.id, member.name, member.rank ? String(member.rank).trim() : "", "retail");
+    });
+    approvedProfiles.forEach(function (profile) {
+      pushRow("p:" + profile.id, profile.display_name, "Konto", profile.game || "");
+    });
+    rows.sort(function (a, b) {
+      return personNameKey(a.name).localeCompare(personNameKey(b.name), "de");
+    });
+    return rows;
+  }
+
+  function renderLeadershipPicker() {
+    const list = document.getElementById("leadership-pick-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!isOfficer()) return;
+    const rows = guildPickEntries().filter(function (row) {
+      return pickMatches(leadershipPickQuery, [row.name, row.detail, gameLabel(row.game)]);
+    });
+    if (!rows.length) {
+      if (!foreverMembers.length && !retailMembers.length && approvedProfilesState !== "ready") {
+        pickNote(list, pickWaitText("Die Konten konnten nicht geladen werden. Den Namen kannst du unten eintragen."));
+        return;
+      }
+      pickNote(list, guildPickEntries().length ? "Kein Name passt zur Suche." : "Noch keine Namen zum Auswählen.");
+      return;
+    }
+    rows.forEach(function (row) {
+      appendPickRow(list, {
+        key: row.key,
+        name: row.name,
+        detail: row.detail,
+        game: row.game,
+        action: "leadership-pick",
+        buttonLabel: "Übernehmen",
+        buttonClass: PICK_ADD_AMBER,
+      });
+    });
+  }
+
+  function applyLeadershipPick(key) {
+    if (!isOfficer()) return;
+    const row = guildPickEntries().filter(function (entry) { return entry.key === key; })[0];
+    const input = document.getElementById("leadership-name");
+    if (!row || !input) return;
+    input.value = row.name.slice(0, 80);
+    input.focus();
+  }
+
+  function dkpPickEntries() {
+    const byKey = {};
+    const rows = [];
+    function add(label, memberId, game, detail) {
+      const name = suggestDkpName(label);
+      if (name.length < 2) return;
+      const key = dkpNameKey(name);
+      if (!key) return;
+      const existing = byKey[key];
+      if (existing) {
+        if (!existing.memberId && memberId) existing.memberId = memberId;
+        return;
+      }
+      const row = {
+        key: key,
+        name: name,
+        label: String(label || "").trim(),
+        memberId: memberId || "",
+        game: game || "",
+        detail: detail || "",
+      };
+      if (row.label !== row.name) row.detail = row.detail ? row.detail + " · wird als " + row.name + " angelegt" : "Wird als " + row.name + " angelegt";
+      byKey[key] = row;
+      rows.push(row);
+    }
+    foreverMembers.forEach(function (member) {
+      if (!member || !String(member.name || "").trim()) return;
+      add(member.name, isDkpUuid(member.id) ? member.id : "", "forever", member.rank ? String(member.rank).trim() : "");
+    });
+    approvedProfiles.forEach(function (profile) {
+      const match = foreverMembers.find(function (member) {
+        return member && namesOverlap(member.name, profile.display_name);
+      });
+      add(
+        profile.display_name,
+        match && isDkpUuid(match.id) ? match.id : "",
+        profile.game || "",
+        "Konto"
+      );
+    });
+    rows.sort(function (a, b) {
+      return personNameKey(a.name).localeCompare(personNameKey(b.name), "de");
+    });
+    return rows;
+  }
+
+  function dkpPickByKey(key) {
+    const rows = dkpPickEntries();
+    for (let i = 0; i < rows.length; i += 1) {
+      if (rows[i].key === key) return rows[i];
+    }
+    return null;
+  }
+
+  function dkpPickTaken(entry) {
+    if (!entry) return true;
+    if (dkpNameTaken(entry.name) || dkpNameTaken(entry.label)) return true;
+    if (entry.memberId && dkpMemberTaken(entry.memberId)) return true;
+    return false;
+  }
+
+  function renderDkpPlayerPicker() {
+    const list = document.getElementById("dkp-player-pick-list");
+    const batch = document.getElementById("dkp-player-pick-selected");
+    if (!list) return;
+    const editing = isDkpUuid(String((document.getElementById("dkp-player-id") || {}).value || ""));
+    if (batch) batch.hidden = editing;
+    if (!isOfficer() || !canReadDkp()) {
+      list.replaceChildren();
+      return;
+    }
+    list.replaceChildren();
+    const available = dkpPickEntries();
+    if (!available.length && approvedProfilesState !== "ready") {
+      pickNote(list, pickWaitText("Die Konten konnten nicht geladen werden. Einen Namen kannst du unten von Hand eintragen."));
+      return;
+    }
+    const rows = available.filter(function (row) {
+      return pickMatches(dkpPickQuery, [row.label, row.name, row.detail, gameLabel(row.game)]);
+    });
+    if (!rows.length) {
+      pickNote(list, available.length ? "Kein Name passt zur Suche." : "Noch keine Namen zum Auswählen.");
+      return;
+    }
+    rows.forEach(function (row) {
+      const taken = dkpPickTaken(row);
+      if (taken) delete dkpPickSelected[row.key];
+      appendPickRow(list, {
+        key: row.key,
+        name: row.label || row.name,
+        detail: taken ? (row.detail ? row.detail + " · schon im DKP" : "schon im DKP") : row.detail,
+        game: row.game,
+        muted: taken,
+        checkName: editing || taken ? "" : "dkp-player-pick",
+        checked: !!dkpPickSelected[row.key],
+        disabled: dkpBusy || taken,
+        action: taken ? "" : "dkp-pick-one",
+        buttonLabel: taken ? "" : (editing ? "Übernehmen" : "Hinzufügen"),
+        buttonClass: PICK_ADD_AMBER,
+        dkpWrite: !editing,
+      });
+    });
+  }
+
+  function fillDkpPlayerFromPick(entry) {
+    const name = document.getElementById("dkp-player-name");
+    const member = document.getElementById("dkp-player-member");
+    const manual = document.getElementById("dkp-player-manual");
+    if (name) name.value = entry.name;
+    if (member) {
+      const id = entry.memberId && isDkpUuid(entry.memberId) ? entry.memberId : "";
+      if (id && !Array.prototype.some.call(member.options, function (option) { return option.value === id; })) {
+        member.appendChild(dkpOption(id, entry.label || "Verknüpftes Mitglied"));
+      }
+      member.value = id;
+    }
+    if (manual) manual.open = true;
+    setDkpStatus("dkp-player-status", "Name übernommen. Bitte speichern.");
+    if (name) name.focus();
+  }
+
+  function addPickedDkpPlayers(keys) {
+    if (!isOfficer() || !canReadDkp()) return;
+    const editing = isDkpUuid(String((document.getElementById("dkp-player-id") || {}).value || ""));
+    const entries = [];
+    keys.forEach(function (key) {
+      const row = dkpPickByKey(key);
+      if (!row) return;
+      if (entries.some(function (existing) { return existing.key === row.key; })) return;
+      entries.push(row);
+    });
+    if (!entries.length) {
+      setDkpStatus("dkp-player-status", "Bitte mindestens einen Spieler auswählen.");
+      return;
+    }
+    if (editing) {
+      fillDkpPlayerFromPick(entries[0]);
+      return;
+    }
+    const todo = entries.filter(function (entry) { return !dkpPickTaken(entry); });
+    if (!todo.length) {
+      setDkpStatus("dkp-player-status", "Bitte einen Spieler auswählen, der noch nicht im DKP steht.");
+      return;
+    }
+    dkpPickSelected = {};
+    runDkpWrite("dkp-player-status", function () {
+      let added = 0;
+      function next(index) {
+        if (index >= todo.length) {
+          return added === 1 ? "1 Spieler angelegt." : added + " Spieler angelegt.";
+        }
+        const entry = todo[index];
+        return dkpRpc("dkp_save_player", {
+          p_char_name: entry.name,
+          p_id: null,
+          p_member_id: entry.memberId || null,
+          p_active: true,
+        }).then(function () {
+          added += 1;
+          return next(index + 1);
+        }).catch(function (error) {
+          if (!added) throw error;
+          return added + " Spieler angelegt. Der Rest konnte nicht gespeichert werden.";
+        });
+      }
+      return next(0);
+    });
+  }
+
   function openAddMemberModal(front) {
     if (!isOfficer()) {
       notify("Nur Offiziere dürfen Mitglieder bearbeiten.", "error");
@@ -1115,6 +1886,13 @@
     const form = document.getElementById("member-form");
     form.reset();
     document.getElementById("modal-front").value = front;
+    memberPickQuery = "";
+    memberPickSelected = {};
+    const manual = document.getElementById("member-manual");
+    if (manual) manual.open = false;
+    setPickStatus("member-pick-status", "");
+    loadApprovedProfiles(true);
+    renderMemberPicker();
     openModal("member-modal");
   }
 
@@ -1127,6 +1905,13 @@
     const form = document.getElementById("raid-form");
     form.reset();
     document.getElementById("modal-raid-front").value = front;
+    raidPickQuery = "";
+    raidPickSelected = {};
+    const manual = document.getElementById("raid-manual");
+    if (manual) manual.open = false;
+    setPickStatus("raid-pick-status", "");
+    loadApprovedProfiles(true);
+    renderRaidPicker();
     openModal("raid-modal");
   }
 
@@ -1222,21 +2007,12 @@
       notify("Bitte einen Charakternamen eintragen.", "error");
       return;
     }
-    const list = membersOf(front);
-    remote.from("members").insert({
-      front: front,
-      name: name,
-      rank: rank,
-      sort_order: nextSort(list),
-    }).select("id, front, name, rank, sort_order").single().then(function (result) {
-      if (result.error || !result.data) {
-        notify(SAVE_FAIL, "error");
-        return;
-      }
-      list.push(mapMember(result.data));
+    insertMember(front, name, rank).then(function () {
       renderMembers(front);
       closeModal("member-modal");
       form.reset();
+    }).catch(function () {
+      notify(SAVE_FAIL, "error");
     });
   }
 
@@ -1272,21 +2048,12 @@
       notify("Bitte einen Namen eintragen.", "error");
       return;
     }
-    const kader = kaderOf(front);
-    remote.from("roster").insert({
-      front: front,
-      name: name,
-      role: role,
-      sort_order: nextSort(kader),
-    }).select("id, front, name, role, sort_order").single().then(function (result) {
-      if (result.error || !result.data) {
-        notify(SAVE_FAIL, "error");
-        return;
-      }
-      kader.push(mapRoster(result.data));
+    insertRoster(front, name, role).then(function () {
       renderRaidKader(front);
       closeModal("raid-modal");
       form.reset();
+    }).catch(function () {
+      notify(SAVE_FAIL, "error");
     });
   }
 
@@ -3075,6 +3842,11 @@
     document.getElementById("leadership-subtitle").value = person ? person.subtitle : "";
     document.getElementById("leadership-accent").value = person && person.accent === "amber" ? "amber" : "red";
     document.getElementById("leadership-modal-label").textContent = person ? "Leitung bearbeiten" : "Zur Leitung hinzufügen";
+    leadershipPickQuery = "";
+    const search = document.getElementById("leadership-pick-search");
+    if (search) search.value = "";
+    loadApprovedProfiles(true);
+    renderLeadershipPicker();
     openModal("leadership-modal");
   }
 
@@ -4947,6 +5719,8 @@
     renderDkpAwardPlayers();
     renderDkpImport();
     renderDkpHints();
+    if (isOfficer() && canReadDkp()) loadApprovedProfiles(false);
+    renderDkpPlayerPicker();
     renderDkpPlayerAdmin();
     renderDkpTypeAdmin();
     renderDkpItemAdmin();
@@ -5489,6 +6263,13 @@
     if (active) active.checked = true;
     const submit = document.getElementById("dkp-player-submit");
     if (submit) submit.textContent = "Spieler anlegen";
+    const manual = document.getElementById("dkp-player-manual");
+    if (manual) manual.open = false;
+    dkpPickQuery = "";
+    dkpPickSelected = {};
+    const search = document.getElementById("dkp-player-pick-search");
+    if (search) search.value = "";
+    renderDkpPlayerPicker();
   }
 
   function resetDkpTypeForm() {
@@ -5534,7 +6315,10 @@
     }
     if (active) active.checked = !!player.active;
     if (submit) submit.textContent = "Änderungen speichern";
+    const manual = document.getElementById("dkp-player-manual");
+    if (manual) manual.open = true;
     if (name) name.focus();
+    renderDkpPlayerPicker();
   }
 
   function editDkpType(id) {
