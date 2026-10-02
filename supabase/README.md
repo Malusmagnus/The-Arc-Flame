@@ -39,7 +39,17 @@ set role = 'admin', status = 'approved', approved_at = now()
 where id = (select id from auth.users where email = 'deine@email.de');
 ```
 
-Danach auf der Seite abmelden und wieder anmelden. Neben dem Namen erscheint **Rollen**. Weitere Konten werden dort Offizier oder Administrator. Die eigene Rolle lässt sich dort nicht ändern. Offiziere sehen **Freischaltungen** und können wartende Konten freischalten oder ablehnen. Abgelehnte Konten lassen sich dort wieder freischalten.
+Danach auf der Seite abmelden und wieder anmelden. Neben dem Namen erscheint **Rollen**. Weitere Konten werden dort Offizier oder Administrator. Die eigene Rolle lässt sich dort nicht ändern. Offiziere sehen **Mitglieder** und **Freischaltungen**. Freischalten und Ablehnen bleibt wie bisher. In der Mitgliederliste ordnen Offiziere und Administratoren jedem Konto ein Spiel zu: Forever, Retail oder beides. Mitglieder können das nicht selbst ändern.
+
+## Spiel-Zuordnung
+
+`profile_game.sql` einmal ausführen, wenn `schema.sql` schon auf dem Projekt liegt und die Spalte `profiles.game` noch fehlt. Ein komplettes erneutes Ausführen von `schema.sql` enthält dieselben Anweisungen. Beides kann wiederholt werden.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/profile_game.sql
+```
+
+`public.profiles.game` ist leer oder `forever`, `retail` oder `both`. Lesen und Schreiben der Spalte dürfen angemeldete Konten. Ein Trigger lässt die Änderung nur zu, wenn `public.is_officer()` gilt, auch für das eigene Konto.
 
 ## Galerie
 

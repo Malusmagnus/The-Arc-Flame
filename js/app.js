@@ -106,6 +106,9 @@
   const guildInfo = clone(DEFAULTS.guildInfo || { col1: "", col2: "", col3: "" });
   let currentUser = null;
   let approvalEnforced = false;
+  let profileDirectory = [];
+  let profileGameFilter = "all";
+  const profileGameSaving = {};
   let foreverPollRows = [];
   let foreverPollOwn = null;
   let foreverPollSending = false;
@@ -369,6 +372,14 @@
       openRolesModal();
       return;
     }
+    if (action === "filter-profile-game") {
+      const next = el.dataset.game;
+      if (next === "all" || next === "forever" || next === "retail" || next === "none") {
+        profileGameFilter = next;
+        renderProfileDirectory();
+      }
+      return;
+    }
     if (action === "open-approvals") {
       goTo("freischaltungen");
       return;
@@ -426,6 +437,11 @@
       return;
     }
     if (handleDkpChange(event)) return;
+    const profileGame = event.target.closest('[data-action="set-game"]');
+    if (profileGame) {
+      setProfileGame(profileGame.dataset.userId, profileGame.value, profileGame);
+      return;
+    }
     const profileRole = event.target.closest('[data-action="set-role"]');
     if (!profileRole) return;
     setProfileRole(profileRole.dataset.userId, profileRole.value, profileRole);
@@ -607,12 +623,12 @@
       name.appendChild(icon);
       name.appendChild(document.createTextNode(" " + currentUser.displayName + " (" + roleLabel(currentUser.role) + ")"));
       pill.appendChild(name);
-      if (isAdmin()) {
+      if (isOfficer()) {
         const roles = document.createElement("button");
         roles.type = "button";
         roles.dataset.action = "open-roles";
         roles.className = "inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-bold text-amber-400 hover:text-white";
-        roles.textContent = "Rollen";
+        roles.textContent = isAdmin() ? "Rollen" : "Mitglieder";
         pill.appendChild(roles);
       }
       if (approvalEnforced && isOfficer()) {
@@ -3113,60 +3129,197 @@
     });
   }
 
-  function openRolesModal() {
-    if (!isAdmin() || !remote || !remoteReady) {
-      notify("Nur Administratoren dürfen Rollen ändern.", "error");
+  function profileGameValue(game) {
+    if (game === "forever" || game === "retail" || game === "both") return game;
+    return "";
+  }
+
+  function gameLabel(game) {
+    if (game === "forever") return "Forever";
+    if (game === "retail") return "Retail";
+    if (game === "both") return "Beides";
+    return "";
+  }
+
+  function profileMatchesGame(profile) {
+    const game = profileGameValue(profile && profile.game);
+    if (profileGameFilter === "none") return !game;
+    if (profileGameFilter === "forever") return game === "forever" || game === "both";
+    if (profileGameFilter === "retail") return game === "retail" || game === "both";
+    return true;
+  }
+
+  function profileGameError(error) {
+    const msg = String((error && error.message) || "").replace(/^\s*ERROR:\s*/i, "").trim();
+    if (!msg || /failed to fetch|network|jwt|permission denied|PGRST|schema cache/i.test(msg)) {
+      return "Das Spiel konnte nicht gespeichert werden.";
+    }
+    return msg;
+  }
+
+  function syncProfileGameFilter() {
+    document.querySelectorAll("[data-action='filter-profile-game']").forEach(function (button) {
+      const on = button.dataset.game === profileGameFilter;
+      button.className = on
+        ? "inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-sm font-extrabold text-slate-950"
+        : "inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-slate-700";
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  function gameBadge(game) {
+    const text = gameLabel(profileGameValue(game));
+    if (!text) return null;
+    const badge = document.createElement("span");
+    const tone = game === "retail"
+      ? "border-red-900/60 text-red-300"
+      : "border-amber-500/40 text-amber-300";
+    badge.className = "shrink-0 rounded-full border px-2 py-0.5 text-xs font-bold " + tone;
+    badge.textContent = text;
+    return badge;
+  }
+
+  function renderProfileDirectory() {
+    const list = document.getElementById("roles-list");
+    if (!list) return;
+    syncProfileGameFilter();
+    list.replaceChildren();
+    const rows = profileDirectory.filter(profileMatchesGame);
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "text-sm text-slate-400";
+      empty.textContent = profileDirectory.length ? "Keine Konten für diesen Filter." : "Noch keine Konten.";
+      list.appendChild(empty);
       return;
     }
-    remote.from("profiles").select("id, display_name, email, role").order("display_name").then(function (result) {
+    const admin = isAdmin();
+    rows.forEach(function (profile) {
+      const row = document.createElement("div");
+      row.className = "flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:flex-row sm:items-center sm:justify-between";
+      const label = document.createElement("div");
+      label.className = "min-w-0";
+      const nameRow = document.createElement("div");
+      nameRow.className = "flex min-w-0 flex-wrap items-center gap-2";
+      const name = document.createElement("p");
+      name.className = "truncate text-sm font-bold text-white";
+      name.textContent = profile.display_name || "Mitglied";
+      nameRow.appendChild(name);
+      const badge = gameBadge(profile.game);
+      if (badge) nameRow.appendChild(badge);
+      const email = document.createElement("p");
+      email.className = "truncate text-xs text-slate-400";
+      email.textContent = currentUser && profile.id === currentUser.id ? "Das bist du" : (profile.email || "");
+      label.append(nameRow, email);
+      const controls = document.createElement("div");
+      controls.className = "flex w-full flex-col gap-2 sm:max-w-xs";
+      const gameField = document.createElement("label");
+      gameField.className = "block text-xs font-semibold text-slate-400";
+      gameField.textContent = "Spiel";
+      const gameSelect = document.createElement("select");
+      gameSelect.className = "mt-1 min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-amber-500";
+      gameSelect.dataset.action = "set-game";
+      gameSelect.dataset.userId = profile.id;
+      gameSelect.setAttribute("aria-label", "Spiel von " + (profile.display_name || "Mitglied"));
+      if (profileGameSaving[profile.id]) gameSelect.disabled = true;
+      [
+        ["", "– nicht zugeordnet –"],
+        ["forever", "Forever"],
+        ["retail", "Retail"],
+        ["both", "Beides"],
+      ].forEach(function (pair) {
+        const option = document.createElement("option");
+        option.value = pair[0];
+        option.textContent = pair[1];
+        if (profileGameValue(profile.game) === pair[0]) option.selected = true;
+        gameSelect.appendChild(option);
+      });
+      gameField.appendChild(gameSelect);
+      controls.appendChild(gameField);
+      if (admin && currentUser && profile.id !== currentUser.id) {
+        const roleSelect = document.createElement("select");
+        roleSelect.className = "min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-amber-500";
+        roleSelect.dataset.action = "set-role";
+        roleSelect.dataset.userId = profile.id;
+        roleSelect.setAttribute("aria-label", "Rolle von " + (profile.display_name || "Mitglied"));
+        ["member", "officer", "admin"].forEach(function (role) {
+          const option = document.createElement("option");
+          option.value = role;
+          option.textContent = roleLabel(role);
+          if (profile.role === role) option.selected = true;
+          roleSelect.appendChild(option);
+        });
+        controls.appendChild(roleSelect);
+      } else {
+        const roleText = document.createElement("p");
+        roleText.className = "text-xs font-semibold text-amber-400";
+        roleText.textContent = roleLabel(profile.role);
+        controls.appendChild(roleText);
+      }
+      row.append(label, controls);
+      list.appendChild(row);
+    });
+  }
+
+  function openRolesModal() {
+    if (!isOfficer() || !remote || !remoteReady) {
+      notify("Nur Offiziere dürfen das Spiel zuordnen.", "error");
+      return;
+    }
+    const title = document.getElementById("roles-modal-label");
+    const hint = document.getElementById("roles-modal-hint");
+    if (title) title.textContent = isAdmin() ? "Rollen" : "Mitglieder";
+    if (hint) {
+      hint.textContent = isAdmin()
+        ? "Nur Administratoren ändern Rollen. Die eigene Rolle bleibt unverändert. Das Spiel ordnen Offiziere und Administratoren zu."
+        : "Du kannst das Spiel zuordnen. Rollen ändert nur ein Administrator.";
+    }
+    profileGameFilter = "all";
+    remote.from("profiles").select("id, display_name, email, role, status, game").order("display_name").then(function (result) {
       if (result.error) {
-        notify("Die Rollenliste konnte nicht geladen werden.", "error");
+        notify("Die Mitgliederliste konnte nicht geladen werden.", "error");
         return;
       }
-      const list = document.getElementById("roles-list");
-      list.replaceChildren();
-      (result.data || []).forEach(function (profile) {
-        const row = document.createElement("div");
-        row.className = "flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3";
-        const label = document.createElement("div");
-        label.className = "min-w-0";
-        const name = document.createElement("p");
-        name.className = "truncate text-sm font-bold text-white";
-        name.textContent = profile.display_name || "Mitglied";
-        const email = document.createElement("p");
-        email.className = "truncate text-xs text-slate-400";
-        email.textContent = profile.id === currentUser.id ? "Das bist du" : (profile.email || "");
-        label.append(name, email);
-        row.appendChild(label);
-        if (profile.id === currentUser.id) {
-          const self = document.createElement("span");
-          self.className = "text-xs font-semibold text-amber-400";
-          self.textContent = roleLabel(profile.role);
-          row.appendChild(self);
-        } else {
-          const select = document.createElement("select");
-          select.className = "rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-amber-500";
-          select.dataset.action = "set-role";
-          select.dataset.userId = profile.id;
-          select.setAttribute("aria-label", "Rolle von " + (profile.display_name || "Mitglied"));
-          ["member", "officer", "admin"].forEach(function (role) {
-            const option = document.createElement("option");
-            option.value = role;
-            option.textContent = roleLabel(role);
-            if (profile.role === role) option.selected = true;
-            select.appendChild(option);
-          });
-          row.appendChild(select);
-        }
-        list.appendChild(row);
-      });
-      if (!list.children.length) {
-        const empty = document.createElement("p");
-        empty.className = "text-sm text-slate-400";
-        empty.textContent = "Noch keine Konten.";
-        list.appendChild(empty);
-      }
+      profileDirectory = result.data || [];
+      renderProfileDirectory();
       openModal("roles-modal");
+    });
+  }
+
+  function setProfileGame(userId, value, select) {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen das Spiel zuordnen.", "error");
+      return;
+    }
+    if (!userId || profileGameSaving[userId]) return;
+    const game = profileGameValue(value);
+    if (value && !game) return;
+    const stored = profileDirectory.find(function (profile) { return profile.id === userId; });
+    const previous = stored ? profileGameValue(stored.game) : "";
+    if (game === previous) return;
+    if (!requireRemote()) return;
+    profileGameSaving[userId] = true;
+    if (select) select.disabled = true;
+    remote.from("profiles").update({ game: game || null }).eq("id", userId).select("id, game").then(function (result) {
+      delete profileGameSaving[userId];
+      const saved = result && result.data && result.data[0];
+      if (!result || result.error || !saved) {
+        notify(profileGameError(result && result.error), "error");
+        if (select) {
+          select.disabled = false;
+          select.value = previous;
+        }
+        return;
+      }
+      if (stored) stored.game = saved.game;
+      renderProfileDirectory();
+      notify("Spiel gespeichert.", "info");
+    }).catch(function () {
+      delete profileGameSaving[userId];
+      notify("Das Spiel konnte nicht gespeichert werden.", "error");
+      if (select) {
+        select.disabled = false;
+        select.value = previous;
+      }
     });
   }
 
@@ -3194,7 +3347,7 @@
   function loadApprovals() {
     if (!remote || !approvalEnforced || !isOfficer()) return;
     remote.from("profiles")
-      .select("id, display_name, status, role, created_at")
+      .select("id, display_name, status, role, created_at, game")
       .in("status", ["pending", "rejected"])
       .order("created_at", { ascending: true })
       .then(function (result) {
@@ -3716,7 +3869,7 @@
       currentUser = null;
       return Promise.resolve();
     }
-    return remote.from("profiles").select("display_name, role, status").eq("id", user.id).maybeSingle().then(function (result) {
+    return remote.from("profiles").select("display_name, role, status, game").eq("id", user.id).maybeSingle().then(function (result) {
       if (result && result.error && missingStatusColumn(result.error)) {
         approvalEnforced = false;
         return remote.from("profiles").select("display_name, role").eq("id", user.id).maybeSingle().then(function (fallback) {
