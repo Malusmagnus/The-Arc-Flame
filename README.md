@@ -120,6 +120,7 @@ supabase/schema.sql Tabellen, Rechte, Startdaten, Galerie und Freischaltung
 supabase/approval.sql Freischaltung (erneut ausführbar, auch in schema.sql)
 supabase/gallery.sql Galerie-Bucket, Tabelle und Rechte (erneut ausführbar)
 supabase/forever_poll.sql Forever-Umfrage, Tabelle und Rechte (erneut ausführbar)
+supabase/profile_game.sql Spiel-Zuordnung Forever, Retail oder beides (erneut ausführbar)
 supabase/README.md  Einstellungen im Supabase-Dashboard
 assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
 assets/gallery/     Screenshots für die Galerie
