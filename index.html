@@ -636,9 +636,22 @@
             <form id="dkp-player-form" novalidate class="space-y-4">
               <input type="hidden" id="dkp-player-id" value="">
               <div>
-                <label for="dkp-player-name" class="mb-1 block text-xs font-semibold text-slate-400">Name (2 bis 40 Zeichen)</label>
-                <input type="text" id="dkp-player-name" maxlength="40" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                <p class="text-sm font-bold text-white">Spieler auswählen</p>
+                <p class="mt-1 text-sm text-slate-400">Forever-Mitglieder und freigegebene Konten. Ein Klick legt den Spieler an.</p>
               </div>
+              <div>
+                <label for="dkp-player-pick-search" class="mb-1 block text-xs font-semibold text-slate-400">Suchen</label>
+                <input type="search" id="dkp-player-pick-search" autocomplete="off" placeholder="Name" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              </div>
+              <button type="button" id="dkp-player-pick-selected" data-action="dkp-pick-selected" data-dkp-write class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50">Ausgewählte hinzufügen</button>
+              <div id="dkp-player-pick-list" class="max-h-72 space-y-2 overflow-y-auto" aria-label="Spieler zum Anlegen"></div>
+              <details id="dkp-player-manual" class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                <summary class="flex min-h-11 cursor-pointer items-center text-sm font-bold text-slate-300">Name von Hand eintragen</summary>
+                <div class="mt-3">
+                  <label for="dkp-player-name" class="mb-1 block text-xs font-semibold text-slate-400">Name (2 bis 40 Zeichen)</label>
+                  <input type="text" id="dkp-player-name" maxlength="40" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+                </div>
+              </details>
               <div>
                 <label for="dkp-player-member" class="mb-1 block text-xs font-semibold text-slate-400">Gildenmitglied (optional)</label>
                 <select id="dkp-player-member" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
@@ -1052,31 +1065,47 @@
 
   <div id="member-modal" class="modal" hidden>
     <div class="modal-backdrop" data-action="close-modal" data-modal="member-modal"></div>
-    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="member-modal-title">
+    <div class="modal-panel max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="member-modal-title">
       <h2 id="member-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
         <i class="fa-solid fa-user-plus text-red-500" aria-hidden="true"></i> Mitglied hinzufügen
       </h2>
       <form id="member-form" class="mt-4 space-y-4">
         <input type="hidden" id="modal-front" value="retail">
         <div>
-          <label for="modal-char-name" class="mb-1 block text-xs font-semibold text-slate-400">Charaktername &amp; Level</label>
-          <input type="text" id="modal-char-name" placeholder="z.B. Charaktername 80" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+          <h3 class="text-base font-bold text-white">Aus angemeldeten Konten wählen</h3>
+          <p class="mt-1 text-sm text-slate-400">Neue Mitglieder starten als Frischefunke. Den Rang kannst du vorher ändern. Passende Konten stehen oben.</p>
         </div>
         <div>
           <label for="modal-char-rank" class="mb-1 block text-xs font-semibold text-slate-400">Rang</label>
-          <select id="modal-char-rank" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+          <select id="modal-char-rank" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
             <option value="Flammenrat">Flammenrat</option>
             <option value="Raidplaner">Raidplaner</option>
             <option value="Raidleitung">Raidleitung</option>
             <option value="Schlachtflamme">Schlachtflamme</option>
             <option value="Flammenherz">Flammenherz</option>
             <option value="Funkenecho">Funkenecho</option>
-            <option value="Frischefunke">Frischefunke</option>
+            <option value="Frischefunke" selected>Frischefunke</option>
           </select>
         </div>
-        <div class="flex justify-end gap-3 pt-2">
+        <div>
+          <label for="member-pick-search" class="mb-1 block text-xs font-semibold text-slate-400">Suchen</label>
+          <input type="search" id="member-pick-search" autocomplete="off" placeholder="Name" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+        </div>
+        <button type="button" id="member-pick-selected" data-action="member-pick-selected" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">Ausgewählte hinzufügen</button>
+        <div id="member-pick-list" class="max-h-72 space-y-2 overflow-y-auto" aria-label="Angemeldete Konten"></div>
+        <p id="member-pick-status" class="text-sm text-amber-200" hidden role="status"></p>
+        <details id="member-manual" class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+          <summary class="flex min-h-11 cursor-pointer items-center text-sm font-bold text-slate-300">Name von Hand eintragen</summary>
+          <div class="mt-3">
+            <label for="modal-char-name" class="mb-1 block text-xs font-semibold text-slate-400">Charaktername &amp; Level</label>
+            <input type="text" id="modal-char-name" placeholder="z.B. Charaktername 80" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+          </div>
+          <div class="mt-3 flex justify-end">
+            <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-lg hover:bg-red-500">Eintragen</button>
+          </div>
+        </details>
+        <div class="flex justify-end pt-2">
           <button type="button" data-action="close-modal" data-modal="member-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
-          <button type="submit" class="min-h-11 rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-lg hover:bg-red-500">Hinzufügen</button>
         </div>
       </form>
     </div>
@@ -1084,28 +1113,44 @@
 
   <div id="raid-modal" class="modal" hidden>
     <div class="modal-backdrop" data-action="close-modal" data-modal="raid-modal"></div>
-    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="raid-modal-title">
+    <div class="modal-panel max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="raid-modal-title">
       <h2 id="raid-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
         <i class="fa-solid fa-shield text-red-500" aria-hidden="true"></i> In den Raidkader eintragen
       </h2>
       <form id="raid-form" class="mt-4 space-y-4">
         <input type="hidden" id="modal-raid-front" value="retail">
         <div>
-          <label for="modal-raid-name" class="mb-1 block text-xs font-semibold text-slate-400">Name &amp; Klasse</label>
-          <input type="text" id="modal-raid-name" placeholder="z.B. Name (Klasse)" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+          <h3 class="text-base font-bold text-white">Aus der Gilde wählen</h3>
+          <p class="mt-1 text-sm text-slate-400">Die Rolle kannst du vorher wählen und im Kader danach noch ändern.</p>
         </div>
         <div>
           <label for="modal-raid-role" class="mb-1 block text-xs font-semibold text-slate-400">Rolle im Raid</label>
-          <select id="modal-raid-role" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+          <select id="modal-raid-role" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
             <option value="Tank">Tank</option>
             <option value="Heiler">Heiler</option>
             <option value="Melee-DD">Melee-DD</option>
             <option value="Range-DD">Range-DD</option>
           </select>
         </div>
-        <div class="flex justify-end gap-3 pt-2">
+        <div>
+          <label for="raid-pick-search" class="mb-1 block text-xs font-semibold text-slate-400">Suchen</label>
+          <input type="search" id="raid-pick-search" autocomplete="off" placeholder="Name" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+        </div>
+        <button type="button" id="raid-pick-selected" data-action="raid-pick-selected" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50">Ausgewählte hinzufügen</button>
+        <div id="raid-pick-list" class="max-h-72 space-y-2 overflow-y-auto" aria-label="Spieler für den Kader"></div>
+        <p id="raid-pick-status" class="text-sm text-amber-200" hidden role="status"></p>
+        <details id="raid-manual" class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+          <summary class="flex min-h-11 cursor-pointer items-center text-sm font-bold text-slate-300">Name von Hand eintragen</summary>
+          <div class="mt-3">
+            <label for="modal-raid-name" class="mb-1 block text-xs font-semibold text-slate-400">Name &amp; Klasse</label>
+            <input type="text" id="modal-raid-name" placeholder="z.B. Name (Klasse)" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-red-500">
+          </div>
+          <div class="mt-3 flex justify-end">
+            <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-lg hover:bg-red-500">Eintragen</button>
+          </div>
+        </details>
+        <div class="flex justify-end pt-2">
           <button type="button" data-action="close-modal" data-modal="raid-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
-          <button type="submit" class="min-h-11 rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-lg hover:bg-red-500">Eintragen</button>
         </div>
       </form>
     </div>
@@ -1186,12 +1231,19 @@
 
   <div id="leadership-modal" class="modal" hidden>
     <div class="modal-backdrop" data-action="close-modal" data-modal="leadership-modal"></div>
-    <div class="modal-panel max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="leadership-modal-title">
+    <div class="modal-panel max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="leadership-modal-title">
       <h2 id="leadership-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
         <i class="fa-solid fa-crown text-amber-400" aria-hidden="true"></i> <span id="leadership-modal-label">Zur Leitung hinzufügen</span>
       </h2>
       <form id="leadership-form" class="mt-4 space-y-4">
         <input type="hidden" id="leadership-id" value="">
+        <div>
+          <p class="text-sm font-bold text-white">Name aus der Gilde übernehmen</p>
+          <p class="mt-1 text-sm text-slate-400">Ein Klick schreibt den Namen ins Feld. Die Rolle trägst du danach ein.</p>
+          <label for="leadership-pick-search" class="mb-1 mt-3 block text-xs font-semibold text-slate-400">Suchen</label>
+          <input type="search" id="leadership-pick-search" autocomplete="off" placeholder="Name" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div id="leadership-pick-list" class="max-h-72 space-y-2 overflow-y-auto" aria-label="Namen aus der Gilde"></div>
         <div>
           <label for="leadership-name" class="mb-1 block text-xs font-semibold text-slate-400">Name</label>
           <input type="text" id="leadership-name" maxlength="80" required class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
