@@ -94,7 +94,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/raids.sql
 
 Danach gibt es `public.raids` und `public.raid_signups`. Termine lesen alle Besucher, aber ohne Notiz. Die Zahl der Anmeldungen (Zusage und Vielleicht) liefert `public.raid_public_counts()`. Namen, Rolle und Notiz sehen nur freigeschaltete Konten (`public.is_approved()`). E-Mail-Spalten gibt es hier nicht. Anlegen, ändern, absagen und löschen dürfen freigeschaltete Offiziere und Administratoren. Zusagen darf nur das eigene freigeschaltete Konto, nur bis zum Raid-Start.
 
-Discord läuft in der Datenbank, nicht im Browser. Der Trigger liest `vault.decrypted_secrets` mit dem Namen `discord_raid_webhook` und, falls der fehlt oder leer ist, `discord_chat_webhook`. Beide Geheimnisse legt ihr im Vault an. Die Webhook-Adresse steht nicht in `raids.sql`. Schlägt der Versand fehl, bleibt der Raid trotzdem gespeichert.
+Discord läuft in der Datenbank, nicht im Browser. Forever- und Retail-Raidmeldungen können in getrennte Kanäle gehen. Dafür legt ihr im Vault die Geheimnisse `discord_raid_webhook_forever` und `discord_raid_webhook_retail` an. Fehlt das Geheimnis der Front oder ist es leer, liest der Trigger `discord_raid_webhook` und danach `discord_chat_webhook`. Die Webhook-Adressen stehen nicht im Repository. Schlägt der Versand fehl, bleibt der Raid trotzdem gespeichert.
 
 ## Realtime
 

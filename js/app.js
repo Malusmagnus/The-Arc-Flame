@@ -131,7 +131,7 @@
 
   const RAID_TITLES = {
     forever: ["Geschmolzener Kern", "Onyxias Hort", "Pechschwingenhort", "Zul'Gurub", "Ruinen von Ahn'Qiraj", "Tempel von Ahn'Qiraj", "Naxxramas"],
-    retail: ["Die Leerenspitze", "Der Traumriss", "Marsch auf Quel'Danas", "Nerub-ar-Palast", "Befreiung von Lorenhall", "Manaschmiede Omega"],
+    retail: ["The Venomous Abyss (Ula'tek, Season 2)", "Die Leerenspitze", "Der Traumriss", "Marsch auf Quel'Danas", "Nerub-ar-Palast", "Befreiung von Lorenhall", "Manaschmiede Omega"],
   };
   const RAID_PUBLIC_COLUMNS = "id, front, title, starts_at, max_size, status";
   const RAID_MEMBER_COLUMNS = RAID_PUBLIC_COLUMNS + ", note";

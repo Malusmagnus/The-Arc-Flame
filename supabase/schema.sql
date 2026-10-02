@@ -2439,8 +2439,14 @@ begin
   begin
     select btrim(ds.decrypted_secret) into hook
     from vault.decrypted_secrets ds
-    where ds.name = 'discord_raid_webhook'
+    where ds.name = 'discord_raid_webhook_' || row.front
     limit 1;
+    if hook is null or hook = '' then
+      select btrim(ds.decrypted_secret) into hook
+      from vault.decrypted_secrets ds
+      where ds.name = 'discord_raid_webhook'
+      limit 1;
+    end if;
     if hook is null or hook = '' then
       select btrim(ds.decrypted_secret) into hook
       from vault.decrypted_secrets ds
