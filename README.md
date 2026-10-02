@@ -1,6 +1,6 @@
 # The Arc Flame
 
-Statische Gildenhomepage für **The Arc Flame** (World of Warcraft, Horde). Die Seite zeigt Retail und WoW Forever (Classic): Gildenleitung, Raidkader, Mitglieder, M+-Planer, Classic-Planer, Forever-Umfrage, Bewerbung, Gilden-Chat und die bearbeitbare Gildeninfo.
+Statische Gildenhomepage für **The Arc Flame** (World of Warcraft, Horde). Die Seite zeigt Retail und WoW Forever (Classic): Gildenleitung, Raidkader, Raid-Planung, Mitglieder, M+-Planer, Classic-Planer, Forever-Umfrage, DKP, Bewerbung, Gilden-Chat und die bearbeitbare Gildeninfo.
 
 Sie wird über GitHub Pages unter [https://thearcflame.github.io/](https://thearcflame.github.io/) ausgeliefert. Eigene Dateien sind relativ verlinkt.
 
@@ -65,6 +65,16 @@ galleryImages: [
 
 3. Auf `main` pushen. Diese Dateien haben kein **Löschen** auf der Seite.
 
+## Raid-Planung
+
+Der Abschnitt **Raid-Planung** steht in der Navigation von Retail und Forever unter **Raids** und hat die Adresse `#raidplanung`. Jeder Termin hat zusätzlich `#raid-<id>`.
+
+Offiziere und Administratoren legen Raids an (Forever oder Retail, Name aus der Liste oder frei, Datum und Uhrzeit in Berliner Zeit, Notiz, Plätze). Sie können Termine ändern, absagen oder löschen. Freigeschaltete Mitglieder sagen mit einem Klick zu, vielleicht oder ab und wählen Tank, Heiler oder Schaden. Bis zum Start können sie die Antwort ändern.
+
+Besucher ohne Anmeldung sehen die nächsten Termine und wie viele Anmeldungen es gibt, plus den Knopf **Anmelden, um mitzumachen**. Namen sehen nur angemeldete, freigeschaltete Konten. E-Mails werden nicht angezeigt.
+
+Einmal `supabase/raids.sql` ausführen, falls der Block in `schema.sql` noch nicht gelaufen ist. Dieselben Anweisungen stehen am Ende von `schema.sql`. Beim Anlegen und Absagen schreibt ein Trigger nach Discord. Den Webhook liest die Datenbank aus dem Vault (`discord_raid_webhook`, sonst `discord_chat_webhook`). Die Adresse steht nicht im SQL.
+
 ## Forever-Umfrage
 
 Der Abschnitt **Forever-Umfrage** steht in der Navigation von Retail und Forever und hat die Adresse `#forever-umfrage`. Main-Klasse, Twink-Klasse, Rolle und Rasse kann jeder eintragen, auch ohne Anmeldung. Ohne Konto gilt ein Name nur einmal. Angemeldete Mitglieder sehen ihre Antwort im Formular und können sie ändern. Offiziere und Administratoren löschen Einträge.
@@ -121,6 +131,7 @@ supabase/approval.sql Freischaltung (erneut ausführbar, auch in schema.sql)
 supabase/gallery.sql Galerie-Bucket, Tabelle und Rechte (erneut ausführbar)
 supabase/forever_poll.sql Forever-Umfrage, Tabelle und Rechte (erneut ausführbar)
 supabase/profile_game.sql Spiel-Zuordnung Forever, Retail oder beides (erneut ausführbar)
+supabase/raids.sql   Raid-Planung, Anmeldungen und Discord (erneut ausführbar)
 supabase/README.md  Einstellungen im Supabase-Dashboard
 assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
 assets/gallery/     Screenshots für die Galerie
