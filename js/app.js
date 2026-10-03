@@ -96,6 +96,7 @@
   let authReady = false;
   let chatRefreshTimer = 0;
   let rosterRefreshTimer = 0;
+  let raidRefreshTimer;
 
   const retailMembers = clone(DEFAULTS.retailMembers || []);
   const foreverMembers = clone(DEFAULTS.foreverMembers || []);
@@ -4972,6 +4973,14 @@
       .on("postgres_changes", { event: "*", schema: "public", table: "roster" }, function () {
         window.clearTimeout(rosterRefreshTimer);
         rosterRefreshTimer = window.setTimeout(refreshRoster, 250);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "raid_signups" }, function () {
+        window.clearTimeout(raidRefreshTimer);
+        raidRefreshTimer = window.setTimeout(loadRaids, 500);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "raids" }, function () {
+        window.clearTimeout(raidRefreshTimer);
+        raidRefreshTimer = window.setTimeout(loadRaids, 500);
       })
       .subscribe();
   }
