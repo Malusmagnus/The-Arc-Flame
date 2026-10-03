@@ -821,6 +821,20 @@ button.gallery-tile {
   box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.45), 0 0 28px rgba(196, 40, 16, 0.35);
 }
 
+.via-discord {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid #334155;
+  border-radius: 9999px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  vertical-align: middle;
+}
+
 .raid-actions {
   display: flex;
   flex-direction: column;

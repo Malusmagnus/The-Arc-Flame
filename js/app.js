@@ -135,7 +135,7 @@
   };
   const RAID_PUBLIC_COLUMNS = "id, front, title, starts_at, max_size, status";
   const RAID_MEMBER_COLUMNS = RAID_PUBLIC_COLUMNS + ", note";
-  const RAID_SIGNUP_COLUMNS = "id, raid_id, user_id, status, role, character_name";
+  const RAID_SIGNUP_COLUMNS = "id, raid_id, user_id, status, role, character_name, discord_name";
   const RAID_STATUSES = ["Zusage", "Vielleicht", "Absage"];
   const RAID_ROLES = ["Tank", "Heiler", "Schaden"];
   const RAID_BTN = "inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 py-3 text-base font-extrabold transition";
@@ -2780,7 +2780,7 @@
       body: text,
       author: currentUser.displayName,
       user_id: currentUser.id,
-    }).select("id, author, body, user_id, created_at").single().then(function (result) {
+    }).select("id, author, body, user_id, source, created_at").single().then(function (result) {
       if (result.error || !result.data) {
         notify(SAVE_FAIL, "error");
         return;
@@ -2844,11 +2844,13 @@
       time.textContent = "[" + (message.time || "") + "]";
       const author = document.createElement("strong");
       author.className = "text-amber-400";
-      author.textContent = " <" + (message.author || "Unbekannt") + ">:";
+      author.textContent = " <" + (message.author || "Unbekannt") + ">";
       const text = document.createElement("span");
       text.className = "text-emerald-400";
       text.textContent = " " + message.text;
-      line.append(time, author, text);
+      line.append(time, author);
+      if (message.source === "discord") line.appendChild(viaDiscordBadge());
+      line.append(document.createTextNode(":"), text);
       if (message.id && currentUser && (message.userId === currentUser.id || isOfficer())) {
         const remove = document.createElement("button");
         remove.type = "button";
@@ -4840,7 +4842,7 @@
       fetchRows("mplus_groups", "id, name, dungeon, meeting_time, tank, heal, dds, created_by", "created_at", true),
       fetchRows("mplus_signups", "id, group_id, user_id, character_name", "created_at", true),
       fetchRows("classic_runs", "id, name, size, meeting_time", "created_at", true),
-      remote.from("chat_messages").select("id, author, body, user_id, created_at").order("created_at", { ascending: false }).limit(200),
+      remote.from("chat_messages").select("id, author, body, user_id, source, created_at").order("created_at", { ascending: false }).limit(200),
     ]).then(function (rows) {
       const chatResult = rows[7];
       replaceItems(retailMembers, rows[0].filter(function (row) { return row.front === "retail"; }).map(mapMember));
@@ -4920,6 +4922,7 @@
       author: row.author,
       text: row.body,
       userId: row.user_id || null,
+      source: row.source === "discord" ? "discord" : "homepage",
       time: formatStamp(row.created_at),
     };
   }
@@ -4942,7 +4945,7 @@
       renderChat();
       return;
     }
-    remote.from("chat_messages").select("id, author, body, user_id, created_at").order("created_at", { ascending: false }).limit(200).then(function (result) {
+    remote.from("chat_messages").select("id, author, body, user_id, source, created_at").order("created_at", { ascending: false }).limit(200).then(function (result) {
       if (result.error || !result.data) return;
       replaceItems(chatMessages, result.data.slice().reverse().map(mapChat));
       renderChat();
@@ -6950,6 +6953,7 @@
       status: row.status,
       role: row.role,
       characterName: raidPublicName(row.character_name),
+      viaDiscord: !!row.discord_name,
     };
   }
 
@@ -7007,7 +7011,7 @@
     if (!currentUser) return null;
     const rows = raidSignupsFor(raidId);
     for (let i = 0; i < rows.length; i += 1) {
-      if (rows[i].userId === currentUser.id) return rows[i];
+      if (rows[i].userId && rows[i].userId === currentUser.id) return rows[i];
     }
     return null;
   }
@@ -7117,6 +7121,13 @@
     el.hidden = false;
     el.textContent = message;
     el.className = kind === "ok" ? "text-sm text-emerald-300" : "text-sm text-amber-200";
+  }
+
+  function viaDiscordBadge() {
+    const badge = document.createElement("span");
+    badge.className = "via-discord";
+    badge.textContent = "via Discord";
+    return badge;
   }
 
   function raidNode(tag, className, text) {
@@ -7506,8 +7517,9 @@
       }).forEach(function (signup) {
         const item = raidNode("li", "text-base text-slate-100");
         const who = signup.characterName || "Ohne Namen";
-        const mine = currentUser && signup.userId === currentUser.id;
-        item.textContent = who + " · " + signup.role + (mine ? " (du)" : "");
+        const mine = !!(currentUser && signup.userId && signup.userId === currentUser.id);
+        item.appendChild(document.createTextNode(who + " · " + signup.role + (mine ? " (du)" : "")));
+        if (signup.viaDiscord) item.appendChild(viaDiscordBadge());
         list.appendChild(item);
       });
       block.appendChild(list);
