@@ -57,6 +57,7 @@
     "inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-bold text-amber-400 transition hover:bg-slate-700";
 
   const RETAIL_NAV = [
+    { href: "#werte", label: "Über uns", icon: "fa-fire", tone: "text-amber-400" },
     { href: "#retail-leitung", label: "Leitung", icon: "fa-crown", tone: "text-amber-400" },
     { href: "#retail-kader", label: "Raidkader", icon: "fa-shield", tone: "text-red-500" },
     { href: "#raidplanung", label: "Raids", icon: "fa-calendar-days", tone: "text-amber-400" },
@@ -68,6 +69,7 @@
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
   ];
   const FOREVER_NAV = [
+    { href: "#werte", label: "Über uns", icon: "fa-fire", tone: "text-amber-400" },
     { href: "#forever-uebersicht", label: "Übersicht", icon: "fa-hourglass-start", tone: "text-amber-400" },
     { href: "#raidplanung", label: "Raids", icon: "fa-calendar-days", tone: "text-amber-400" },
     { href: "#forever-planer", label: "Classic Planer", icon: "fa-skull", tone: "text-amber-400" },
