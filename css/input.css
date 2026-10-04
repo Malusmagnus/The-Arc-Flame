@@ -891,6 +891,343 @@ button.gallery-tile {
   white-space: pre-line;
 }
 
+#forever-karte [role="tab"] {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #1a1214;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  padding: 0.65rem 0.5rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#forever-karte [role="tab"][aria-selected="true"] {
+  background: #f59e0b;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.karte-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.karte-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #e7d7c8;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.karte-swatch {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-right: 0.35rem;
+  border-radius: 0.2rem;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  vertical-align: -1px;
+}
+
+.karte-swatch[data-band="green"] { background: #2f9a4e; }
+.karte-swatch[data-band="yellow"] { background: #e2b423; }
+.karte-swatch[data-band="orange"] { background: #e06a1c; }
+.karte-swatch[data-band="red"] { background: #c43832; }
+.karte-swatch[data-band="all"] { background: #7d68c4; }
+.karte-swatch[data-band="raid"] { background: #f4c343; }
+
+.karte-layout {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+.karte-map {
+  background: #0c141c;
+  border: 1px solid rgba(244, 195, 67, 0.28);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.karte-stage {
+  position: relative;
+}
+
+.karte-stage svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.karte-zone {
+  cursor: pointer;
+  stroke: #140c08;
+  stroke-width: 1.4px;
+  stroke-linejoin: round;
+  touch-action: manipulation;
+  transition: filter 0.15s ease, stroke 0.15s ease;
+}
+
+.karte-zone:hover,
+.karte-zone:focus-visible,
+.karte-zone.is-on {
+  filter: brightness(1.14);
+  stroke: #ffe7a8;
+  stroke-width: 2.6px;
+}
+
+.karte-zone.is-on {
+  stroke: #ffd100;
+  stroke-width: 3px;
+}
+
+.karte-coast {
+  fill: none;
+  stroke: #e6c98a;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.karte-wave {
+  fill: none;
+  stroke: #2a5470;
+  stroke-width: 1.4px;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.karte-deco {
+  pointer-events: none;
+}
+
+.karte-label {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  fill: #fffaf3;
+  stroke: #140c08;
+  stroke-width: 4px;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+
+.karte-label.is-dark {
+  fill: #1a1008;
+  stroke: #fff8e8;
+}
+
+.karte-pin {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  max-width: 6.2rem;
+  color: #fffaf3;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-align: center;
+  text-shadow: 0 1px 1px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+
+.karte-pin.is-dark {
+  color: #1a1008;
+  text-shadow: 0 0 3px #fff6df, 0 0 2px #fff;
+}
+
+.karte-info {
+  border: 1px solid rgba(244, 195, 67, 0.28);
+  border-radius: 1rem;
+  background: rgba(16, 10, 12, 0.72);
+  padding: 1rem;
+  min-height: 8.5rem;
+}
+
+.karte-info-title {
+  margin: 0;
+  font-family: Cinzel, Palatino, "Palatino Linotype", serif;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: #fff;
+}
+
+.karte-info-level {
+  margin: 0.3rem 0 0;
+  color: #f4c343;
+  font-weight: 800;
+}
+
+.karte-info p {
+  margin: 0.4rem 0 0;
+  color: #e7d7c8;
+  font-size: 0.95rem;
+}
+
+.karte-info-sub {
+  margin: 0.85rem 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f4c343;
+}
+
+.karte-info-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #f7f1ea;
+  font-size: 0.92rem;
+}
+
+.karte-info-list li {
+  margin: 0.25rem 0;
+}
+
+.karte-list-title {
+  margin: 0.25rem 0 0;
+  font-size: 1.35rem;
+  color: #fff;
+}
+
+.karte-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.karte-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  table-layout: fixed;
+}
+
+.karte-table th,
+.karte-table td {
+  padding: 0.45rem 0.4rem;
+  vertical-align: top;
+  text-align: left;
+  border-bottom: 1px solid rgba(244, 195, 67, 0.16);
+  overflow-wrap: break-word;
+}
+
+.karte-table th:nth-child(1),
+.karte-table td:first-child { width: 32%; }
+.karte-table th:nth-child(2) { width: 18%; }
+.karte-table th:nth-child(3) { width: 22%; }
+
+.karte-table thead th {
+  color: #f4c343;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.karte-name {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.15rem 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.karte-name:hover,
+.karte-row.is-on .karte-name {
+  color: #ffd100;
+}
+
+.karte-row.is-on th,
+.karte-row.is-on td {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.karte-steps {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.karte-step {
+  border: 1px solid rgba(244, 195, 67, 0.16);
+  border-left: 3px solid #f4c343;
+  border-radius: 0.85rem;
+  background: rgba(16, 10, 12, 0.55);
+  padding: 0.85rem 1rem;
+}
+
+.karte-step-title {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin: 0;
+  color: #fff;
+  font-family: Cinzel, Palatino, "Palatino Linotype", serif;
+  font-size: 1.15rem;
+}
+
+.karte-step p {
+  margin: 0.35rem 0 0;
+  color: #f7f1ea;
+  font-size: 0.95rem;
+}
+
+.karte-tip {
+  color: #f4c343 !important;
+  font-weight: 700;
+}
+
+@media (min-width: 700px) {
+  .karte-pin {
+    font-size: 12px;
+    max-width: 8rem;
+  }
+}
+
+@media (min-width: 800px) {
+  .karte-steps {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .karte-step-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .karte-layout {
+    grid-template-columns: minmax(0, 1fr) 18.5rem;
+  }
+
+  .karte-info {
+    position: sticky;
+    top: calc(var(--section-scroll-offset) + 0.4rem);
+  }
+}
+
+@media (min-width: 1100px) {
+  .karte-pin {
+    font-size: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-embers {
     display: none !important;

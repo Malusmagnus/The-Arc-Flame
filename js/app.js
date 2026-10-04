@@ -33,6 +33,7 @@
     "forever-mitglieder",
     "forever-dkp",
     "forever-beute",
+    "forever-karte",
   ]);
   const RETAIL_IDS = new Set([
     "retail-leitung",
@@ -76,6 +77,7 @@
     { href: "#werte", label: "Über uns", icon: "fa-fire", tone: "text-amber-400" },
     { href: "#forever-uebersicht", label: "Übersicht", icon: "fa-hourglass-start", tone: "text-amber-400" },
     { href: "#forever-beute", label: "Beute", icon: "fa-gem", tone: "text-amber-400" },
+    { href: "#forever-karte", label: "Karte", icon: "fa-map", tone: "text-amber-400" },
     { href: "#raidplanung", label: "Raids", icon: "fa-calendar-days", tone: "text-amber-400" },
     { href: "#forever-planer", label: "Classic Planer", icon: "fa-skull", tone: "text-amber-400" },
     { href: "#forever-kader", label: "Classic Kader", icon: "fa-shield-cat", tone: "text-amber-400" },
