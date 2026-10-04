@@ -1,4 +1,4 @@
-/* Forever-Karte: eigene, stilisierte Gebiete. Keine Blizzard-Grafik. */
+/* Forever-Karte: eigene Zeichnung der Kontinente. Keine Blizzard- oder Mobalytics-Grafik. */
 (function () {
   "use strict";
 
@@ -10,7 +10,28 @@
     { name: "Pechschwingenhort", min: 60, max: 60, raid: true },
   ];
 
-  function zone(id, name, lines, min, max, faction, box, seed, extra) {
+  const TERRAIN = {
+    forest: "#7d995c",
+    mountain: "#b09a80",
+    swamp: "#6f865f",
+    desert: "#d2b072",
+    snow: "#d7e2e6",
+    plague: "#9aa56c",
+    lava: "#c17a52",
+    grass: "#c6b07a",
+    dark: "#6a624f",
+  };
+
+  const TINT = {
+    green: "#2f9a4e",
+    yellow: "#d6a61a",
+    orange: "#e06a1c",
+    red: "#c43832",
+    all: "#7d68c4",
+    unknown: "#7d8794",
+  };
+
+  function zone(id, name, lines, min, max, faction, extra) {
     const item = {
       id: id,
       name: name,
@@ -18,10 +39,8 @@
       min: min,
       max: max,
       faction: faction,
-      box: box,
-      seed: seed,
       instances: [],
-      mark: "",
+      mark: "grass",
       note: "",
       instanceNote: "",
     };
@@ -31,178 +50,598 @@
       });
     }
     item.band = bandOf(item);
-    item.pts = item.points || blob(item.box, item.seed);
+    item.pts = item.points;
+    if (signedArea(item.pts) > 0) item.pts.reverse();
     return item;
   }
 
+  function bandOf(item) {
+    if (item.min == null || item.max == null) return "unknown";
+    if (item.min <= 1 && item.max >= 60) return "all";
+    if (item.max <= 20) return "green";
+    if (item.max <= 40) return "yellow";
+    if (item.min >= 50) return "red";
+    return "orange";
+  }
+
+  function ring(id, parts) {
+    const pts = [];
+    for (let p = 0; p < parts.length; p++) {
+      const part = parts[p];
+      for (let i = 0; i < part.length; i++) {
+        if (pts.length && i === 0) {
+          const last = pts[pts.length - 1];
+          if (last[0] !== part[0][0] || last[1] !== part[0][1]) {
+            throw new Error(id + " join " + p + ": " + last.join(",") + " != " + part[0].join(","));
+          }
+          continue;
+        }
+        pts.push(part[i]);
+      }
+    }
+    const a = pts[0];
+    const b = pts[pts.length - 1];
+    if (!a || a[0] !== b[0] || a[1] !== b[1]) {
+      throw new Error(id + " open " + (a ? a.join(",") : "?") + " .. " + (b ? b.join(",") : "?"));
+    }
+    pts.pop();
+    return pts;
+  }
+
+  const TIR_WPL = [[248, 58], [256, 116], [242, 174], [228, 214]];
+  const TIR_SIL = [[228, 214], [156, 222], [86, 216], [50, 180]];
+  const WPL_EPL = [[512, 46], [518, 116], [506, 176], [496, 218]];
+  const WPL_ALT = [[228, 214], [332, 206], [424, 200], [496, 218]];
+  const EPL_HIN = [[496, 218], [614, 208], [724, 222]];
+  const SIL_ALT = [[228, 214], [240, 274], [248, 336]];
+  const SIL_HIL = [[248, 336], [168, 350], [92, 364]];
+  const ALT_HIL = [[248, 336], [328, 368], [396, 408]];
+  const ALT_HIN = [[496, 218], [488, 294], [476, 368], [458, 418]];
+  const ALT_ARA = [[396, 408], [458, 418]];
+  const HIN_ARA = [[458, 418], [590, 404], [706, 426]];
+  const HIL_ARA = [[396, 408], [346, 464], [300, 510]];
+  const ARA_WET = [[300, 510], [442, 518], [572, 530], [702, 548]];
+  const WET_DUN = [[214, 710], [320, 698], [404, 686]];
+  const WET_LOCH = [[404, 686], [498, 672], [566, 690]];
+  const WET_BAD = [[750, 732], [662, 712], [566, 690]];
+  const DUN_LOCH = [[404, 686], [390, 762], [366, 838]];
+  const DUN_SEAR = [[46, 860], [180, 844], [280, 854], [366, 838]];
+  const LOCH_BAD = [[566, 690], [578, 764], [556, 846]];
+  const LOCH_BURN = [[366, 838], [470, 852], [556, 846]];
+  const SEAR_NE = [[366, 838], [328, 938]];
+  const SEAR_BURN = [[40, 938], [190, 920], [328, 938]];
+  const BURN_RIV = [[556, 846], [528, 942], [498, 1022], [488, 1032]];
+  const BURN_RED = [[488, 1032], [378, 1014], [286, 1026]];
+  const BURN_ELW = [[286, 1026], [158, 1008], [36, 1030]];
+  const BAD_RIV = [[688, 912], [622, 892], [556, 846]];
+  const BAD_SWP = [[792, 902], [742, 932], [688, 912]];
+  const RIV_SWP = [[688, 912], [712, 982], [690, 1056]];
+  const RIV_DEAD = [[690, 1056], [620, 1062]];
+  const RIV_RED = [[620, 1062], [542, 1046], [488, 1032]];
+  const RED_DEAD = [[620, 1062], [600, 1122], [560, 1182]];
+  const RED_DUSK = [[560, 1182], [420, 1170], [300, 1166]];
+  const RED_ELW = [[300, 1166], [292, 1102], [286, 1026]];
+  const ELW_WF = [[300, 1166], [198, 1180], [48, 1192]];
+  const WF_DUSK = [[300, 1166], [312, 1242], [300, 1322]];
+  const WF_STV = [[300, 1322], [178, 1338], [70, 1326]];
+  const DUSK_STV = [[300, 1322], [422, 1342], [520, 1330]];
+  const DEAD_DUSK = [[600, 1202], [560, 1182]];
+  const DEAD_BLA = [[690, 1056], [712, 1122], [682, 1190], [600, 1202]];
+  const SWP_BLA = [[690, 1056], [762, 1072], [822, 1042], [842, 982]];
+
   const EK = [
-    zone("tirisfal", "Tirisfal", ["Tirisfal"], 1, 10, "Horde", [26, 18, 186, 108], 3, {
-      mark: "forest",
+    zone("tirisfal", "Tirisfal", ["Tirisfal"], 1, 10, "Horde", {
+      mark: "forest", land: "#6f8f52",
+      labelAt: [172, 148],
+      points: ring("tirisfal", [
+        [[50, 180], [34, 132], [28, 88], [52, 52], [108, 30], [170, 24], [226, 40], [248, 58]],
+        TIR_WPL,
+        TIR_SIL,
+      ]),
       instances: [{ name: "Scharlachrotes Kloster", min: 30, max: 45 }],
     }),
-    zone("wpl", "Westliche Pestländer", ["Westliche", "Pestländer"], 51, 58, "umkämpft", [230, 14, 176, 106], 8, {
+    zone("wpl", "Westliche Pestländer", ["Westliche", "Pestländer"], 51, 58, "umkämpft", {
       mark: "plague",
+      points: ring("wpl", [
+        TIR_WPL.slice().reverse(),
+        [[248, 58], [318, 34], [400, 22], [468, 30], [512, 46]],
+        WPL_EPL,
+        WPL_ALT.slice().reverse(),
+      ]),
       instances: [{ name: "Scholomance", min: 58, max: 60 }],
     }),
-    zone("epl", "Östliche Pestländer", ["Östliche", "Pestländer"], 53, 60, "umkämpft", [420, 16, 194, 116], 5, {
+    zone("epl", "Östliche Pestländer", ["Östliche", "Pestländer"], 53, 60, "umkämpft", {
       mark: "plague",
+      points: ring("epl", [
+        WPL_EPL.slice().reverse(),
+        [[512, 46], [574, 24], [656, 28], [734, 56], [794, 102], [814, 160], [790, 208], [724, 222]],
+        EPL_HIN.slice().reverse(),
+      ]),
       instances: [
         { name: "Stratholme", min: 58, max: 60 },
         { name: "Naxxramas", min: 60, max: 60, raid: true, where: "über der Zone" },
       ],
     }),
-    zone("silberwald", "Silberwald", ["Silberwald"], 10, 20, "Horde", [22, 140, 178, 104], 2, {
-      mark: "forest",
+    zone("silberwald", "Silberwald", ["Silberwald"], 10, 20, "Horde", {
+      mark: "forest", land: "#5f7548",
+      points: ring("silberwald", [
+        SIL_ALT,
+        SIL_HIL,
+        [[92, 364], [70, 330], [40, 280], [32, 230], [50, 180]],
+        TIR_SIL.slice().reverse(),
+      ]),
       instances: [{ name: "Burg Schattenfang", min: 22, max: 30 }],
     }),
-    zone("alterac", "Alteracgebirge", ["Alterac"], 30, 40, "umkämpft", [214, 136, 166, 108], 11, {
+    zone("alterac", "Alteracgebirge", ["Alterac"], 30, 40, "umkämpft", {
       mark: "mountain",
+      points: ring("alterac", [
+        WPL_ALT,
+        ALT_HIN,
+        ALT_ARA.slice().reverse(),
+        ALT_HIL.slice().reverse(),
+        SIL_ALT.slice().reverse(),
+      ]),
     }),
-    zone("hinterland", "Hinterland", ["Hinterland"], 40, 50, "umkämpft", [394, 146, 220, 104], 6, {
+    zone("hinterland", "Hinterland", ["Hinterland"], 40, 50, "umkämpft", {
       mark: "forest",
+      points: ring("hinterland", [
+        ALT_HIN.slice().reverse(),
+        EPL_HIN,
+        [[724, 222], [752, 278], [774, 338], [756, 392], [706, 426]],
+        HIN_ARA.slice().reverse(),
+      ]),
     }),
-    zone("hillsbrad", "Vorgebirge des Hügellands", ["Hügelland"], 20, 30, "umkämpft", [26, 258, 204, 100], 4, {}),
-    zone("arathi", "Arathihochland", ["Arathi"], 30, 40, "umkämpft", [244, 258, 248, 104], 9, {}),
-    zone("dunmorogh", "Dun Morogh", ["Dun Morogh"], 1, 10, "Allianz", [18, 376, 196, 114], 7, {
-      mark: "mountain",
+    zone("hillsbrad", "Vorgebirge des Hügellands", ["Hügelland"], 20, 30, "umkämpft", {
+      mark: "grass",
+      points: ring("hillsbrad", [
+        ALT_HIL,
+        HIL_ARA,
+        [[300, 510], [220, 528], [140, 520], [78, 486], [40, 430], [46, 384], [92, 364]],
+        SIL_HIL.slice().reverse(),
+      ]),
+    }),
+    zone("arathi", "Arathihochland", ["Arathi"], 30, 40, "umkämpft", {
+      mark: "grass", land: "#b7a36e",
+      points: ring("arathi", [
+        ALT_ARA,
+        HIN_ARA,
+        [[706, 426], [728, 470], [716, 516], [702, 548]],
+        ARA_WET.slice().reverse(),
+        HIL_ARA.slice().reverse(),
+      ]),
+    }),
+    zone("dunmorogh", "Dun Morogh", ["Dun Morogh"], 1, 10, "Allianz", {
+      mark: "snow",
+      labelAt: [250, 800],
+      points: ring("dunmorogh", [
+        DUN_SEAR.slice().reverse(),
+        [[46, 860], [36, 858], [22, 808], [42, 746], [86, 698], [148, 686], [214, 710]],
+        WET_DUN,
+        DUN_LOCH,
+      ]),
       instances: [{ name: "Gnomeregan", min: 29, max: 38 }],
     }),
-    zone("wetlands", "Sumpfland", ["Sumpfland"], 20, 30, "Allianz", [228, 376, 250, 104], 13, {
+    zone("wetlands", "Sumpfland", ["Sumpfland"], 20, 30, "Allianz", {
       mark: "swamp",
+      points: ring("wetlands", [
+        ARA_WET,
+        [[702, 548], [738, 602], [766, 662], [750, 732]],
+        WET_BAD,
+        WET_LOCH.slice().reverse(),
+        WET_DUN.slice().reverse(),
+        [[214, 710], [186, 648], [208, 588], [258, 552], [300, 510]],
+      ]),
     }),
-    zone("searing", "Sengende Schlucht", ["Sengende", "Schlucht"], 43, 50, "umkämpft", [18, 506, 168, 96], 15, {
+    zone("loch", "Loch Modan", ["Loch Modan"], 10, 20, "Allianz", {
+      mark: "mountain", land: "#a89478",
+      points: ring("loch", [
+        WET_LOCH,
+        LOCH_BAD,
+        LOCH_BURN.slice().reverse(),
+        DUN_LOCH.slice().reverse(),
+      ]),
+    }),
+    zone("badlands", "Ödland", ["Ödland"], 35, 45, "umkämpft", {
+      mark: "desert", land: "#c9a15e",
+      points: ring("badlands", [
+        WET_BAD.slice().reverse(),
+        [[750, 732], [788, 782], [812, 842], [792, 902]],
+        BAD_SWP,
+        BAD_RIV,
+        LOCH_BAD.slice().reverse(),
+      ]),
+      instances: [{ name: "Uldaman", min: 41, max: 51 }],
+    }),
+    zone("searing", "Sengende Schlucht", ["Sengende", "Schlucht"], 43, 50, "umkämpft", {
       mark: "lava",
+      points: ring("searing", [
+        SEAR_NE,
+        SEAR_BURN.slice().reverse(),
+        [[40, 938], [28, 898], [46, 860]],
+        DUN_SEAR,
+      ]),
       instances: SCHWARZFELS,
       instanceNote: "Im Schwarzfels. Der Berg hat auch einen Zugang von der Brennenden Steppe.",
     }),
-    zone("loch", "Loch Modan", ["Loch Modan"], 10, 20, "Allianz", [200, 496, 174, 106], 10, {
-      mark: "mountain",
-    }),
-    zone("badlands", "Ödland", ["Ödland"], 35, 45, "umkämpft", [388, 494, 226, 112], 12, {
-      mark: "desert",
-      instances: [{ name: "Uldaman", min: 41, max: 51 }],
-    }),
-    zone("burning", "Brennende Steppe", ["Brennende", "Steppe"], 50, 60, "umkämpft", [16, 618, 200, 100], 16, {
-      mark: "lava",
+    zone("burning", "Brennende Steppe", ["Brennende", "Steppe"], 50, 60, "umkämpft", {
+      mark: "lava", land: "#a85a3e",
+      points: ring("burning", [
+        LOCH_BURN,
+        BURN_RIV,
+        BURN_RED,
+        BURN_ELW,
+        [[36, 1030], [18, 992], [22, 948], [40, 938]],
+        SEAR_BURN,
+        SEAR_NE.slice().reverse(),
+      ]),
       instances: SCHWARZFELS,
       instanceNote: "Im Schwarzfels. Der Berg hat auch einen Zugang von der Sengenden Schlucht.",
     }),
-    zone("swamp", "Sümpfe des Elends", ["Sümpfe", "des Elends"], 35, 45, "umkämpft", [340, 622, 150, 104], 18, {
+    zone("riverglades", "Riverglades", ["Riverglades"], 35, 45, "umkämpft", {
+      mark: "forest", land: "#8aaa68", neu: true,
+      points: ring("riverglades", [
+        BAD_RIV.slice().reverse(),
+        RIV_SWP,
+        RIV_DEAD,
+        RIV_RED,
+        BURN_RIV.slice().reverse(),
+      ]),
+    }),
+    zone("swamp", "Sümpfe des Elends", ["Sümpfe", "des Elends"], 35, 45, "umkämpft", {
       mark: "swamp",
+      points: ring("swamp", [
+        BAD_SWP.slice().reverse(),
+        [[792, 902], [838, 858], [862, 922], [842, 982]],
+        SWP_BLA.slice().reverse(),
+        RIV_SWP.slice().reverse(),
+      ]),
       instances: [{ name: "Tempel von Atal'Hakkar", min: 50, max: 60 }],
     }),
-    zone("blasted", "Verwüstete Lande", ["Verwüstete", "Lande"], 45, 55, "umkämpft", [504, 612, 116, 124], 21, {
-      mark: "desert",
-    }),
-    zone("elwynn", "Wald von Elwynn", ["Elwynn"], 1, 10, "Allianz", [14, 748, 176, 90], 1, {
-      mark: "forest",
+    zone("elwynn", "Wald von Elwynn", ["Elwynn"], 1, 10, "Allianz", {
+      mark: "forest", land: "#8aaa58",
+      labelAt: [200, 1135],
+      points: ring("elwynn", [
+        RED_ELW.slice().reverse(),
+        ELW_WF,
+        [[48, 1192], [28, 1124], [20, 1064], [36, 1030]],
+        BURN_ELW.slice().reverse(),
+      ]),
       instances: [{ name: "Das Verlies", min: 24, max: 32, where: "in Sturmwind" }],
     }),
-    zone("redridge", "Rotkammgebirge", ["Rotkamm"], 15, 25, "Allianz", [204, 744, 150, 92], 14, {
-      mark: "mountain",
+    zone("redridge", "Rotkammgebirge", ["Rotkamm"], 15, 25, "Allianz", {
+      mark: "mountain", land: "#a67a62",
+      points: ring("redridge", [
+        RED_ELW,
+        BURN_RED.slice().reverse(),
+        RIV_RED.slice().reverse(),
+        RED_DEAD,
+        RED_DUSK,
+      ]),
     }),
-    zone("deadwind", "Gebirgspass der Totenwinde", ["Totenwinde"], 55, 60, "umkämpft", [368, 752, 124, 86], 19, {}),
-    zone("westfall", "Westfall", ["Westfall"], 10, 20, "Allianz", [12, 854, 156, 86], 17, {
+    zone("deadwind", "Gebirgspass der Totenwinde", ["Totenwinde"], 55, 60, "umkämpft", {
+      mark: "dark",
+      points: ring("deadwind", [
+        RED_DEAD.slice().reverse(),
+        RIV_DEAD.slice().reverse(),
+        DEAD_BLA,
+        DEAD_DUSK,
+      ]),
+    }),
+    zone("blasted", "Verwüstete Lande", ["Verwüstete", "Lande"], 45, 55, "umkämpft", {
+      mark: "desert", land: "#b7a48c",
+      points: ring("blasted", [
+        SWP_BLA,
+        [[842, 982], [868, 1104], [856, 1184], [802, 1262], [724, 1304], [638, 1264], [600, 1202]],
+        DEAD_BLA.slice().reverse(),
+      ]),
+    }),
+    zone("westfall", "Westfall", ["Westfall"], 10, 20, "Allianz", {
+      mark: "grass", land: "#cbb56a",
+      points: ring("westfall", [
+        ELW_WF.slice().reverse(),
+        WF_DUSK,
+        WF_STV,
+        [[70, 1326], [36, 1288], [26, 1236], [48, 1192]],
+      ]),
       instances: [{ name: "Todesminen", min: 17, max: 26 }],
     }),
-    zone("duskwood", "Dämmerwald", ["Dämmerwald"], 18, 30, "Allianz", [182, 852, 198, 88], 20, {
-      mark: "forest",
+    zone("duskwood", "Dämmerwald", ["Dämmerwald"], 18, 30, "Allianz", {
+      mark: "forest", land: "#5c6a46",
+      points: ring("duskwood", [
+        DEAD_DUSK.slice().reverse(),
+        [[600, 1202], [580, 1240], [548, 1288], [520, 1330]],
+        DUSK_STV.slice().reverse(),
+        WF_DUSK.slice().reverse(),
+        RED_DUSK.slice().reverse(),
+      ]),
     }),
-    zone("stv", "Schlingendorntal", ["Schlingendorn"], 30, 45, "umkämpft", [16, 956, 372, 96], 22, {
-      mark: "forest",
+    zone("stv", "Schlingendorntal", ["Schlingendorn"], 30, 45, "umkämpft", {
+      mark: "forest", land: "#4e7a42",
+      points: ring("stv", [
+        DUSK_STV,
+        [[520, 1330], [500, 1368], [450, 1436], [360, 1510], [250, 1552], [150, 1516], [78, 1448], [46, 1372], [70, 1326]],
+        WF_STV.slice().reverse(),
+      ]),
       instances: [{ name: "Zul'Gurub", min: 60, max: 60, raid: true }],
-    }),
-    zone("riverglades", "Riverglades", ["Riverglades"], 35, 45, "umkämpft", [224, 608, 112, 128], 24, {
-      labelSize: 14,
-      neu: true,
-      mark: "forest",
-      points: oct([224, 608, 112, 128]),
     }),
   ];
 
+  const HY_DK = [[196, 164], [232, 214]];
+  const HY_MO = [[232, 214], [320, 196], [408, 204]];
+  const HY_WI = [[408, 204], [560, 188], [700, 208], [796, 246]];
+  const DK_MO = [[232, 214], [216, 276]];
+  const MO_WI = [[408, 204], [396, 286]];
+  const MO_FE = [[216, 276], [310, 304], [396, 286]];
+  const DK_FE = [[216, 276], [198, 370], [188, 462]];
+  const FE_WI = [[396, 286], [414, 380], [400, 478]];
+  const FE_AS = [[188, 462], [300, 498], [400, 478]];
+  const DK_AS = [[188, 462], [156, 570], [140, 680], [186, 734]];
+  const AS_ST = [[186, 734], [248, 718], [300, 690]];
+  const AS_BA = [[300, 690], [430, 668], [548, 700]];
+  const AS_AZ = [[400, 478], [490, 560], [548, 700]];
+  const WI_AZ = [[400, 478], [540, 456], [690, 448], [790, 490]];
+  const ST_BA = [[300, 690], [280, 800], [260, 900]];
+  const ST_DE = [[150, 960], [200, 940], [260, 900]];
+  const BA_DU = [[640, 760], [666, 840], [640, 930], [610, 1010]];
+  const BA_DW = [[610, 1010], [560, 1060], [500, 1110]];
+  const BA_MU = [[360, 900], [440, 980], [500, 1110]];
+  const BA_SN = [[260, 900], [360, 900]];
+  const DE_SH = [[260, 900], [248, 1000], [236, 1100]];
+  const SH_MU = [[360, 900], [360, 1100]];
+  const SH_FE = [[236, 1100], [300, 1120], [360, 1100]];
+  const MU_ND = [[360, 1100], [430, 1124], [500, 1110]];
+  const DW_ND = [[500, 1110], [600, 1140], [700, 1160]];
+  const ND_TA = [[700, 1160], [660, 1240], [560, 1280]];
+  const ND_UN = [[320, 1260], [430, 1288], [560, 1280]];
+  const ND_FE = [[360, 1100], [330, 1180], [320, 1260]];
+  const FE_UN = [[320, 1260], [280, 1340], [210, 1400]];
+  const FE_SI = [[210, 1400], [160, 1380], [120, 1320]];
+  const UN_TA = [[560, 1280], [540, 1360], [480, 1420]];
+  const UN_SI = [[210, 1400], [340, 1440], [480, 1420]];
+  const DE_FE = [[236, 1100], [180, 1160], [150, 1220]];
+
   const KAL = [
-    zone("teldrassil", "Teldrassil", ["Teldrassil"], 1, 10, "Allianz", [18, 16, 150, 96], 2, {
-      mark: "forest",
+    zone("teldrassil", "Teldrassil", ["Teldrassil"], 1, 10, "Allianz", {
+      mark: "forest", land: "#6a9456",
+      labelAt: [132, 128],
+      points: [[62, 46], [104, 16], [158, 14], [204, 42], [226, 92], [210, 140], [164, 170], [104, 176], [52, 146], [32, 96]],
     }),
-    zone("moonglade", "Mondlichtung", ["Mondlichtung"], 1, 60, "Neutral", [196, 22, 152, 80], 4, {
-      mark: "forest",
+    zone("hyjal", "Berg Hyjal", ["Berg Hyjal"], 60, 60, "umkämpft", {
+      mark: "mountain", land: "#8aa06a", neu: true,
+      note: "Endgame-Gebiet im Norden von Kalimdor.",
+      points: ring("hyjal", [
+        [[196, 164], [236, 108], [330, 64], [460, 40], [590, 34], [700, 56], [778, 112], [824, 176], [796, 246]],
+        HY_WI.slice().reverse(),
+        HY_MO.slice().reverse(),
+        HY_DK.slice().reverse(),
+      ]),
+    }),
+    zone("darkshore", "Dunkelküste", ["Dunkelküste"], 10, 20, "Allianz", {
+      mark: "forest", land: "#5f7848",
+      points: ring("darkshore", [
+        HY_DK,
+        DK_MO,
+        DK_FE,
+        DK_AS,
+        [[186, 734], [120, 690], [78, 600], [62, 490], [70, 380], [96, 280], [140, 200], [196, 164]],
+      ]),
+    }),
+    zone("moonglade", "Mondlichtung", ["Mondlichtung"], 1, 60, "Neutral", {
+      mark: "forest", land: "#8fb56a",
       note: "Neutraler Treffpunkt für Druiden. In jedem Level.",
+      points: ring("moonglade", [
+        HY_MO,
+        MO_WI,
+        MO_FE.slice().reverse(),
+        DK_MO.slice().reverse(),
+      ]),
     }),
-    zone("winterspring", "Winterquell", ["Winterquell"], 55, 60, "umkämpft", [372, 14, 242, 112], 6, {
+    zone("felwood", "Teufelswald", ["Teufelswald"], 48, 55, "umkämpft", {
+      mark: "forest", land: "#5a7244",
+      points: ring("felwood", [
+        DK_FE.slice().reverse(),
+        MO_FE,
+        FE_WI,
+        FE_AS.slice().reverse(),
+      ]),
+    }),
+    zone("winterspring", "Winterquell", ["Winterquell"], 55, 60, "umkämpft", {
       mark: "snow",
+      points: ring("winterspring", [
+        HY_WI,
+        [[796, 246], [834, 310], [846, 390], [820, 460], [790, 490]],
+        WI_AZ.slice().reverse(),
+        FE_WI.slice().reverse(),
+        MO_WI.slice().reverse(),
+      ]),
     }),
-    zone("darkshore", "Dunkelküste", ["Dunkelküste"], 10, 20, "Allianz", [18, 128, 168, 114], 8, {
-      mark: "forest",
-    }),
-    zone("felwood", "Teufelswald", ["Teufelswald"], 48, 55, "umkämpft", [200, 118, 156, 116], 3, {
-      mark: "forest",
-    }),
-    zone("azshara", "Azshara", ["Azshara"], 45, 55, "umkämpft", [384, 142, 230, 112], 9, {}),
-    zone("ashenvale", "Eschental", ["Eschental"], 18, 30, "umkämpft", [18, 258, 266, 112], 5, {
-      mark: "forest",
+    zone("ashenvale", "Eschental", ["Eschental"], 18, 30, "umkämpft", {
+      mark: "forest", land: "#6e8f50",
+      points: ring("ashenvale", [
+        FE_AS,
+        AS_AZ,
+        AS_BA.slice().reverse(),
+        AS_ST.slice().reverse(),
+        DK_AS.slice().reverse(),
+      ]),
       instances: [{ name: "Tiefschwarze Grotte", min: 24, max: 32 }],
     }),
-    zone("durotar", "Durotar", ["Durotar"], 1, 10, "Horde", [472, 270, 146, 126], 7, {
-      mark: "desert",
-      instances: [{ name: "Flammenschlund", min: 13, max: 18, where: "in Orgrimmar" }],
+    zone("azshara", "Azshara", ["Azshara"], 45, 55, "umkämpft", {
+      mark: "grass", land: "#7d9a78",
+      points: ring("azshara", [
+        WI_AZ,
+        [[790, 490], [852, 530], [878, 610], [846, 690], [760, 650], [660, 600], [548, 700]],
+        AS_AZ.slice().reverse(),
+      ]),
     }),
-    zone("stonetalon", "Steinkrallengebirge", ["Steinkrallen"], 15, 27, "umkämpft", [18, 386, 156, 114], 11, {
+    zone("stonetalon", "Steinkrallengebirge", ["Steinkrallen"], 15, 27, "umkämpft", {
       mark: "mountain",
+      points: ring("stonetalon", [
+        AS_ST,
+        ST_BA,
+        ST_DE.slice().reverse(),
+        [[150, 960], [96, 900], [78, 820], [110, 750], [186, 734]],
+      ]),
     }),
-    zone("barrens", "Brachland", ["Brachland"], 10, 25, "Horde", null, 1, {
-      mark: "desert",
-      points: [[190, 384], [446, 368], [456, 470], [448, 560], [430, 628], [378, 636], [368, 516], [188, 508]],
+    zone("barrens", "Brachland", ["Brachland"], 10, 25, "Horde", {
+      mark: "desert", land: "#d2b06a",
+      points: ring("barrens", [
+        ST_BA.slice().reverse(),
+        AS_BA,
+        [[548, 700], [600, 710], [640, 760]],
+        BA_DU,
+        BA_DW,
+        BA_MU.slice().reverse(),
+        BA_SN.slice().reverse(),
+      ]),
       instances: [
         { name: "Höhlen des Wehklagens", min: 17, max: 24 },
         { name: "Kral der Klingenhauer", min: 29, max: 38 },
         { name: "Hügel der Klingenhauer", min: 37, max: 46 },
       ],
     }),
-    zone("desolace", "Desolace", ["Desolace"], 30, 40, "umkämpft", [18, 516, 104, 120], 13, {
-      mark: "desert",
+    zone("durotar", "Durotar", ["Durotar"], 1, 10, "Horde", {
+      mark: "desert", land: "#c4845c",
+      labelAt: [800, 900],
+      points: ring("durotar", [
+        [[640, 760], [700, 700], [790, 690], [860, 740], [870, 840], [820, 930], [740, 980], [610, 1010]],
+        BA_DU.slice().reverse(),
+      ]),
+      instances: [{ name: "Flammenschlund", min: 13, max: 18, where: "in Orgrimmar" }],
+    }),
+    zone("desolace", "Desolace", ["Desolace"], 30, 40, "umkämpft", {
+      mark: "desert", land: "#a39a72",
+      points: ring("desolace", [
+        ST_DE,
+        DE_SH,
+        DE_FE,
+        [[150, 1220], [90, 1160], [68, 1060], [88, 980], [150, 960]],
+      ]),
       instances: [{ name: "Maraudon", min: 46, max: 55 }],
     }),
-    zone("mulgore", "Mulgore", ["Mulgore"], 1, 10, "Horde", [246, 526, 114, 110], 10, {
-      mark: "mountain",
+    zone("shendralas", "Shen'dralas", ["Shen'dralas"], null, null, "umkämpft", {
+      mark: "mountain", land: "#a89878", neu: true, labelSize: 12,
+      points: ring("shendralas", [
+        BA_SN,
+        SH_MU,
+        SH_FE.slice().reverse(),
+        DE_SH.slice().reverse(),
+      ]),
     }),
-    zone("dustwallow", "Düstermarschen", ["Düster-", "marschen"], 35, 45, "umkämpft", [474, 414, 146, 138], 12, {
+    zone("mulgore", "Mulgore", ["Mulgore"], 1, 10, "Horde", {
+      mark: "grass", land: "#7f9a58",
+      labelAt: [430, 1068],
+      points: ring("mulgore", [
+        BA_MU,
+        MU_ND.slice().reverse(),
+        SH_MU.slice().reverse(),
+      ]),
+    }),
+    zone("dustwallow", "Düstermarschen", ["Düster-", "marschen"], 35, 45, "umkämpft", {
       mark: "swamp",
+      points: ring("dustwallow", [
+        BA_DW.slice().reverse(),
+        [[610, 1010], [730, 1040], [820, 1120], [800, 1200], [720, 1180], [700, 1160]],
+        DW_ND.slice().reverse(),
+      ]),
       instances: [{ name: "Onyxias Hort", min: 60, max: 60, raid: true }],
     }),
-    zone("thousand", "Tausend Nadeln", ["Tausend", "Nadeln"], 25, 35, "Horde", [168, 652, 250, 88], 14, {
-      mark: "desert",
+    zone("thousand", "Tausend Nadeln", ["Tausend", "Nadeln"], 25, 35, "Horde", {
+      mark: "desert", land: "#d7c090",
+      points: ring("thousand", [
+        ND_FE,
+        ND_UN,
+        ND_TA.slice().reverse(),
+        DW_ND.slice().reverse(),
+        MU_ND.slice().reverse(),
+      ]),
     }),
-    zone("feralas", "Feralas", ["Feralas"], 40, 50, "umkämpft", [16, 652, 140, 124], 16, {
-      mark: "forest",
+    zone("feralas", "Feralas", ["Feralas"], 40, 50, "umkämpft", {
+      mark: "forest", land: "#5e8448",
+      points: ring("feralas", [
+        DE_FE.slice().reverse(),
+        SH_FE,
+        ND_FE,
+        FE_UN,
+        FE_SI,
+        [[120, 1320], [70, 1260], [60, 1180], [100, 1120], [150, 1220]],
+      ]),
       instances: [{ name: "Düsterbruch", min: 55, max: 60 }],
     }),
-    zone("tanaris", "Tanaris", ["Tanaris"], 40, 50, "umkämpft", [460, 568, 160, 164], 18, {
-      mark: "desert",
+    zone("ungoro", "Krater von Un'Goro", ["Un'Goro"], 48, 55, "umkämpft", {
+      mark: "forest", land: "#6a8f48",
+      points: ring("ungoro", [
+        ND_UN,
+        UN_TA,
+        UN_SI.slice().reverse(),
+        FE_UN.slice().reverse(),
+      ]),
+    }),
+    zone("tanaris", "Tanaris", ["Tanaris"], 40, 50, "umkämpft", {
+      mark: "desert", land: "#e0c48a",
+      points: ring("tanaris", [
+        ND_TA,
+        UN_TA,
+        [[480, 1420], [560, 1480], [700, 1520], [840, 1460], [890, 1340], [860, 1220], [780, 1160], [700, 1160]],
+      ]),
       instances: [{ name: "Zul'Farrak", min: 44, max: 54 }],
     }),
-    zone("silithus", "Silithus", ["Silithus"], 55, 60, "umkämpft", [16, 792, 156, 110], 15, {
-      mark: "desert",
+    zone("silithus", "Silithus", ["Silithus"], 55, 60, "umkämpft", {
+      mark: "desert", land: "#c2b48a",
+      points: ring("silithus", [
+        FE_SI.slice().reverse(),
+        UN_SI,
+        [[480, 1420], [420, 1500], [260, 1540], [120, 1500], [70, 1420], [86, 1340], [120, 1320]],
+      ]),
       instances: [
         { name: "Ruinen von Ahn'Qiraj", min: 60, max: 60, raid: true },
         { name: "Tempel von Ahn'Qiraj", min: 60, max: 60, raid: true },
       ],
     }),
-    zone("ungoro", "Krater von Un'Goro", ["Un'Goro"], 48, 55, "umkämpft", [188, 756, 236, 118], 17, {
-      mark: "forest",
-    }),
-    zone("hyjal", "Berg Hyjal", ["Berg Hyjal"], 60, 60, "umkämpft", [206, -102, 390, 100], 21, {
-      neu: true,
-      mark: "mountain",
-      note: "Endgame-Gebiet im Norden von Kalimdor.",
-      points: oct([206, -102, 390, 100]),
-    }),
-    zone("shendralas", "Shen'dralas", ["Shen'dralas"], null, null, "umkämpft", [128, 534, 112, 112], 23, {
-      labelSize: 13,
-      neu: true,
-      mark: "mountain",
-      points: oct([128, 534, 112, 112]),
-    }),
   ];
+
+  const CITIES = {
+    ek: [
+      { name: "Unterstadt", at: [108, 96], faction: "Horde", lx: -46 },
+      { name: "Eisenschmiede", at: [110, 790], faction: "Allianz", lx: -58 },
+      { name: "Sturmwind", at: [96, 1072], faction: "Allianz", lx: -46 },
+    ],
+    kal: [
+      { name: "Darnassus", at: [118, 72], faction: "Allianz", ly: -14 },
+      { name: "Orgrimmar", at: [748, 760], faction: "Horde", lx: 46 },
+      { name: "Donnerfels", at: [408, 1004], faction: "Horde", lx: 48 },
+    ],
+  };
+
+  const PINS = {
+    ek: [
+      { name: "Scharlachrotes Kloster", short: "Kloster", at: [196, 78] },
+      { name: "Scholomance", short: "Scholomance", at: [340, 78] },
+      { name: "Stratholme", short: "Stratholme", at: [700, 86] },
+      { name: "Naxxramas", short: "Naxxramas", at: [760, 168], raid: true },
+      { name: "Burg Schattenfang", short: "Schattenfang", at: [62, 214] },
+      { name: "Gnomeregan", short: "Gnomeregan", at: [70, 820] },
+      { name: "Schwarzfels", short: "Schwarzfels", at: [120, 910] },
+      { name: "Uldaman", short: "Uldaman", at: [740, 780] },
+      { name: "Tempel von Atal'Hakkar", short: "Atal'Hakkar", at: [820, 980] },
+      { name: "Das Verlies", short: "Verlies", at: [150, 1060] },
+      { name: "Todesminen", short: "Todesminen", at: [86, 1260] },
+      { name: "Zul'Gurub", short: "Zul'Gurub", at: [320, 1470], raid: true },
+    ],
+    kal: [
+      { name: "Tiefschwarze Grotte", short: "Grotte", at: [250, 560] },
+      { name: "Flammenschlund", short: "Flammenschlund", at: [800, 800] },
+      { name: "Höhlen des Wehklagens", short: "Wehklagen", at: [400, 800] },
+      { name: "Kral der Klingenhauer", short: "Kral", at: [460, 920] },
+      { name: "Hügel der Klingenhauer", short: "Hügel", at: [530, 1000] },
+      { name: "Maraudon", short: "Maraudon", at: [120, 1040] },
+      { name: "Onyxias Hort", short: "Onyxia", at: [760, 1140], raid: true },
+      { name: "Düsterbruch", short: "Düsterbruch", at: [160, 1240] },
+      { name: "Zul'Farrak", short: "Zul'Farrak", at: [760, 1320] },
+      { name: "Ruinen von Ahn'Qiraj", short: "AQ Ruinen", at: [180, 1460], raid: true },
+      { name: "Tempel von Ahn'Qiraj", short: "AQ Tempel", at: [280, 1470], raid: true },
+    ],
+  };
 
   const OFFMAP = [
     {
@@ -231,60 +670,6 @@
   ];
 
   const pinned = { ek: "", kal: "" };
-
-  function bandOf(item) {
-    if (item.min == null || item.max == null) return "unknown";
-    if (item.min <= 1 && item.max >= 60) return "all";
-    if (item.max <= 20) return "green";
-    if (item.max <= 40) return "yellow";
-    if (item.min >= 50) return "red";
-    return "orange";
-  }
-
-  function oct(box) {
-    const x = box[0];
-    const y = box[1];
-    const w = box[2];
-    const h = box[3];
-    const ix = Math.max(10, Math.round(w * 0.16));
-    const iy = Math.max(10, Math.round(h * 0.18));
-    return [
-      [x + ix, y],
-      [x + w - ix, y],
-      [x + w, y + iy],
-      [x + w, y + h - iy],
-      [x + w - ix, y + h],
-      [x + ix, y + h],
-      [x, y + h - iy],
-      [x, y + iy],
-    ];
-  }
-
-  function frac(value) {
-    return value - Math.floor(value);
-  }
-
-  function blob(box, seed) {
-    const x = box[0];
-    const y = box[1];
-    const w = box[2];
-    const h = box[3];
-    const n = 7 + (Math.abs(seed) % 3);
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2 - 1;
-    const ry = h / 2 - 1;
-    const pts = [];
-    for (let i = 0; i < n; i++) {
-      const angle = -Math.PI / 2 + (i / n) * Math.PI * 2;
-      const wobble = 0.8 + 0.2 * frac(Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453);
-      pts.push([
-        Math.round(cx + Math.cos(angle) * rx * wobble),
-        Math.round(cy + Math.sin(angle) * ry * wobble),
-      ]);
-    }
-    return pts;
-  }
 
   function rangeText(min, max) {
     return min === max ? String(min) : min + "–" + max;
@@ -336,6 +721,16 @@
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
   }
 
+  function signedArea(pts) {
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const q = pts[(i + 1) % pts.length];
+      area += p[0] * q[1] - q[0] * p[1];
+    }
+    return area / 2;
+  }
+
   function inside(p, pts) {
     let hit = false;
     for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -350,6 +745,69 @@
 
   function pathFrom(pts) {
     return "M" + pts.map(function (pt) { return pt[0] + " " + pt[1]; }).join(" L") + " Z";
+  }
+
+  function ptKey(p) {
+    return p[0] + "," + p[1];
+  }
+
+  function edgeKey(a, b) {
+    const ka = ptKey(a);
+    const kb = ptKey(b);
+    return ka < kb ? ka + "|" + kb : kb + "|" + ka;
+  }
+
+  function boundaries(zones) {
+    const bag = new Map();
+    zones.forEach(function (item) {
+      const pts = item.pts;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i];
+        const b = pts[(i + 1) % pts.length];
+        const key = edgeKey(a, b);
+        if (!bag.has(key)) bag.set(key, { a: a, b: b, n: 0, dirs: [] });
+        const edge = bag.get(key);
+        edge.n += 1;
+        edge.dirs.push(ptKey(a) + ">" + ptKey(b));
+      }
+    });
+    return bag;
+  }
+
+  function coastLoops(zones) {
+    const bag = boundaries(zones);
+    const boundary = [];
+    bag.forEach(function (edge) {
+      if (edge.n === 1) boundary.push(edge);
+    });
+    const out = new Map();
+    boundary.forEach(function (edge) {
+      const key = ptKey(edge.a);
+      if (!out.has(key)) out.set(key, []);
+      out.get(key).push(edge);
+    });
+    const used = new Set();
+    const loops = [];
+    boundary.forEach(function (start) {
+      const startKey = edgeKey(start.a, start.b);
+      if (used.has(startKey)) return;
+      const loop = [start.a];
+      let cur = start;
+      let guard = 0;
+      while (guard < 2000) {
+        guard += 1;
+        used.add(edgeKey(cur.a, cur.b));
+        loop.push(cur.b);
+        if (ptKey(cur.b) === ptKey(start.a)) break;
+        const nexts = (out.get(ptKey(cur.b)) || []).filter(function (edge) {
+          return !used.has(edgeKey(edge.a, edge.b));
+        });
+        if (!nexts.length) break;
+        cur = nexts[0];
+      }
+      if (loop.length > 3 && ptKey(loop[0]) === ptKey(loop[loop.length - 1])) loops.push(loop);
+    });
+    return loops;
   }
 
   function factionLine(item) {
@@ -415,7 +873,7 @@
         maxY = Math.max(maxY, pt[1]);
       });
     });
-    const pad = 46;
+    const pad = 56;
     return {
       x: minX - pad,
       y: minY - pad,
@@ -424,101 +882,141 @@
     };
   }
 
-  function defs(key) {
-    const stops = {
-      green: ["#46b86a", "#1e6a36"],
-      yellow: ["#f0c84a", "#c49212"],
-      orange: ["#f08a32", "#c25412"],
-      red: ["#e15a4e", "#9c2a28"],
-      all: ["#b3a0e6", "#5c4a9a"],
-      unknown: ["#b7c0cc", "#5c6774"],
-    };
-    let html = '<defs><linearGradient id="sea-' + key + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1b425c"/><stop offset="100%" stop-color="#0c141c"/></linearGradient>';
-    Object.keys(stops).forEach(function (band) {
-      html += '<linearGradient id="fill-' + key + "-" + band + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + stops[band][0] + '"/><stop offset="100%" stop-color="' + stops[band][1] + '"/></linearGradient>';
-    });
-    html += "</defs>";
-    return html;
+  function defs(key, coast) {
+    return (
+      "<defs>" +
+      '<clipPath id="clip-' + key + '"><path d="' + coast + '"></path></clipPath>' +
+      '<linearGradient id="sea-' + key + '" x1="0" y1="0" x2="0.2" y2="1">' +
+      '<stop offset="0%" stop-color="#1f6d86"/>' +
+      '<stop offset="55%" stop-color="#16556c"/>' +
+      '<stop offset="100%" stop-color="#0c3140"/>' +
+      "</linearGradient>" +
+      '<linearGradient id="age-' + key + '" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0%" stop-color="#f4e6c4" stop-opacity="0.22"/>' +
+      '<stop offset="100%" stop-color="#6b4e2e" stop-opacity="0.14"/>' +
+      "</linearGradient>" +
+      '<filter id="grain-' + key + '" x="-5%" y="-5%" width="110%" height="110%">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="' + (key === "ek" ? 4 : 9) + '" result="n"/>' +
+      '<feColorMatrix type="matrix" values="0 0 0 0 0.32  0 0 0 0 0.24  0 0 0 0 0.12  0 0 0 0.28 0" in="n"/>' +
+      "</filter>" +
+      '<filter id="hill-' + key + '" x="-5%" y="-5%" width="110%" height="110%">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="' + (key === "ek" ? 2 : 6) + '"/>' +
+      '<feColorMatrix type="matrix" values="0 0 0 0 0.2  0 0 0 0 0.16  0 0 0 0 0.08  0 0 0 0.16 0"/>' +
+      "</filter>" +
+      '<filter id="shade-' + key + '" x="-15%" y="-15%" width="130%" height="130%">' +
+      '<feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#041018" flood-opacity="0.55"/>' +
+      "</filter>" +
+      "</defs>"
+    );
   }
 
   function waves(vb) {
     let html = "";
-    for (let i = 0; i < 6; i++) {
-      const y = Math.round(vb.y + 28 + i * (vb.h / 7));
-      const x = Math.round(vb.x + 8);
-      html += '<path class="karte-wave" d="M' + x + " " + y + " q 8 -5 16 0 t 16 0\"></path>";
+    for (let i = 0; i < 9; i++) {
+      const y = Math.round(vb.y + 24 + i * (vb.h / 10));
+      const x = Math.round(vb.x + 12);
+      html += '<path class="karte-wave" d="M' + x + " " + y + " q 18 -7 36 0 t 36 0 t 36 0\"></path>";
     }
     return html;
   }
 
-  function markSvg(item) {
-    if (!item.mark) return "";
-    const box = bbox(item.pts);
-    if (box.w < 110 || box.h < 72) return "";
-    const x = Math.round(box.x + 8);
-    const y = Math.round(box.y + box.h - 22);
-    const icons = {
-      forest: '<g fill="rgba(8,36,16,0.5)"><circle cx="4" cy="8" r="5"/><circle cx="12" cy="10" r="4"/><circle cx="8" cy="3" r="4"/></g>',
-      mountain: '<path fill="rgba(28,16,10,0.45)" d="M0 16 L8 2 L12 8 L18 0 L28 16 Z"/>',
-      swamp: '<path fill="none" stroke="rgba(10,32,24,0.55)" stroke-width="1.6" d="M0 8 q 6 -6 12 0 t 12 0"/>',
-      desert: '<g fill="rgba(48,28,8,0.5)"><circle cx="2" cy="8" r="1.5"/><circle cx="9" cy="4" r="1.3"/><circle cx="15" cy="9" r="1.5"/></g>',
-      snow: '<g fill="rgba(255,255,255,0.7)"><circle cx="3" cy="4" r="1.6"/><circle cx="10" cy="9" r="1.4"/><circle cx="16" cy="3" r="1.5"/></g>',
-      plague: '<path fill="none" stroke="rgba(36,18,12,0.55)" stroke-width="1.5" d="M6 16 L6 2 M6 7 L1 4 M6 6 L12 3 M6 11 L12 9"/>',
-      lava: '<path fill="none" stroke="rgba(120,28,8,0.65)" stroke-width="1.7" d="M1 12 L8 6 L13 13 L22 3"/>',
-    };
-    return '<g transform="translate(' + x + " " + y + ')" aria-hidden="true">' + (icons[item.mark] || "") + "</g>";
-  }
-
   function labelSvg(item) {
-    const c = centroid(item.pts);
-    const x = Math.round(c[0]);
-    const y = Math.round(c[1]);
-    const lines = item.lines;
-    const size = item.labelSize || (lines.length > 1 ? 17 : 20);
-    const dark = item.band === "yellow" ? " is-dark" : "";
-    const gap = size + 3;
-    const start = y - ((lines.length - 1) * gap) / 2;
-    const tspans = lines.map(function (line, index) {
-      return '<tspan x="' + x + '" y="' + (start + index * gap) + '">' + esc(line) + "</tspan>";
-    }).join("");
-    return '<text class="karte-label' + dark + '" font-size="' + size + '">' + tspans + "</text>";
+    const box = bbox(item.pts);
+    const spot = item.labelAt || centroid(item.pts);
+    const names = item.lines.slice();
+    const longest = names.reduce(function (max, line) {
+      return Math.max(max, line.length);
+    }, 1);
+    let size = item.labelSize || 14;
+    if (box.w < 160 || box.h < 110) size = Math.min(size, 12);
+    if (box.h < 90) size = Math.min(size, 11);
+    const maxByW = Math.floor((box.w * 0.9) / (longest * 0.58));
+    size = Math.max(9, Math.min(size, maxByW));
+    const x = Math.round(spot[0]);
+    let y = Math.round(spot[1]);
+    const levelSize = Math.max(8, size - 2);
+    const neuSize = Math.max(7, Math.min(8, Math.floor((box.w * 0.9) / 8)));
+    const block = names.length * (size + 1) + levelSize + (item.neu ? neuSize + 2 : 0);
+    y = Math.round(y - block / 2 + size * 0.7);
+    let html = "";
+    names.forEach(function (line, index) {
+      html += '<text class="karte-label" x="' + x + '" y="' + (y + index * (size + 1)) + '" font-size="' + size + '">' + esc(line) + "</text>";
+    });
+    const levelY = y + names.length * (size + 1) + 1;
+    html += '<text class="karte-level" x="' + x + '" y="' + levelY + '" font-size="' + levelSize + '">' + esc(rangeCell(item)) + "</text>";
+    if (item.neu) {
+      html += '<text class="karte-neu-line" x="' + x + '" y="' + (levelY + neuSize + 3) + '" font-size="' + neuSize + '">NEU in Forever</text>';
+    }
+    return html;
   }
 
-  function badgeSvg(item) {
-    if (!item.neu) return "";
-    const box = bbox(item.pts);
-    const x = Math.round(box.x + box.w / 2);
-    const y = Math.round(box.y + 15);
-    return '<g class="karte-badge" transform="translate(' + x + " " + y + ')" aria-hidden="true"><rect x="-42" y="-7" width="84" height="14" rx="3"></rect><text y="3.5">NEU in Forever</text></g>';
+  function citySvg(city) {
+    const color = city.faction === "Horde" ? "#8d1c18" : "#1c4e86";
+    const x = city.at[0];
+    const y = city.at[1];
+    const lx = city.lx || 0;
+    const ly = city.ly == null ? 18 : city.ly;
+    return (
+      '<g class="karte-marker" transform="translate(' + x + " " + y + ')">' +
+      '<circle r="8" fill="#f7f0de" stroke="#2c2418" stroke-width="1.1"/>' +
+      '<path d="M-3.4 3.4 V-0.5 L0 -3.6 L3.4 -0.5 V3.4 Z" fill="' + color + '"/>' +
+      '<text class="karte-city-label" x="' + lx + '" y="' + ly + '">' + esc(city.name) + "</text>" +
+      "</g>"
+    );
+  }
+
+  function pinSvg(pin) {
+    const fill = pin.raid ? "#8a2a22" : "#3a3228";
+    return (
+      '<g class="karte-marker" transform="translate(' + pin.at[0] + " " + pin.at[1] + ')">' +
+      '<path d="M0 -5.2 L4.4 0 L0 5.2 L-4.4 0 Z" fill="' + fill + '" stroke="#f4ead6" stroke-width="0.7"/>' +
+      '<text class="karte-pin-label" y="14">' + esc(pin.short) + "</text>" +
+      "<title>" + esc(pin.name) + "</title>" +
+      "</g>"
+    );
   }
 
   function renderMap(key) {
     const data = MAPS[key];
     const vb = viewBox(data.zones);
-    const coasts = [];
-    const fills = [];
-    const labels = [];
-    const marks = [];
-    data.zones.forEach(function (item) {
+    const loops = coastLoops(data.zones);
+    const coast = loops.map(pathFrom).join("");
+    const borders = [];
+    boundaries(data.zones).forEach(function (edge) {
+      if (edge.n === 2) borders.push("M" + edge.a[0] + " " + edge.a[1] + " L" + edge.b[0] + " " + edge.b[1]);
+    });
+    const zones = data.zones.map(function (item) {
       const d = pathFrom(item.pts);
       const aria = item.name + ", " + levelText(item) + ", " + item.faction + (item.neu ? ", NEU in Forever" : "");
-      coasts.push('<path class="karte-coast" d="' + d + '"></path>');
-      fills.push(
-        '<path class="karte-zone" data-zone="' + item.id + '" data-band="' + item.band + '" d="' + d + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(aria) + '" fill="url(#fill-' + key + "-" + item.band + ')"><title>' + esc(item.name + ", " + levelText(item)) + "</title></path>"
+      const land = item.land || TERRAIN[item.mark] || TERRAIN.grass;
+      return (
+        '<g class="karte-zone" data-zone="' + item.id + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(aria) + '">' +
+        '<path class="karte-terrain" d="' + d + '" fill="' + land + '"></path>' +
+        '<path class="karte-tint" d="' + d + '" fill="' + TINT[item.band] + '"><title>' + esc(item.name + ", " + levelText(item)) + "</title></path>" +
+        "</g>"
       );
-      marks.push(markSvg(item));
-      labels.push(labelSvg(item));
-      labels.push(badgeSvg(item));
-    });
+    }).join("");
+    const labels = data.zones.map(labelSvg).join("");
+    const cities = (CITIES[key] || []).map(citySvg).join("");
+    const pins = (PINS[key] || []).map(pinSvg).join("");
     const svg =
       '<svg viewBox="' + [vb.x, vb.y, vb.w, vb.h].join(" ") + '" role="group" aria-label="Karte von ' + esc(data.name) + '">' +
-      defs(key) +
+      defs(key, coast) +
       '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" fill="url(#sea-' + key + ')"></rect>' +
       waves(vb) +
-      coasts.join("") +
-      fills.join("") +
-      '<g class="karte-deco">' + marks.join("") + "</g>" +
-      labels.join("") +
+      '<g filter="url(#shade-' + key + ')">' +
+      '<path class="karte-shoal" d="' + coast + '"></path>' +
+      zones +
+      "</g>" +
+      '<g clip-path="url(#clip-' + key + ')" pointer-events="none">' +
+      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" fill="url(#age-' + key + ')"></rect>' +
+      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" filter="url(#hill-' + key + ')"></rect>' +
+      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" filter="url(#grain-' + key + ')"></rect>' +
+      "</g>" +
+      '<path class="karte-border" d="' + borders.join(" ") + '"></path>' +
+      '<path class="karte-coast" d="' + coast + '"></path>' +
+      '<g class="karte-deco">' + cities + pins + "</g>" +
+      labels +
       "</svg>";
     document.getElementById("karte-map-" + key).innerHTML = '<div class="karte-stage">' + svg + "</div>";
   }
@@ -561,9 +1059,12 @@
   function renderLegend() {
     const list = document.getElementById("karte-legend");
     if (!list) return;
-    list.innerHTML = BANDS.map(function (band) {
+    const bands = BANDS.map(function (band) {
       return '<li><span class="karte-swatch" data-band="' + band.id + '" aria-hidden="true"></span>' + esc(band.label) + "</li>";
     }).join("");
+    list.innerHTML = bands +
+      '<li><span class="karte-swatch karte-swatch-city" aria-hidden="true"></span>Stadt</li>' +
+      '<li><span class="karte-swatch karte-swatch-dung" aria-hidden="true"></span>Dungeon oder Raid</li>';
   }
 
   function showInfo(key, id) {
@@ -675,7 +1176,7 @@
       }
       if ((event.key === "Enter" || event.key === " ") && event.target.classList && event.target.classList.contains("karte-zone")) {
         event.preventDefault();
-        event.target.click();
+        event.target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       }
     });
 
@@ -699,16 +1200,33 @@
     });
   }
 
+  function deepInside(p, pts) {
+    return inside(p, pts) && inside([p[0] + 5, p[1]], pts) && inside([p[0] - 5, p[1]], pts) && inside([p[0], p[1] + 5], pts) && inside([p[0], p[1] - 5], pts);
+  }
+
   function audit(zones, label) {
     const problems = [];
     const seen = new Map();
+    const bag = boundaries(zones);
+    bag.forEach(function (edge) {
+      if (edge.n !== 1 && edge.n !== 2) problems.push(label + " edge x" + edge.n + " " + ptKey(edge.a));
+      if (edge.n === 2 && edge.dirs[0] === edge.dirs[1]) problems.push(label + " same-dir " + edge.dirs[0]);
+    });
+    const loops = coastLoops(zones);
+    const expect = label === "kal" ? 2 : 1;
+    if (loops.length !== expect) {
+      problems.push(label + " coasts " + loops.length + " " + loops.map(function (loop) {
+        const b = bbox(loop);
+        return Math.round(b.x) + "," + Math.round(b.y) + " " + Math.round(b.w) + "x" + Math.round(b.h);
+      }).join(" | "));
+    }
     zones.forEach(function (item) {
       const box = bbox(item.pts);
-      if (box.w < 70 || box.h < 60) problems.push(label + " small " + item.id + " " + box.w + "x" + box.h);
-      const step = 4;
+      if (box.w < 70 || box.h < 55) problems.push(label + " small " + item.id + " " + Math.round(box.w) + "x" + Math.round(box.h));
+      const step = 6;
       for (let y = box.y; y <= box.y + box.h; y += step) {
         for (let x = box.x; x <= box.x + box.w; x += step) {
-          if (!inside([x, y], item.pts)) continue;
+          if (!deepInside([x, y], item.pts)) continue;
           const spot = x + "," + y;
           if (seen.has(spot)) {
             const pair = seen.get(spot) + "/" + item.id;
@@ -725,7 +1243,7 @@
   if (typeof document === "undefined") {
     const problems = audit(EK, "ek").concat(audit(KAL, "kal"));
     if (problems.length) {
-      console.error(problems.slice(0, 30).join("\n"));
+      console.error(problems.slice(0, 40).join("\n"));
       process.exitCode = 1;
     } else {
       console.log("karte geometry ok", EK.length, KAL.length);

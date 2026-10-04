@@ -946,6 +946,17 @@ button.gallery-tile {
 .karte-swatch[data-band="all"] { background: #7d68c4; }
 .karte-swatch[data-band="raid"] { background: #f4c343; }
 .karte-swatch[data-band="unknown"] { background: #8b97a6; }
+.karte-swatch-city {
+  background: #8d1c18;
+  border-radius: 50%;
+}
+.karte-swatch-dung {
+  width: 0.62rem;
+  height: 0.62rem;
+  margin-right: 0.45rem;
+  background: #3a3228;
+  transform: rotate(45deg);
+}
 
 .karte-source {
   color: #f4c343;
@@ -1051,61 +1062,119 @@ button.gallery-tile {
 
 .karte-zone {
   cursor: pointer;
-  stroke: #140c08;
-  stroke-width: 1.4px;
-  stroke-linejoin: round;
   touch-action: manipulation;
-  transition: filter 0.15s ease, stroke 0.15s ease;
 }
 
-.karte-zone:hover,
-.karte-zone:focus-visible,
-.karte-zone.is-on {
-  filter: brightness(1.14);
-  stroke: #ffe7a8;
+.karte-terrain {
+  pointer-events: none;
+}
+
+.karte-tint {
+  fill-opacity: 0.28;
+  stroke: transparent;
   stroke-width: 2.6px;
+  stroke-linejoin: round;
 }
 
-.karte-zone.is-on {
+.karte-zone:hover .karte-tint,
+.karte-zone:focus-visible .karte-tint,
+.karte-zone.is-on .karte-tint {
+  fill-opacity: 0.5;
+  stroke: #f0d078;
+}
+
+.karte-zone.is-on .karte-tint {
   stroke: #ffd100;
-  stroke-width: 3px;
+  stroke-width: 3.2px;
+}
+
+.karte-shoal {
+  fill: none;
+  stroke: #7ec0d0;
+  stroke-width: 16px;
+  stroke-linejoin: round;
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .karte-coast {
   fill: none;
-  stroke: #e6c98a;
-  stroke-width: 5px;
+  stroke: #4a3828;
+  stroke-width: 2.6px;
   stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.karte-border {
+  fill: none;
+  stroke: #5a4330;
+  stroke-width: 1.2px;
+  stroke-linejoin: round;
+  opacity: 0.78;
   pointer-events: none;
 }
 
 .karte-wave {
   fill: none;
-  stroke: #2a5470;
-  stroke-width: 1.4px;
-  opacity: 0.8;
+  stroke: #b7e0ea;
+  stroke-width: 1.3px;
+  opacity: 0.28;
   pointer-events: none;
 }
 
-.karte-deco {
+.karte-deco,
+.karte-marker {
+  pointer-events: none;
+}
+
+.karte-label,
+.karte-level,
+.karte-neu-line,
+.karte-city-label,
+.karte-pin-label {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  text-anchor: middle;
   pointer-events: none;
 }
 
 .karte-label {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-weight: 800;
-  text-anchor: middle;
-  dominant-baseline: middle;
-  fill: #fffaf3;
-  stroke: #140c08;
-  stroke-width: 4px;
+  fill: #241910;
+  stroke: #f7f1e2;
+  stroke-width: 3px;
   paint-order: stroke fill;
-  pointer-events: none;
 }
 
-.karte-label.is-dark {
-  fill: #1a1008;
-  stroke: #fff8e8;
+.karte-level {
+  fill: #3a2c1c;
+  stroke: #f7f1e2;
+  stroke-width: 2.6px;
+  paint-order: stroke fill;
+  font-weight: 700;
+}
+
+.karte-neu-line {
+  fill: #8a4b12;
+  stroke: #f8f1df;
+  stroke-width: 2px;
+  paint-order: stroke fill;
+}
+
+.karte-city-label {
+  fill: #241910;
+  stroke: #f7f0de;
+  stroke-width: 2.5px;
+  paint-order: stroke fill;
+  font-size: 10px;
+}
+
+.karte-pin-label {
+  fill: #2c2418;
+  stroke: #f6edd8;
+  stroke-width: 2px;
+  paint-order: stroke fill;
+  font-size: 8px;
+  font-weight: 700;
 }
 
 .karte-pin {
