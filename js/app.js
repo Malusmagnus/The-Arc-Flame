@@ -205,7 +205,9 @@
   let dkpImportSelected = {};
   let dkpImportNames = {};
 
-  const LOOT_SLOTS = ["Kopf", "Hals", "Schulter", "Rücken", "Brust", "Handgelenke", "Hände", "Taille", "Beine", "Füße", "Finger", "Schmuck", "Einhand", "Zweihand", "Schildhand", "Nebenhand", "Distanz", "Zauberstab", "Tasche", "Sonstiges"];
+  const LOOT_SLOTS = ["Kopf", "Hals", "Schulter", "Rücken", "Brust", "Handgelenke", "Hände", "Taille", "Beine", "Füße", "Finger", "Schmuck", "Einhand", "Waffenhand", "Zweihand", "Schildhand", "Nebenhand", "Distanz", "Zauberstab", "Tasche", "Sonstiges"];
+  const LOOT_STAT_ORDER = ["Schaden", "Schattenschaden", "Schadensart", "Tempo", "DPS", "Rüstung", "Blocken", "Stärke", "Beweglichkeit", "Ausdauer", "Intelligenz", "Willenskraft"];
+  const LOOT_ATTR = { "Stärke": true, "Beweglichkeit": true, "Ausdauer": true, "Intelligenz": true, "Willenskraft": true };
   const LOOT_ARMOR = ["Stoff", "Leder", "Schwere Rüstung", "Platte"];
   const LOOT_QUALITIES = [
     { id: "poor", label: "Schlecht" },
@@ -8320,22 +8322,80 @@
     return "0";
   }
 
-  function lootFormatStat(key, value) {
-    if (typeof value === "number" && Number.isFinite(value)) return lootSigned(value) + " " + key;
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (/^[+-]?\d+$/.test(trimmed) || /^[+-]?\d+[.,]\d+$/.test(trimmed)) {
-        return lootSigned(Number(trimmed.replace(",", "."))) + " " + key;
-      }
-      return key + ": " + trimmed;
+  function lootAsNumber(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && /^[+-]?\d+(?:[.,]\d+)?$/.test(value.trim())) {
+      return Number(value.trim().replace(",", "."));
     }
+    return null;
+  }
+
+  function lootDeDecimal(n, fixed) {
+    if (!Number.isFinite(n)) return String(n);
+    if (fixed != null) return n.toFixed(fixed).replace(".", ",");
+    const rounded = Math.round(n * 100) / 100;
+    if (Number.isInteger(rounded)) return String(rounded);
+    return rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "").replace(".", ",");
+  }
+
+  function lootPlainAmount(n) {
+    if (n < 0) return lootSigned(n);
+    return lootDeDecimal(n);
+  }
+
+  function lootDamageRange(value) {
+    const text = String(value == null ? "" : value).trim();
+    const match = text.match(/^[+]?\s*(\d+(?:[.,]\d+)?)\s*[-–]\s*[+]?\s*(\d+(?:[.,]\d+)?)$/);
+    if (!match) return null;
+    return {
+      min: lootDeDecimal(Number(match[1].replace(",", "."))),
+      max: lootDeDecimal(Number(match[2].replace(",", "."))),
+    };
+  }
+
+  function lootFormatStat(key, value) {
+    if (key === "Schaden") {
+      const range = lootDamageRange(value);
+      if (range) return range.min + " - " + range.max + " Schaden";
+    }
+    if (key === "Schattenschaden") {
+      const range = lootDamageRange(value);
+      if (range) return "+" + range.min + " - " + range.max + " Schattenschaden";
+    }
+    if (key === "Schadensart") return "Schadensart: " + String(value == null ? "" : value).trim();
+    if (key === "Tempo") {
+      const tempo = lootAsNumber(value);
+      if (tempo != null) return "Tempo " + lootDeDecimal(tempo, 2);
+    }
+    if (key === "DPS") {
+      const dps = lootAsNumber(value);
+      if (dps != null) return "(" + lootDeDecimal(dps) + " Schaden pro Sekunde)";
+    }
+    if (key === "Rüstung" || key === "Blocken") {
+      const amount = lootAsNumber(value);
+      if (amount != null) return lootPlainAmount(amount) + " " + key;
+    }
+    if (LOOT_ATTR[key]) {
+      const amount = lootAsNumber(value);
+      if (amount != null) return lootSigned(amount) + " " + key;
+    }
+    const numeric = lootAsNumber(value);
+    if (numeric != null) return lootSigned(numeric) + " " + key;
     if (value == null) return key + ":";
-    return key + ": " + String(value);
+    return key + ": " + String(value).trim();
+  }
+
+  function lootStatKeys(stats) {
+    const keys = Object.keys(stats);
+    const known = LOOT_STAT_ORDER.filter(function (key) { return keys.indexOf(key) !== -1; });
+    const rest = keys.filter(function (key) { return LOOT_STAT_ORDER.indexOf(key) === -1; });
+    rest.sort(function (a, b) { return a.localeCompare(b, "de"); });
+    return known.concat(rest);
   }
 
   function lootStatLines(stats) {
     if (!stats || typeof stats !== "object" || Array.isArray(stats)) return [];
-    return Object.keys(stats).map(function (key) {
+    return lootStatKeys(stats).map(function (key) {
       return lootFormatStat(key, stats[key]);
     });
   }
@@ -8394,7 +8454,7 @@
       title.appendChild(hidden);
     }
     body.appendChild(title);
-    if (item.name_en && item.name_en !== item.name_de) {
+    if (item.name_en) {
       const en = document.createElement("p");
       en.className = "text-xs text-slate-500";
       en.textContent = item.name_en;
