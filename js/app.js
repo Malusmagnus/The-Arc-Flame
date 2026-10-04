@@ -67,6 +67,7 @@
     { href: "#galerie", label: "Galerie", icon: "fa-image", tone: "text-amber-400" },
     { href: "#bewerbung", label: "Bewerbung", icon: "fa-scroll", tone: "text-amber-400" },
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
+    { href: "#meckerkasten", label: "Meckerkasten", icon: "fa-comment-dots", tone: "text-amber-400" },
   ];
   const FOREVER_NAV = [
     { href: "#werte", label: "Über uns", icon: "fa-fire", tone: "text-amber-400" },
@@ -80,6 +81,7 @@
     { href: "#galerie", label: "Galerie", icon: "fa-image", tone: "text-amber-400" },
     { href: "#bewerbung", label: "Bewerbung", icon: "fa-scroll", tone: "text-amber-400" },
     { href: "#gilden-chat", label: "Chat", icon: "fa-comments", tone: "text-emerald-400" },
+    { href: "#meckerkasten", label: "Meckerkasten", icon: "fa-comment-dots", tone: "text-amber-400" },
   ];
 
   let activeFront = "retail";
@@ -131,6 +133,11 @@
   let foreverPollOwn = null;
   let foreverPollSending = false;
   let foreverPollReadable = false;
+  let feedbackCategory = "";
+  let feedbackFrontTouched = false;
+  let feedbackSending = false;
+  let feedbackNamePrefill = "";
+  let feedbackNameDraft = null;
 
   const RAID_TITLES = {
     forever: ["Geschmolzener Kern", "Onyxias Hort", "Pechschwingenhort", "Zul'Gurub", "Ruinen von Ahn'Qiraj", "Tempel von Ahn'Qiraj", "Naxxramas"],
@@ -220,6 +227,7 @@
     const hash = location.hash.replace(/^#/, "");
     if (FOREVER_IDS.has(hash)) switchFront("forever");
     else switchFront("retail");
+    initFeedbackForm();
     resetRaidForm();
     if (hash.indexOf("raid-") === 0) {
       /* Der Termin kommt erst aus der Datenbank. Danach scrollt focusLinkedRaid. */
@@ -261,6 +269,17 @@
 
     const mode = document.getElementById("auth-mode");
     if (mode) mode.addEventListener("change", syncAuthMode);
+
+    const meckerFront = document.getElementById("mecker-front");
+    if (meckerFront) {
+      meckerFront.addEventListener("change", function () {
+        feedbackFrontTouched = true;
+      });
+    }
+    const meckerAnonymous = document.getElementById("mecker-anonymous");
+    if (meckerAnonymous) meckerAnonymous.addEventListener("change", syncFeedbackAnonymous);
+    const meckerMessage = document.getElementById("mecker-message");
+    if (meckerMessage) meckerMessage.addEventListener("input", updateFeedbackCount);
 
     const galleryFile = document.getElementById("gallery-file");
     if (galleryFile) {
@@ -356,6 +375,10 @@
     const front = el.dataset.front === "forever" ? "forever" : "retail";
     if (action === "switch-front") {
       switchFront(el.dataset.front, { scroll: true });
+      return;
+    }
+    if (action === "mecker-category") {
+      setFeedbackCategory(el.dataset.category);
       return;
     }
     if (action === "open-auth") {
@@ -629,6 +652,9 @@
     } else if (form.id === "chat-form") {
       event.preventDefault();
       sendChatMessage(form);
+    } else if (form.id === "mecker-form") {
+      event.preventDefault();
+      submitFeedback(form);
     } else if (form.id === "leadership-form") {
       event.preventDefault();
       saveLeadership(form);
@@ -704,6 +730,7 @@
     raidFront = activeFront;
     renderRaids();
     updateQuickNav();
+    syncFeedbackFront(false);
 
     if (options && options.scroll) {
       const id = activeFront === "retail" ? "content-retail" : "forever-uebersicht";
@@ -832,6 +859,7 @@
     }
     syncPermissions();
     prefillChatAuthor();
+    prefillFeedbackName();
     updateQuickNav();
   }
 
@@ -4673,6 +4701,176 @@
       showForeverPollStatus("Eintrag gelöscht.", "info", true);
     }).catch(function () {
       showForeverPollStatus("Der Eintrag konnte nicht gelöscht werden.", "error", true);
+    });
+  }
+
+  const FEEDBACK_CHOICE_ON =
+    "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-sm font-extrabold text-slate-950";
+  const FEEDBACK_CHOICE_OFF =
+    "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700";
+
+  function feedbackErrorText(error) {
+    const message = error && typeof error.message === "string" ? error.message.trim() : "";
+    return message || "Die Nachricht konnte nicht gesendet werden.";
+  }
+
+  function showFeedbackStatus(message, kind, toast) {
+    const el = document.getElementById("mecker-status");
+    if (el) {
+      if (!message) {
+        el.hidden = true;
+        el.textContent = "";
+      } else {
+        el.hidden = false;
+        el.textContent = message;
+        el.className = "text-sm break-words " + (kind === "error" ? "text-red-400" : "text-emerald-400");
+      }
+    }
+    if (toast && message) notify(message, kind === "error" ? "error" : "info");
+  }
+
+  function paintFeedbackCategory() {
+    document.querySelectorAll("[data-action='mecker-category']").forEach(function (button) {
+      const on = button.dataset.category === feedbackCategory;
+      button.className = on ? FEEDBACK_CHOICE_ON : FEEDBACK_CHOICE_OFF;
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  function setFeedbackCategory(category) {
+    if (category !== "lob" && category !== "kritik" && category !== "vorschlag") return;
+    feedbackCategory = category;
+    paintFeedbackCategory();
+  }
+
+  function syncFeedbackFront(force) {
+    const select = document.getElementById("mecker-front");
+    if (!select || (feedbackFrontTouched && !force)) return;
+    select.value = activeFront === "forever" ? "forever" : "retail";
+  }
+
+  function updateFeedbackCount() {
+    const text = document.getElementById("mecker-message");
+    const count = document.getElementById("mecker-count");
+    if (!text || !count) return;
+    count.textContent = String(text.value.length);
+  }
+
+  function prefillFeedbackName() {
+    const input = document.getElementById("mecker-name");
+    const anon = document.getElementById("mecker-anonymous");
+    if (!input || input.disabled || (anon && anon.checked)) return;
+    const next = currentUser && currentUser.displayName ? String(currentUser.displayName).slice(0, 40) : "";
+    if (input.value && input.value !== feedbackNamePrefill) return;
+    input.value = next;
+    feedbackNamePrefill = next;
+  }
+
+  function syncFeedbackAnonymous() {
+    const input = document.getElementById("mecker-name");
+    const anon = document.getElementById("mecker-anonymous");
+    if (!input || !anon) return;
+    if (anon.checked) {
+      if (!input.disabled) feedbackNameDraft = input.value;
+      input.value = "";
+      input.disabled = true;
+      return;
+    }
+    input.disabled = false;
+    if (feedbackNameDraft) {
+      input.value = feedbackNameDraft;
+      feedbackNameDraft = null;
+      return;
+    }
+    feedbackNameDraft = null;
+    prefillFeedbackName();
+  }
+
+  function initFeedbackForm() {
+    paintFeedbackCategory();
+    syncFeedbackFront(false);
+    updateFeedbackCount();
+    prefillFeedbackName();
+  }
+
+  function resetFeedbackForm() {
+    const form = document.getElementById("mecker-form");
+    feedbackCategory = "";
+    feedbackFrontTouched = false;
+    feedbackNameDraft = null;
+    if (form) form.reset();
+    const name = document.getElementById("mecker-name");
+    if (name) {
+      name.disabled = false;
+      name.value = "";
+    }
+    paintFeedbackCategory();
+    syncFeedbackFront(true);
+    updateFeedbackCount();
+    prefillFeedbackName();
+  }
+
+  function submitFeedback() {
+    if (feedbackSending) return;
+    const frontValue = fieldValue("mecker-front");
+    const front = frontValue === "forever" ? "forever" : (frontValue === "retail" ? "retail" : "");
+    const message = fieldValue("mecker-message").trim();
+    const anonEl = document.getElementById("mecker-anonymous");
+    const anonymous = !!(anonEl && anonEl.checked);
+    const name = anonymous ? "" : fieldValue("mecker-name").trim().slice(0, 40);
+    if (feedbackCategory !== "lob" && feedbackCategory !== "kritik" && feedbackCategory !== "vorschlag") {
+      showFeedbackStatus("Bitte Lob, Kritik oder Vorschlag wählen.", "error", true);
+      const first = document.querySelector("[data-action='mecker-category']");
+      if (first) first.focus();
+      return;
+    }
+    if (!front) {
+      showFeedbackStatus("Bitte Retail oder Forever wählen.", "error", true);
+      return;
+    }
+    if (!message) {
+      showFeedbackStatus("Bitte eine Nachricht schreiben.", "error", true);
+      const field = document.getElementById("mecker-message");
+      if (field) field.focus();
+      return;
+    }
+    if (message.length > 2000) {
+      showFeedbackStatus("Die Nachricht ist zu lang.", "error", true);
+      return;
+    }
+    if (!remote || typeof remote.rpc !== "function") {
+      showFeedbackStatus("Senden ist gerade nicht möglich.", "error", true);
+      return;
+    }
+    const button = document.getElementById("mecker-submit");
+    feedbackSending = true;
+    if (button) button.disabled = true;
+    showFeedbackStatus("", "info", false);
+    hideNotice();
+    remote.rpc("submit_feedback", {
+      p_front: front,
+      p_category: feedbackCategory,
+      p_message: message,
+      p_name: anonymous ? "" : name,
+      p_anonymous: anonymous,
+    }).then(function (result) {
+      if (!result || result.error) {
+        showFeedbackStatus(feedbackErrorText(result && result.error), "error", true);
+        return;
+      }
+      if (result.data && result.data.ok === false) {
+        const failed = result.data.message || result.data.error;
+        showFeedbackStatus(typeof failed === "string" && failed.trim() ? failed : "Die Nachricht konnte nicht gesendet werden.", "error", true);
+        return;
+      }
+      resetFeedbackForm();
+      showFeedbackStatus("Danke! Deine Nachricht ist angekommen.", "info", true);
+    }).catch(function (err) {
+      showFeedbackStatus(feedbackErrorText(err), "error", true);
+    }).then(function () {
+      feedbackSending = false;
+      const again = document.getElementById("mecker-submit");
+      if (again) again.disabled = false;
     });
   }
 
