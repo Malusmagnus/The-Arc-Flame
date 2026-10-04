@@ -95,8 +95,11 @@
   let remote = null;
   let remoteReady = false;
   let liveChannel = null;
+  let liveChannelFront = "";
+  let liveChannelSerial = 0;
   let authReady = false;
   let chatRefreshTimer = 0;
+  let chatLoadEpoch = 0;
   let rosterRefreshTimer = 0;
   let raidRefreshTimer;
 
@@ -689,7 +692,15 @@
   }
 
   function switchFront(front, options) {
-    activeFront = front === "forever" ? "forever" : "retail";
+    const nextFront = front === "forever" ? "forever" : "retail";
+    const frontChanged = nextFront !== activeFront;
+    activeFront = nextFront;
+    if (frontChanged) {
+      chatLoadEpoch += 1;
+      replaceItems(chatMessages, []);
+      renderChat();
+    }
+    updateChatHeading();
     document.getElementById("content-retail").hidden = activeFront !== "retail";
     document.getElementById("content-forever").hidden = activeFront !== "forever";
 
@@ -704,6 +715,10 @@
     raidFront = activeFront;
     renderRaids();
     updateQuickNav();
+    if (frontChanged) {
+      refreshChat();
+      if (remoteReady) subscribeLive();
+    }
 
     if (options && options.scroll) {
       const id = activeFront === "retail" ? "content-retail" : "forever-uebersicht";
@@ -900,7 +915,7 @@
     if (applyHint) {
       applyHint.textContent = approvalEnforced
         ? "Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie liegt im Gilden-Chat für freigeschaltete Mitglieder."
-        : "Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie erscheint im gemeinsamen Gilden-Chat.";
+        : "Die Bewerbung geht an die Gildenleitung auf Discord. Eine Kopie erscheint im Gilden-Chat.";
     }
   }
 
@@ -2779,11 +2794,14 @@
       notify("Die Nachricht ist zu lang.", "error");
       return;
     }
+    const front = chatFront();
     remote.from("chat_messages").insert({
       body: text,
       author: currentUser.displayName,
       user_id: currentUser.id,
-    }).select("id, author, body, user_id, source, created_at").single().then(function (result) {
+      front: front,
+    }).select("id, author, body, user_id, source, front, created_at").single().then(function (result) {
+      if (front !== chatFront()) return;
       if (result.error || !result.data) {
         notify(SAVE_FAIL, "error");
         return;
@@ -2822,8 +2840,9 @@
     const box = document.getElementById("chat-messages");
     if (!box) return;
     box.replaceChildren();
+    const front = chatFront();
     const messages = chatMessages.filter(function (message) {
-      return message && typeof message.text === "string";
+      return message && typeof message.text === "string" && (!message.front || message.front === front);
     });
     if (!canReadChat()) {
       const locked = document.createElement("p");
@@ -2872,7 +2891,13 @@
   function loadGuildInfoView() {
     document.getElementById("info-col-1").textContent = guildInfo.col1;
     document.getElementById("info-col-2").textContent = guildInfo.col2;
-    document.getElementById("info-col-3").textContent = guildInfo.col3;
+    document.getElementById("info-col-3").textContent = guildInfoCol3();
+  }
+
+  function guildInfoCol3() {
+    const shared = "Ob Retail-Veteran oder Classic-Liebhaber ab dem 5. November: Über unseren gemeinsamen Gilden-Chat halten wir alle Fäden zusammen unter der roten Flagge.";
+    const split = "Ob Retail-Veteran oder Classic-Liebhaber ab dem 5. November: Retail und Forever haben jeweils einen eigenen Gilden-Chat unter der roten Flagge.";
+    return guildInfo.col3 === shared ? split : guildInfo.col3;
   }
 
   function toggleInfoEdit() {
@@ -2883,7 +2908,7 @@
     }
     document.getElementById("edit-col-1").value = guildInfo.col1;
     document.getElementById("edit-col-2").value = guildInfo.col2;
-    document.getElementById("edit-col-3").value = guildInfo.col3;
+    document.getElementById("edit-col-3").value = guildInfoCol3();
     document.getElementById("info-display-mode").hidden = true;
     document.getElementById("edit-info-btn").hidden = true;
     document.getElementById("info-edit-mode").hidden = false;
@@ -4809,8 +4834,11 @@
     }).catch(function () {
       currentUser = null;
     }).then(function () {
-      return fetchAll();
-    }).then(function () {
+      const chatEpochAtFetch = chatLoadEpoch;
+      return fetchAll().then(function () {
+        return chatEpochAtFetch;
+      });
+    }).then(function (chatEpochAtFetch) {
       remoteReady = true;
       renderGuild();
       updateAuthUI();
@@ -4818,7 +4846,7 @@
       loadMyForeverPoll();
       loadRaids();
       subscribeLive();
-      if (currentUser && approvalEnforced) refreshChat();
+      if ((currentUser && approvalEnforced) || chatEpochAtFetch !== chatLoadEpoch) refreshChat();
     }).catch(function () {
       remoteReady = false;
       notify(OFFLINE_MSG, "error");
@@ -4837,6 +4865,7 @@
   }
 
   function fetchAll() {
+    const chatRequest = chatSelect();
     return Promise.all([
       fetchRows("members", "id, front, name, rank, sort_order", "sort_order", true),
       fetchRows("roster", "id, front, name, role, sort_order", "sort_order", true),
@@ -4845,9 +4874,10 @@
       fetchRows("mplus_groups", "id, name, dungeon, meeting_time, tank, heal, dds, created_by", "created_at", true),
       fetchRows("mplus_signups", "id, group_id, user_id, character_name", "created_at", true),
       fetchRows("classic_runs", "id, name, size, meeting_time", "created_at", true),
-      remote.from("chat_messages").select("id, author, body, user_id, source, created_at").order("created_at", { ascending: false }).limit(200),
+      chatRequest.query,
     ]).then(function (rows) {
       const chatResult = rows[7];
+      const chatCurrent = chatRequest.epoch === chatLoadEpoch && chatRequest.front === chatFront();
       replaceItems(retailMembers, rows[0].filter(function (row) { return row.front === "retail"; }).map(mapMember));
       replaceItems(foreverMembers, rows[0].filter(function (row) { return row.front === "forever"; }).map(mapMember));
       replaceItems(retailRaid, rows[1].filter(function (row) { return row.front === "retail"; }).map(mapRoster));
@@ -4864,11 +4894,11 @@
         return mapGroup(row, signups.filter(function (signup) { return signup.groupId === row.id; }));
       }));
       replaceItems(classicRuns, rows[6].map(mapRun));
-      if (!canReadChat()) {
+      if (chatCurrent && !canReadChat()) {
         replaceItems(chatMessages, []);
-      } else if (chatResult.error) {
+      } else if (chatCurrent && chatResult.error) {
         throw chatResult.error;
-      } else {
+      } else if (chatCurrent) {
         replaceItems(chatMessages, (chatResult.data || []).slice().reverse().map(mapChat));
       }
     });
@@ -4920,12 +4950,14 @@
   }
 
   function mapChat(row) {
+    const front = row.front === "forever" || row.front === "retail" ? row.front : "";
     return {
       id: row.id,
       author: row.author,
       text: row.body,
       userId: row.user_id || null,
       source: row.source === "discord" ? "discord" : "homepage",
+      front: front,
       time: formatStamp(row.created_at),
     };
   }
@@ -4941,6 +4973,40 @@
     });
   }
 
+  function chatFront() {
+    return activeFront === "forever" ? "forever" : "retail";
+  }
+
+  function updateChatHeading() {
+    const text = activeFront === "forever" ? "Gildenchat Forever" : "Gildenchat Retail";
+    const label = document.getElementById("gilden-chat-label");
+    const lead = document.getElementById("gilden-chat-lead");
+    const log = document.getElementById("chat-messages");
+    if (label) label.textContent = text;
+    if (lead) lead.textContent = activeFront === "forever"
+      ? "Nachrichten in diesem Chat gelten für Forever."
+      : "Nachrichten in diesem Chat gelten für Retail.";
+    if (log) log.setAttribute("aria-label", text);
+  }
+
+  function chatSelect() {
+    const front = chatFront();
+    return {
+      front: front,
+      epoch: chatLoadEpoch,
+      query: remote.from("chat_messages").select("id, author, body, user_id, source, front, created_at").eq("front", front).order("created_at", { ascending: false }).limit(200),
+    };
+  }
+
+  function chatChangeForActiveFront(payload) {
+    const front = chatFront();
+    const next = payload && payload.new ? payload.new.front : "";
+    const prev = payload && payload.old ? payload.old.front : "";
+    const known = next === "retail" || next === "forever" || prev === "retail" || prev === "forever";
+    if (!known) return true;
+    return next === front || prev === front;
+  }
+
   function refreshChat() {
     if (!remote || !remoteReady) return;
     if (!canReadChat()) {
@@ -4948,7 +5014,9 @@
       renderChat();
       return;
     }
-    remote.from("chat_messages").select("id, author, body, user_id, source, created_at").order("created_at", { ascending: false }).limit(200).then(function (result) {
+    const request = chatSelect();
+    request.query.then(function (result) {
+      if (request.epoch !== chatLoadEpoch || request.front !== chatFront()) return;
       if (result.error || !result.data) return;
       replaceItems(chatMessages, result.data.slice().reverse().map(mapChat));
       renderChat();
@@ -4966,9 +5034,15 @@
   }
 
   function subscribeLive() {
-    if (!remote || liveChannel) return;
-    liveChannel = remote.channel("arc-guild")
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, function () {
+    if (!remote) return;
+    const front = chatFront();
+    if (liveChannel && liveChannelFront === front) return;
+    const previous = liveChannel;
+    liveChannelFront = front;
+    liveChannelSerial += 1;
+    liveChannel = remote.channel("arc-guild-" + front + "-" + liveChannelSerial)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: "front=eq." + front }, function (payload) {
+        if (!chatChangeForActiveFront(payload)) return;
         window.clearTimeout(chatRefreshTimer);
         chatRefreshTimer = window.setTimeout(refreshChat, 250);
       })
@@ -4985,6 +5059,9 @@
         raidRefreshTimer = window.setTimeout(loadRaids, 500);
       })
       .subscribe();
+    if (previous && typeof remote.removeChannel === "function") {
+      Promise.resolve(remote.removeChannel(previous)).catch(function () {});
+    }
   }
 
   function isDkpUuid(value) {
