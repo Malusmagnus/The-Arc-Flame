@@ -132,6 +132,7 @@ supabase/gallery.sql Galerie-Bucket, Tabelle und Rechte (erneut ausführbar)
 supabase/forever_poll.sql Forever-Umfrage, Tabelle und Rechte (erneut ausführbar)
 supabase/profile_game.sql Spiel-Zuordnung Forever, Retail oder beides (erneut ausführbar)
 supabase/raids.sql   Raid-Planung, Anmeldungen und Discord (erneut ausführbar)
+supabase/feedback.sql Meckerkasten, Speicherung und Discord (erneut ausführbar)
 supabase/README.md  Einstellungen im Supabase-Dashboard
 assets/             Emblem, Wortmarke, Hero, Favicon, Open-Graph-Bild, Schriften, Icons
 assets/gallery/     Screenshots für die Galerie

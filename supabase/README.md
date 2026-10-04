@@ -96,6 +96,18 @@ Danach gibt es `public.raids` und `public.raid_signups`. Termine lesen alle Besu
 
 Discord läuft in der Datenbank, nicht im Browser. Forever- und Retail-Raidmeldungen können in getrennte Kanäle gehen. Dafür legt ihr im Vault die Geheimnisse `discord_raid_webhook_forever` und `discord_raid_webhook_retail` an. Fehlt das Geheimnis der Front oder ist es leer, liest der Trigger `discord_raid_webhook` und danach `discord_chat_webhook`. Die Webhook-Adressen stehen nicht im Repository. Schlägt der Versand fehl, bleibt der Raid trotzdem gespeichert.
 
+## Meckerkasten
+
+`feedback.sql` einmal ausführen, wenn `schema.sql` schon auf dem Projekt liegt und der Meckerkasten-Block darin noch nicht gelaufen ist. Ein komplettes erneutes Ausführen von `schema.sql` enthält dieselben Anweisungen. Beides kann wiederholt werden.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/feedback.sql
+```
+
+Danach gibt es `public.submit_feedback`. Jeder Besucher darf eine Nachricht schicken, auch ohne Anmeldung. Die Nachricht landet in `public.feedback`. Lesen und Löschen dürfen nur freigeschaltete Offiziere und Administratoren (`public.is_officer()` und `public.is_approved()`). Eine öffentliche Liste gibt es nicht. Bei anonym speichert die Funktion weder Namen noch Konto.
+
+Discord läuft in der Datenbank, nicht im Browser. Sobald die Kanäle und Webhooks existieren, legt ihr im Vault die Geheimnisse `discord_feedback_webhook_retail` und `discord_feedback_webhook_forever` an. Fehlt das Geheimnis der Front oder ist es leer, liest die Funktion `discord_feedback_webhook` und danach `discord_chat_webhook`. Die Webhook-Adressen stehen nicht im Repository. Schlägt der Versand fehl, bleibt die Nachricht trotzdem gespeichert.
+
 ## Realtime
 
 `schema.sql` hängt `chat_messages` und `roster` an die Publication `supabase_realtime`. Unter **Database → Publications** sollten beide Tabellen dort stehen, damit Chat und Kader live mitlaufen.
