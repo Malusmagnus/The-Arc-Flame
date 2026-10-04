@@ -372,6 +372,50 @@
         </div>
       </section>
 
+      <section id="forever-beute" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl md:p-8" aria-labelledby="forever-beute-title">
+        <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-end">
+          <div class="min-w-0">
+            <span class="text-xs font-bold uppercase tracking-widest text-amber-400">WoW Forever</span>
+            <h2 id="forever-beute-title" class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
+              <i class="fa-solid fa-gem text-amber-400" aria-hidden="true"></i> Beutekompendium
+            </h2>
+            <p class="mt-2 max-w-3xl text-sm text-slate-400">Hier findest du Bosse und Beute aus den Forever-Instanzen. Die Werte prüfen wir nach und nach im Spiel.</p>
+          </div>
+          <button type="button" data-action="loot-add-instance" data-perm="officer" hidden class="inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> Instanz anlegen
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label for="loot-search" class="mb-1 block text-xs font-semibold text-slate-400">Gegenstand suchen</label>
+            <input type="search" id="loot-search" placeholder="Gegenstandsname…" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="loot-filter-slot" class="mb-1 block text-xs font-semibold text-slate-400">Platz</label>
+            <select id="loot-filter-slot" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Alle Plätze</option>
+            </select>
+          </div>
+          <div>
+            <label for="loot-filter-armor" class="mb-1 block text-xs font-semibold text-slate-400">Rüstung</label>
+            <select id="loot-filter-armor" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Alle Rüstungen</option>
+            </select>
+          </div>
+          <div>
+            <label for="loot-filter-quality" class="mb-1 block text-xs font-semibold text-slate-400">Qualität</label>
+            <select id="loot-filter-quality" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Alle Qualitäten</option>
+            </select>
+          </div>
+        </div>
+
+        <p id="loot-status" class="text-sm text-amber-200" hidden role="status"></p>
+        <div id="loot-instances" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Instanzen"></div>
+        <div id="loot-detail" class="space-y-3"></div>
+      </section>
+
       <section id="forever-planer" tabindex="-1" class="panel reveal space-y-6 rounded-2xl p-6 shadow-xl">
         <div class="flex flex-col items-start justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-center">
           <div class="min-w-0">
@@ -1438,6 +1482,181 @@
       <div class="mt-4 flex justify-end">
         <button type="button" data-action="close-modal" data-modal="roles-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Schließen</button>
       </div>
+    </div>
+  </div>
+
+  <div id="loot-instance-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="loot-instance-modal"></div>
+    <div class="modal-panel max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="loot-instance-modal-title">
+      <h2 id="loot-instance-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-gem text-amber-400" aria-hidden="true"></i> <span id="loot-instance-modal-label">Instanz anlegen</span>
+      </h2>
+      <form id="loot-instance-form" class="mt-4 space-y-4">
+        <input type="hidden" id="loot-instance-id" value="">
+        <div>
+          <label for="loot-instance-name" class="mb-1 block text-xs font-semibold text-slate-400">Name</label>
+          <input type="text" id="loot-instance-name" maxlength="120" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="loot-instance-slug" class="mb-1 block text-xs font-semibold text-slate-400">Kurzname</label>
+          <input type="text" id="loot-instance-slug" maxlength="80" autocomplete="off" placeholder="z.B. todesminen" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          <p class="mt-1 text-xs text-slate-500">Kleinbuchstaben, Zahlen und Bindestriche. Leer lassen erzeugt den Kurznamen aus dem Namen.</p>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="loot-instance-kind" class="mb-1 block text-xs font-semibold text-slate-400">Art</label>
+            <select id="loot-instance-kind" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              <option value="dungeon">Dungeon</option>
+              <option value="raid">Raid</option>
+            </select>
+          </div>
+          <div>
+            <label for="loot-instance-level" class="mb-1 block text-xs font-semibold text-slate-400">Stufenbereich</label>
+            <input type="text" id="loot-instance-level" maxlength="40" autocomplete="off" placeholder="z.B. 17–26" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="loot-instance-location" class="mb-1 block text-xs font-semibold text-slate-400">Ort</label>
+            <input type="text" id="loot-instance-location" maxlength="80" autocomplete="off" placeholder="z.B. Westfall" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="loot-instance-sort" class="mb-1 block text-xs font-semibold text-slate-400">Reihenfolge</label>
+            <input type="number" id="loot-instance-sort" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <label class="inline-flex min-h-11 items-center gap-2 text-sm text-slate-300" for="loot-instance-new">
+          <input type="checkbox" id="loot-instance-new" class="h-4 w-4 accent-amber-500">
+          Neu in Forever
+        </label>
+        <div>
+          <label for="loot-instance-note" class="mb-1 block text-xs font-semibold text-slate-400">Notiz</label>
+          <textarea id="loot-instance-note" rows="3" maxlength="500" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
+        </div>
+        <p id="loot-instance-status" class="text-sm text-amber-200" hidden role="status"></p>
+        <div class="flex flex-wrap justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="loot-instance-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-amber-500 px-5 py-2 text-sm font-extrabold text-slate-950 shadow-lg hover:bg-amber-400">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="loot-boss-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="loot-boss-modal"></div>
+    <div class="modal-panel max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="loot-boss-modal-title">
+      <h2 id="loot-boss-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-skull text-amber-400" aria-hidden="true"></i> <span id="loot-boss-modal-label">Boss anlegen</span>
+      </h2>
+      <form id="loot-boss-form" class="mt-4 space-y-4">
+        <input type="hidden" id="loot-boss-id" value="">
+        <input type="hidden" id="loot-boss-instance" value="">
+        <div>
+          <label for="loot-boss-name-de" class="mb-1 block text-xs font-semibold text-slate-400">Name</label>
+          <input type="text" id="loot-boss-name-de" maxlength="120" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="loot-boss-name-en" class="mb-1 block text-xs font-semibold text-slate-400">Englischer Name</label>
+          <input type="text" id="loot-boss-name-en" maxlength="120" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="loot-boss-sort" class="mb-1 block text-xs font-semibold text-slate-400">Reihenfolge</label>
+          <input type="number" id="loot-boss-sort" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <label for="loot-boss-note" class="mb-1 block text-xs font-semibold text-slate-400">Notiz</label>
+          <textarea id="loot-boss-note" rows="3" maxlength="500" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
+        </div>
+        <p id="loot-boss-status" class="text-sm text-amber-200" hidden role="status"></p>
+        <div class="flex flex-wrap justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="loot-boss-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-amber-500 px-5 py-2 text-sm font-extrabold text-slate-950 shadow-lg hover:bg-amber-400">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="loot-item-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-modal="loot-item-modal"></div>
+    <div class="modal-panel max-w-3xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="loot-item-modal-title">
+      <h2 id="loot-item-modal-title" class="flex items-center gap-2 text-xl font-bold text-white">
+        <i class="fa-solid fa-gem text-amber-400" aria-hidden="true"></i> <span id="loot-item-modal-label">Gegenstand anlegen</span>
+      </h2>
+      <form id="loot-item-form" class="mt-4 space-y-4">
+        <input type="hidden" id="loot-item-id" value="">
+        <input type="hidden" id="loot-item-instance" value="">
+        <div>
+          <label for="loot-item-boss" class="mb-1 block text-xs font-semibold text-slate-400">Boss</label>
+          <select id="loot-item-boss" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="loot-item-name-de" class="mb-1 block text-xs font-semibold text-slate-400">Name</label>
+            <input type="text" id="loot-item-name-de" maxlength="160" autocomplete="off" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="loot-item-name-en" class="mb-1 block text-xs font-semibold text-slate-400">Englischer Name</label>
+            <input type="text" id="loot-item-name-en" maxlength="160" autocomplete="off" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="loot-item-quality" class="mb-1 block text-xs font-semibold text-slate-400">Qualität</label>
+            <select id="loot-item-quality" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+          </div>
+          <div>
+            <label for="loot-item-slot" class="mb-1 block text-xs font-semibold text-slate-400">Platz</label>
+            <select id="loot-item-slot" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500"></select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="loot-item-armor" class="mb-1 block text-xs font-semibold text-slate-400">Rüstung</label>
+            <select id="loot-item-armor" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+              <option value="">Keine</option>
+            </select>
+          </div>
+          <div>
+            <label for="loot-item-weapon" class="mb-1 block text-xs font-semibold text-slate-400">Waffe</label>
+            <input type="text" id="loot-item-weapon" maxlength="80" autocomplete="off" placeholder="z.B. Schwert, Streitkolben, Dolch" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="loot-item-level" class="mb-1 block text-xs font-semibold text-slate-400">Benötigte Stufe (1 bis 60, leer lassen)</label>
+            <input type="number" id="loot-item-level" min="1" max="60" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+          <div>
+            <label for="loot-item-dkp" class="mb-1 block text-xs font-semibold text-slate-400">DKP (0 bis 500, leer lassen)</label>
+            <input type="number" id="loot-item-dkp" min="0" max="500" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+          </div>
+        </div>
+        <div>
+          <label for="loot-item-sort" class="mb-1 block text-xs font-semibold text-slate-400">Reihenfolge</label>
+          <input type="number" id="loot-item-sort" step="1" inputmode="numeric" class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500">
+        </div>
+        <div>
+          <div class="mb-1 flex items-center justify-between gap-2">
+            <p class="text-xs font-semibold text-slate-400">Werte</p>
+            <button type="button" data-action="loot-stat-add" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700">Wert hinzufügen</button>
+          </div>
+          <p class="mb-2 text-xs text-slate-500">Zahl wird zu „+5 Ausdauer“. Text bleibt „Schaden: 20-38“. Ohne Zeilen steht „Werte folgen“.</p>
+          <div id="loot-item-stats" class="space-y-2"></div>
+        </div>
+        <div>
+          <label for="loot-item-effect" class="mb-1 block text-xs font-semibold text-slate-400">Effekt</label>
+          <textarea id="loot-item-effect" rows="3" maxlength="500" class="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200 focus:border-amber-500"></textarea>
+        </div>
+        <label class="inline-flex min-h-11 items-center gap-2 text-sm text-slate-300" for="loot-item-verified">
+          <input type="checkbox" id="loot-item-verified" class="h-4 w-4 accent-amber-500">
+          Im Spiel geprüft
+        </label>
+        <p id="loot-item-status" class="text-sm text-amber-200" hidden role="status"></p>
+        <div class="flex flex-wrap justify-end gap-3 pt-2">
+          <button type="button" data-action="close-modal" data-modal="loot-item-modal" class="min-h-11 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700">Abbrechen</button>
+          <button type="submit" class="min-h-11 rounded-xl bg-amber-500 px-5 py-2 text-sm font-extrabold text-slate-950 shadow-lg hover:bg-amber-400">Speichern</button>
+        </div>
+      </form>
     </div>
   </div>
 

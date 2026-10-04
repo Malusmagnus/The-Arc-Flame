@@ -32,6 +32,7 @@
     "forever-kader",
     "forever-mitglieder",
     "forever-dkp",
+    "forever-beute",
   ]);
   const RETAIL_IDS = new Set([
     "retail-leitung",
@@ -72,6 +73,7 @@
   const FOREVER_NAV = [
     { href: "#werte", label: "Über uns", icon: "fa-fire", tone: "text-amber-400" },
     { href: "#forever-uebersicht", label: "Übersicht", icon: "fa-hourglass-start", tone: "text-amber-400" },
+    { href: "#forever-beute", label: "Beute", icon: "fa-gem", tone: "text-amber-400" },
     { href: "#raidplanung", label: "Raids", icon: "fa-calendar-days", tone: "text-amber-400" },
     { href: "#forever-planer", label: "Classic Planer", icon: "fa-skull", tone: "text-amber-400" },
     { href: "#forever-kader", label: "Classic Kader", icon: "fa-shield-cat", tone: "text-amber-400" },
@@ -203,6 +205,33 @@
   let dkpImportSelected = {};
   let dkpImportNames = {};
 
+  const LOOT_SLOTS = ["Kopf", "Hals", "Schulter", "Rücken", "Brust", "Handgelenke", "Hände", "Taille", "Beine", "Füße", "Finger", "Schmuck", "Einhand", "Zweihand", "Schildhand", "Nebenhand", "Distanz", "Zauberstab", "Tasche", "Sonstiges"];
+  const LOOT_ARMOR = ["Stoff", "Leder", "Schwere Rüstung", "Platte"];
+  const LOOT_QUALITIES = [
+    { id: "poor", label: "Schlecht" },
+    { id: "common", label: "Gewöhnlich" },
+    { id: "uncommon", label: "Ungewöhnlich" },
+    { id: "rare", label: "Selten" },
+    { id: "epic", label: "Episch" },
+    { id: "legendary", label: "Legendär" },
+  ];
+  const LOOT_INPUT = "min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-200 focus:border-amber-500";
+  const LOOT_BTN = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700";
+  const LOOT_BTN_AMBER = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-amber-400";
+  const LOOT_BTN_DANGER = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-sm font-bold text-red-400 transition hover:bg-slate-700";
+  let lootInstances = [];
+  let lootState = "loading";
+  let lootError = "";
+  let lootSelectedId = "";
+  let lootOpen = {};
+  let lootFilterKey = "";
+  let lootPreferKey = "";
+  let lootSaving = false;
+  let lootEpoch = 0;
+  let lootRefreshTimer = 0;
+  let lootChannel = null;
+  let lootFiltersReady = false;
+
   document.addEventListener("DOMContentLoaded", boot);
 
   const APPLICATION_COOLDOWN_MS = 60000;
@@ -225,6 +254,8 @@
     renderLeadership();
     loadGuildInfoView();
     renderForeverPoll();
+    initLootFilters();
+    renderLoot();
     updateAuthUI();
     loadRemote();
     const hash = location.hash.replace(/^#/, "");
@@ -346,6 +377,13 @@
       leadershipPickQuery = value;
       renderLeadershipPicker();
     });
+
+    const lootSearch = document.getElementById("loot-search");
+    if (lootSearch) {
+      lootSearch.addEventListener("input", function () {
+        renderLoot();
+      });
+    }
   }
 
   function bindPickSearch(id, onInput) {
@@ -375,6 +413,10 @@
 
   function handleAction(el, event) {
     const action = el.dataset.action;
+    if (action.indexOf("loot-") === 0) {
+      handleLootAction(action, el);
+      return;
+    }
     const front = el.dataset.front === "forever" ? "forever" : "retail";
     if (action === "switch-front") {
       switchFront(el.dataset.front, { scroll: true });
@@ -598,6 +640,11 @@
   }
 
   function onChange(event) {
+    const changedId = event.target && event.target.id ? event.target.id : "";
+    if (changedId.indexOf("loot-filter-") === 0) {
+      renderLoot();
+      return;
+    }
     const pickBox = event.target;
     if (pickBox && pickBox.name === "member-pick") {
       togglePickKey(memberPickSelected, pickBox);
@@ -672,6 +719,15 @@
     } else if (form.id && form.id.indexOf("dkp-") === 0) {
       event.preventDefault();
       submitDkpForm(form);
+    } else if (form.id === "loot-instance-form") {
+      event.preventDefault();
+      saveLootInstance();
+    } else if (form.id === "loot-boss-form") {
+      event.preventDefault();
+      saveLootBoss();
+    } else if (form.id === "loot-item-form") {
+      event.preventDefault();
+      saveLootItem();
     }
   }
 
@@ -3913,6 +3969,7 @@
     renderForeverPoll();
     renderDkp();
     renderRaids();
+    renderLoot();
   }
 
   function renderLeadership() {
@@ -4994,10 +5051,15 @@
       renderDkp();
       raidState = "error";
       renderRaids();
+      lootState = "error";
+      lootError = "Die Beute konnte nicht geladen werden.";
+      renderLoot();
       return;
     }
     loadGallery();
     loadForeverPoll();
+    loadLoot();
+    subscribeLoot();
     probeApproval().then(function () {
       if (!authReady) {
         authReady = true;
@@ -8028,5 +8090,1299 @@
       raidState = "error";
       renderRaids();
     });
+  }
+
+  function lootIsId(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
+  }
+
+  function lootAppendOptions(id, pairs) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    pairs.forEach(function (pair) {
+      const option = document.createElement("option");
+      option.value = pair[0];
+      option.textContent = pair[1];
+      select.appendChild(option);
+    });
+  }
+
+  function initLootFilters() {
+    if (lootFiltersReady) return;
+    lootFiltersReady = true;
+    lootAppendOptions("loot-filter-slot", LOOT_SLOTS.map(function (slot) { return [slot, slot]; }));
+    lootAppendOptions("loot-filter-armor", LOOT_ARMOR.map(function (armor) { return [armor, armor]; }));
+    lootAppendOptions("loot-filter-quality", LOOT_QUALITIES.map(function (entry) { return [entry.id, entry.label]; }));
+    lootAppendOptions("loot-item-quality", LOOT_QUALITIES.map(function (entry) { return [entry.id, entry.label]; }));
+    lootAppendOptions("loot-item-slot", LOOT_SLOTS.map(function (slot) { return [slot, slot]; }));
+    lootAppendOptions("loot-item-armor", LOOT_ARMOR.map(function (armor) { return [armor, armor]; }));
+  }
+
+  function lootBySortName(list) {
+    return (list || []).slice().sort(function (a, b) {
+      const as = Number(a && a.sort);
+      const bs = Number(b && b.sort);
+      const aNum = Number.isFinite(as) ? as : 0;
+      const bNum = Number.isFinite(bs) ? bs : 0;
+      if (aNum !== bNum) return aNum - bNum;
+      return String((a && a.name_de) || "").localeCompare(String((b && b.name_de) || ""), "de");
+    });
+  }
+
+  function lootNextSort(list) {
+    let max = 0;
+    (list || []).forEach(function (item) {
+      const n = Number(item && item.sort);
+      if (Number.isFinite(n) && n > max) max = n;
+    });
+    return max + 10;
+  }
+
+  function lootCopyItem(item) {
+    const stats = {};
+    if (item && item.stats && typeof item.stats === "object" && !Array.isArray(item.stats)) {
+      Object.keys(item.stats).forEach(function (key) {
+        stats[key] = item.stats[key];
+      });
+    }
+    return {
+      id: item.id,
+      instance_id: item.instance_id,
+      boss_id: item.boss_id || null,
+      name_de: item.name_de || "",
+      name_en: item.name_en || "",
+      quality: item.quality || "",
+      slot: item.slot || "",
+      armor_type: item.armor_type || "",
+      weapon_type: item.weapon_type || "",
+      required_level: item.required_level,
+      stats: stats,
+      effect_text: item.effect_text || "",
+      dkp_cost: item.dkp_cost,
+      verified_in_forever: item.verified_in_forever,
+      sort: item.sort,
+    };
+  }
+
+  function lootUniqueItems(items) {
+    const seen = {};
+    const out = [];
+    (items || []).forEach(function (item) {
+      if (!item || !item.id || seen[item.id]) return;
+      seen[item.id] = true;
+      out.push(lootCopyItem(item));
+    });
+    return lootBySortName(out);
+  }
+
+  function lootNormalizeInstance(row) {
+    const top = Array.isArray(row.loot_items) ? row.loot_items : [];
+    const byBoss = {};
+    top.forEach(function (item) {
+      const key = item && item.boss_id ? item.boss_id : "";
+      if (!byBoss[key]) byBoss[key] = [];
+      byBoss[key].push(item);
+    });
+    const bosses = lootBySortName(Array.isArray(row.loot_bosses) ? row.loot_bosses : []).map(function (boss) {
+      const nested = Array.isArray(boss.loot_items) && boss.loot_items.length ? boss.loot_items : (byBoss[boss.id] || []);
+      return {
+        id: boss.id,
+        instance_id: boss.instance_id || row.id,
+        name_de: boss.name_de || "",
+        name_en: boss.name_en || "",
+        sort: boss.sort,
+        note: boss.note || "",
+        items: lootUniqueItems(nested),
+      };
+    });
+    return {
+      id: row.id,
+      slug: row.slug || "",
+      name_de: row.name_de || "",
+      kind: row.kind === "raid" ? "raid" : "dungeon",
+      level_range: row.level_range || "",
+      location: row.location || "",
+      sort: row.sort,
+      is_new_in_forever: !!row.is_new_in_forever,
+      note: row.note || "",
+      bosses: bosses,
+      trash: lootUniqueItems(byBoss[""] || []),
+    };
+  }
+
+  function lootFind(id) {
+    for (let i = 0; i < lootInstances.length; i += 1) {
+      if (lootInstances[i].id === id) return lootInstances[i];
+    }
+    return null;
+  }
+
+  function lootBossById(id) {
+    for (let i = 0; i < lootInstances.length; i += 1) {
+      const bosses = lootInstances[i].bosses;
+      for (let j = 0; j < bosses.length; j += 1) {
+        if (bosses[j].id === id) return bosses[j];
+      }
+    }
+    return null;
+  }
+
+  function lootItemById(id) {
+    for (let i = 0; i < lootInstances.length; i += 1) {
+      const inst = lootInstances[i];
+      const pools = [inst.trash];
+      inst.bosses.forEach(function (boss) { pools.push(boss.items); });
+      for (let p = 0; p < pools.length; p += 1) {
+        for (let j = 0; j < pools[p].length; j += 1) {
+          if (pools[p][j].id === id) return pools[p][j];
+        }
+      }
+    }
+    return null;
+  }
+
+  function lootReadFilters() {
+    const search = document.getElementById("loot-search");
+    const slot = document.getElementById("loot-filter-slot");
+    const armor = document.getElementById("loot-filter-armor");
+    const quality = document.getElementById("loot-filter-quality");
+    return {
+      query: search ? search.value.trim().toLowerCase() : "",
+      slot: slot ? slot.value : "",
+      armor: armor ? armor.value : "",
+      quality: quality ? quality.value : "",
+    };
+  }
+
+  function lootFiltersActive(filters) {
+    return !!(filters.query || filters.slot || filters.armor || filters.quality);
+  }
+
+  function lootItemMatches(item, filters) {
+    if (filters.query) {
+      const de = String(item.name_de || "").toLowerCase();
+      const en = String(item.name_en || "").toLowerCase();
+      if (de.indexOf(filters.query) === -1 && en.indexOf(filters.query) === -1) return false;
+    }
+    if (filters.slot && item.slot !== filters.slot) return false;
+    if (filters.armor && item.armor_type !== filters.armor) return false;
+    if (filters.quality && item.quality !== filters.quality) return false;
+    return true;
+  }
+
+  function lootKindLabel(kind) {
+    return kind === "raid" ? "Raid" : "Dungeon";
+  }
+
+  function lootLevelLabel(range) {
+    const text = String(range || "").trim();
+    if (!text) return "";
+    if (/^stufe\b/i.test(text)) return text;
+    return "Stufe " + text;
+  }
+
+  function lootQualityLabel(id) {
+    for (let i = 0; i < LOOT_QUALITIES.length; i += 1) {
+      if (LOOT_QUALITIES[i].id === id) return LOOT_QUALITIES[i].label;
+    }
+    return "";
+  }
+
+  function lootQualityClass(id) {
+    return lootQualityLabel(id) ? "loot-quality-" + id : "text-white";
+  }
+
+  function lootCountItems(inst) {
+    let total = inst.trash.length;
+    inst.bosses.forEach(function (boss) { total += boss.items.length; });
+    return total;
+  }
+
+  function lootCountMatches(inst, filters) {
+    let total = inst.trash.filter(function (item) { return lootItemMatches(item, filters); }).length;
+    inst.bosses.forEach(function (boss) {
+      total += boss.items.filter(function (item) { return lootItemMatches(item, filters); }).length;
+    });
+    return total;
+  }
+
+  function lootPlural(count, one, many) {
+    return count + " " + (count === 1 ? one : many);
+  }
+
+  function lootSigned(n) {
+    if (!Number.isFinite(n)) return String(n);
+    const negative = n < 0;
+    const rounded = Math.round(Math.abs(n) * 100) / 100;
+    const text = (Number.isInteger(rounded) ? String(rounded) : String(rounded)).replace(".", ",");
+    if (negative) return "-" + text;
+    if (n > 0) return "+" + text;
+    return "0";
+  }
+
+  function lootFormatStat(key, value) {
+    if (typeof value === "number" && Number.isFinite(value)) return lootSigned(value) + " " + key;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (/^[+-]?\d+$/.test(trimmed) || /^[+-]?\d+[.,]\d+$/.test(trimmed)) {
+        return lootSigned(Number(trimmed.replace(",", "."))) + " " + key;
+      }
+      return key + ": " + trimmed;
+    }
+    if (value == null) return key + ":";
+    return key + ": " + String(value);
+  }
+
+  function lootStatLines(stats) {
+    if (!stats || typeof stats !== "object" || Array.isArray(stats)) return [];
+    return Object.keys(stats).map(function (key) {
+      return lootFormatStat(key, stats[key]);
+    });
+  }
+
+  function lootMeta(item) {
+    const parts = [];
+    if (item.slot) parts.push(item.slot);
+    if (item.armor_type) parts.push(item.armor_type);
+    if (item.weapon_type) parts.push(item.weapon_type);
+    if (item.required_level != null && item.required_level !== "" && Number.isFinite(Number(item.required_level))) {
+      parts.push("Stufe " + Number(item.required_level));
+    }
+    return parts.join(" · ");
+  }
+
+  function lootActionButton(action, id, label, className, icon) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.action = action;
+    if (id) button.dataset.id = id;
+    button.className = className;
+    if (icon) {
+      const mark = document.createElement("i");
+      mark.className = "fa-solid " + icon;
+      mark.setAttribute("aria-hidden", "true");
+      button.appendChild(mark);
+    }
+    button.appendChild(document.createTextNode((icon ? " " : "") + label));
+    return button;
+  }
+
+  function lootActionRow(buttons) {
+    const row = document.createElement("div");
+    row.className = "mt-3 flex flex-wrap gap-2";
+    row.dataset.perm = "officer";
+    row.hidden = !isOfficer();
+    buttons.forEach(function (button) { row.appendChild(button); });
+    return row;
+  }
+
+  function lootRenderItem(item) {
+    const article = document.createElement("article");
+    article.className = "rounded-xl border border-slate-800 bg-slate-950 p-3";
+    const row = document.createElement("div");
+    row.className = "flex flex-col items-start gap-3 sm:flex-row sm:justify-between";
+    const body = document.createElement("div");
+    body.className = "min-w-0";
+    const title = document.createElement("h4");
+    title.className = "break-words text-base font-extrabold " + lootQualityClass(item.quality);
+    title.appendChild(document.createTextNode(item.name_de || "Ohne Namen"));
+    const quality = lootQualityLabel(item.quality);
+    if (quality) {
+      const hidden = document.createElement("span");
+      hidden.className = "sr-only";
+      hidden.textContent = ", " + quality;
+      title.appendChild(hidden);
+    }
+    body.appendChild(title);
+    if (item.name_en && item.name_en !== item.name_de) {
+      const en = document.createElement("p");
+      en.className = "text-xs text-slate-500";
+      en.textContent = item.name_en;
+      body.appendChild(en);
+    }
+    const meta = lootMeta(item);
+    if (meta) {
+      const line = document.createElement("p");
+      line.className = "mt-1 text-xs text-slate-400";
+      line.textContent = meta;
+      body.appendChild(line);
+    }
+    const lines = lootStatLines(item.stats);
+    const statList = document.createElement("ul");
+    statList.className = "mt-2 space-y-1 text-sm text-slate-200";
+    if (!lines.length) {
+      const empty = document.createElement("li");
+      empty.className = "italic text-slate-500";
+      empty.textContent = "Werte folgen";
+      statList.appendChild(empty);
+    } else {
+      lines.forEach(function (line) {
+        const entry = document.createElement("li");
+        entry.textContent = line;
+        statList.appendChild(entry);
+      });
+    }
+    body.appendChild(statList);
+    if (item.effect_text) {
+      const effect = document.createElement("p");
+      effect.className = "loot-effect mt-2 text-sm text-slate-300";
+      effect.textContent = item.effect_text;
+      body.appendChild(effect);
+    }
+    if (item.dkp_cost != null && item.dkp_cost !== "" && Number.isFinite(Number(item.dkp_cost))) {
+      const dkp = document.createElement("p");
+      dkp.className = "mt-2 text-sm font-bold text-amber-400";
+      dkp.textContent = Number(item.dkp_cost).toLocaleString("de-DE") + " DKP";
+      body.appendChild(dkp);
+    }
+    if (item.verified_in_forever === false) {
+      const hint = document.createElement("p");
+      hint.className = "mt-1 text-xs text-slate-500";
+      hint.textContent = "noch nicht geprüft";
+      body.appendChild(hint);
+    }
+    row.appendChild(body);
+    const actions = document.createElement("div");
+    actions.className = "flex flex-wrap gap-2";
+    actions.appendChild(lootActionButton("loot-edit-item", item.id, "Bearbeiten", LOOT_BTN, "fa-pen"));
+    actions.appendChild(lootActionButton("loot-delete-item", item.id, "Löschen", LOOT_BTN_DANGER, "fa-trash"));
+    const wrap = document.createElement("div");
+    wrap.dataset.perm = "officer";
+    wrap.hidden = !isOfficer();
+    wrap.appendChild(actions);
+    row.appendChild(wrap);
+    article.appendChild(row);
+    return article;
+  }
+
+  function lootRenderGroup(parent, options) {
+    const filters = options.filters;
+    const matched = options.items.filter(function (item) { return lootItemMatches(item, filters); });
+    const active = lootFiltersActive(filters);
+    if (active && !matched.length) return false;
+    const shown = active ? matched : options.items;
+    const open = !!lootOpen[options.key];
+    const section = document.createElement("section");
+    section.className = "loot-boss rounded-xl border border-slate-800 bg-slate-950 p-3";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "flex min-h-11 w-full items-center justify-between gap-3 text-left";
+    toggle.dataset.action = "loot-toggle";
+    toggle.dataset.id = options.key;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    const titles = document.createElement("span");
+    titles.className = "min-w-0";
+    const name = document.createElement("span");
+    name.className = "block break-words font-black text-white";
+    name.textContent = options.title;
+    titles.appendChild(name);
+    if (options.subtitle) {
+      const sub = document.createElement("span");
+      sub.className = "block text-xs text-slate-500";
+      sub.textContent = options.subtitle;
+      titles.appendChild(sub);
+    }
+    const right = document.createElement("span");
+    right.className = "flex shrink-0 items-center gap-2";
+    const count = document.createElement("span");
+    count.className = "text-xs font-bold text-slate-400";
+    count.textContent = lootPlural(shown.length, "Gegenstand", "Gegenstände");
+    const icon = document.createElement("i");
+    icon.className = "fa-solid " + (open ? "fa-chevron-up" : "fa-chevron-down") + " text-amber-400";
+    icon.setAttribute("aria-hidden", "true");
+    right.appendChild(count);
+    right.appendChild(icon);
+    toggle.appendChild(titles);
+    toggle.appendChild(right);
+    section.appendChild(toggle);
+    if (options.note) {
+      const note = document.createElement("p");
+      note.className = "mt-1 text-sm text-slate-400";
+      note.textContent = options.note;
+      section.appendChild(note);
+    }
+    const buttons = [];
+    if (options.boss) {
+      buttons.push(lootActionButton("loot-edit-boss", options.boss.id, "Boss bearbeiten", LOOT_BTN, "fa-pen"));
+      buttons.push(lootActionButton("loot-delete-boss", options.boss.id, "Boss löschen", LOOT_BTN_DANGER, "fa-trash"));
+    }
+    const addItem = lootActionButton("loot-add-item", "", "Gegenstand", LOOT_BTN_AMBER, "fa-plus");
+    addItem.dataset.bossId = options.bossId || "";
+    buttons.push(addItem);
+    section.appendChild(lootActionRow(buttons));
+    if (open) {
+      const list = document.createElement("div");
+      list.className = "mt-3 space-y-2";
+      if (!shown.length) {
+        const empty = document.createElement("p");
+        empty.className = "py-4 text-center italic text-slate-500";
+        empty.textContent = "Noch keine Beute.";
+        list.appendChild(empty);
+      } else {
+        shown.forEach(function (item) { list.appendChild(lootRenderItem(item)); });
+      }
+      section.appendChild(list);
+    }
+    parent.appendChild(section);
+    return true;
+  }
+
+  function lootRenderInstanceCard(inst, filters) {
+    const selected = inst.id === lootSelectedId;
+    const total = lootCountItems(inst);
+    const matched = lootCountMatches(inst, filters);
+    const active = lootFiltersActive(filters);
+    const card = document.createElement("div");
+    card.className = "loot-card rounded-xl border border-slate-800 bg-slate-950 p-4";
+    if (selected) card.className += " is-selected";
+    if (active && matched === 0) card.className += " is-muted";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "w-full text-left";
+    button.dataset.action = "loot-select-instance";
+    button.dataset.id = inst.id;
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+    const head = document.createElement("span");
+    head.className = "flex items-start justify-between gap-2";
+    const name = document.createElement("span");
+    name.className = "break-words font-black text-white";
+    name.textContent = inst.name_de || "Instanz";
+    head.appendChild(name);
+    if (inst.is_new_in_forever) {
+      const badge = document.createElement("span");
+      badge.className = "shrink-0 rounded-full border border-amber-500/30 bg-amber-500/25 px-2 py-1 text-xs font-bold uppercase tracking-wider text-amber-400";
+      badge.textContent = "Neu in Forever";
+      head.appendChild(badge);
+    }
+    button.appendChild(head);
+    const metaParts = [lootKindLabel(inst.kind)];
+    const level = lootLevelLabel(inst.level_range);
+    if (level) metaParts.push(level);
+    if (inst.location) metaParts.push(inst.location);
+    const meta = document.createElement("span");
+    meta.className = "mt-2 block text-xs text-slate-400";
+    meta.textContent = metaParts.join(" · ");
+    button.appendChild(meta);
+    const count = document.createElement("span");
+    count.className = "mt-1 block text-xs text-slate-500";
+    count.textContent = active ? (matched + " von " + total) : lootPlural(total, "Gegenstand", "Gegenstände");
+    button.appendChild(count);
+    if (inst.note) {
+      const note = document.createElement("span");
+      note.className = "mt-2 block text-sm text-slate-400";
+      note.textContent = inst.note;
+      button.appendChild(note);
+    }
+    card.appendChild(button);
+    const edit = lootActionButton("loot-edit-instance", inst.id, "Bearbeiten", LOOT_BTN, "fa-pen");
+    const remove = lootActionButton("loot-delete-instance", inst.id, "Löschen", LOOT_BTN_DANGER, "fa-trash");
+    card.appendChild(lootActionRow([edit, remove]));
+    return card;
+  }
+
+  function lootPreferMatch(filters) {
+    const key = [filters.query, filters.slot, filters.armor, filters.quality].join("|");
+    if (key === lootPreferKey) return;
+    lootPreferKey = key;
+    if (!lootFiltersActive(filters)) return;
+    const current = lootFind(lootSelectedId);
+    if (current && lootCountMatches(current, filters) > 0) return;
+    for (let i = 0; i < lootInstances.length; i += 1) {
+      if (lootCountMatches(lootInstances[i], filters) > 0) {
+        lootSelectedId = lootInstances[i].id;
+        return;
+      }
+    }
+  }
+
+  function lootSyncFilterOpen(inst, filters) {
+    const key = [filters.query, filters.slot, filters.armor, filters.quality, inst ? inst.id : ""].join("|");
+    if (key === lootFilterKey) return;
+    lootFilterKey = key;
+    if (!inst || !lootFiltersActive(filters)) return;
+    inst.bosses.forEach(function (boss) {
+      const hit = boss.items.some(function (item) { return lootItemMatches(item, filters); });
+      if (hit) lootOpen[boss.id] = true;
+    });
+    if (inst.trash.some(function (item) { return lootItemMatches(item, filters); })) lootOpen["trash:" + inst.id] = true;
+  }
+
+  function renderLootInstances() {
+    const list = document.getElementById("loot-instances");
+    if (!list) return;
+    list.replaceChildren();
+    if (lootState !== "ready") return;
+    if (!lootInstances.length) {
+      const empty = document.createElement("p");
+      empty.className = "col-span-full py-8 text-center italic text-slate-500";
+      empty.textContent = "Noch keine Instanzen eingetragen.";
+      list.appendChild(empty);
+      return;
+    }
+    const filters = lootReadFilters();
+    lootInstances.forEach(function (inst) {
+      list.appendChild(lootRenderInstanceCard(inst, filters));
+    });
+  }
+
+  function renderLootDetail() {
+    const root = document.getElementById("loot-detail");
+    if (!root) return;
+    root.replaceChildren();
+    if (lootState !== "ready") return;
+    const inst = lootFind(lootSelectedId);
+    if (!inst) return;
+    const filters = lootReadFilters();
+    lootSyncFilterOpen(inst, filters);
+    root.setAttribute("aria-label", inst.name_de || "Beute");
+    const header = document.createElement("div");
+    header.className = "rounded-xl border border-slate-800 bg-slate-950 p-4";
+    const title = document.createElement("h3");
+    title.className = "break-words text-2xl font-black text-white";
+    title.textContent = inst.name_de || "Instanz";
+    header.appendChild(title);
+    const metaParts = [lootKindLabel(inst.kind), lootPlural(inst.bosses.length, "Boss", "Bosse")];
+    const level = lootLevelLabel(inst.level_range);
+    if (level) metaParts.push(level);
+    if (inst.location) metaParts.push(inst.location);
+    const meta = document.createElement("p");
+    meta.className = "mt-1 text-sm text-slate-400";
+    meta.textContent = metaParts.join(" · ");
+    header.appendChild(meta);
+    if (inst.is_new_in_forever) {
+      const badge = document.createElement("p");
+      badge.className = "mt-2";
+      const mark = document.createElement("span");
+      mark.className = "rounded-full border border-amber-500/30 bg-amber-500/25 px-2 py-1 text-xs font-bold uppercase tracking-wider text-amber-400";
+      mark.textContent = "Neu in Forever";
+      badge.appendChild(mark);
+      header.appendChild(badge);
+    }
+    if (inst.note) {
+      const note = document.createElement("p");
+      note.className = "mt-2 text-sm text-slate-300";
+      note.textContent = inst.note;
+      header.appendChild(note);
+    }
+    const addBoss = lootActionButton("loot-add-boss", inst.id, "Boss anlegen", LOOT_BTN_AMBER, "fa-plus");
+    const addItem = lootActionButton("loot-add-item", "", "Gegenstand anlegen", LOOT_BTN, "fa-plus");
+    addItem.dataset.bossId = "";
+    const edit = lootActionButton("loot-edit-instance", inst.id, "Instanz bearbeiten", LOOT_BTN, "fa-pen");
+    header.appendChild(lootActionRow([addBoss, addItem, edit]));
+    root.appendChild(header);
+    let visible = 0;
+    inst.bosses.forEach(function (boss) {
+      const subtitle = boss.name_en && boss.name_en !== boss.name_de ? boss.name_en : "";
+      const shown = lootRenderGroup(root, {
+        key: boss.id,
+        title: boss.name_de || "Boss",
+        subtitle: subtitle,
+        note: boss.note,
+        items: boss.items,
+        filters: filters,
+        boss: boss,
+        bossId: boss.id,
+      });
+      if (shown) visible += 1;
+    });
+    if (inst.trash.length) {
+      const shown = lootRenderGroup(root, {
+        key: "trash:" + inst.id,
+        title: "Trash / Sonstige Beute",
+        subtitle: "",
+        note: "",
+        items: inst.trash,
+        filters: filters,
+        boss: null,
+        bossId: "",
+      });
+      if (shown) visible += 1;
+    }
+    if (!visible) {
+      const empty = document.createElement("p");
+      empty.className = "py-8 text-center italic text-slate-500";
+      empty.textContent = lootFiltersActive(filters)
+        ? "Keine Beute passt zur Suche."
+        : "Für diese Instanz ist noch keine Beute eingetragen.";
+      root.appendChild(empty);
+    }
+  }
+
+  function renderLoot() {
+    const active = document.activeElement;
+    const restoreAction = active && active.dataset ? active.dataset.action || "" : "";
+    const restoreId = active && active.dataset ? active.dataset.id || "" : "";
+    const section = document.getElementById("forever-beute");
+    if (section) section.setAttribute("aria-busy", lootState === "loading" ? "true" : "false");
+    const status = document.getElementById("loot-status");
+    if (status) {
+      if (lootState === "loading" && !lootInstances.length) {
+        status.hidden = false;
+        status.textContent = "Beute wird geladen…";
+      } else if (lootState === "error" && !lootInstances.length) {
+        status.hidden = false;
+        status.textContent = lootError || "Die Beute konnte nicht geladen werden.";
+      } else {
+        status.hidden = true;
+        status.textContent = "";
+      }
+    }
+    if (lootState === "ready") lootPreferMatch(lootReadFilters());
+    renderLootInstances();
+    renderLootDetail();
+    if (restoreAction.indexOf("loot-") === 0 && restoreId) {
+      const selector = '[data-action="' + restoreAction + '"][data-id="' + restoreId + '"]';
+      const again = document.querySelector(selector);
+      if (again && typeof again.focus === "function") again.focus();
+    }
+  }
+
+  function lootFailMessage(error) {
+    const message = error && error.message ? String(error.message).trim() : "";
+    return message || "Die Änderung wurde nicht übernommen.";
+  }
+
+  function loadLoot() {
+    if (!remote) return;
+    const epoch = lootEpoch + 1;
+    lootEpoch = epoch;
+    if (!lootInstances.length) {
+      lootState = "loading";
+      lootError = "";
+      renderLoot();
+    }
+    remote.from("loot_instances").select("*,loot_bosses(*,loot_items(*)),loot_items(*)").order("sort").then(function (result) {
+      if (epoch !== lootEpoch) return;
+      if (!result || result.error) {
+        const message = lootFailMessage(result && result.error);
+        if (!lootInstances.length) {
+          lootState = "error";
+          lootError = message;
+          renderLoot();
+        } else {
+          notify(message, "error");
+        }
+        return;
+      }
+      lootInstances = lootBySortName((result.data || []).map(lootNormalizeInstance));
+      lootState = "ready";
+      lootError = "";
+      if (!lootFind(lootSelectedId)) lootSelectedId = lootInstances.length ? lootInstances[0].id : "";
+      renderLoot();
+    }).catch(function (err) {
+      if (epoch !== lootEpoch) return;
+      const message = lootFailMessage(err);
+      if (!lootInstances.length) {
+        lootState = "error";
+        lootError = message;
+        renderLoot();
+      } else {
+        notify(message, "error");
+      }
+    });
+  }
+
+  function subscribeLoot() {
+    if (!remote || lootChannel) return;
+    try {
+      lootChannel = remote.channel("arc-loot")
+        .on("postgres_changes", { event: "*", schema: "public", table: "loot_instances" }, scheduleLootRefresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "loot_bosses" }, scheduleLootRefresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "loot_items" }, scheduleLootRefresh)
+        .subscribe();
+    } catch (err) {
+      lootChannel = null;
+    }
+  }
+
+  function scheduleLootRefresh() {
+    window.clearTimeout(lootRefreshTimer);
+    lootRefreshTimer = window.setTimeout(loadLoot, 250);
+  }
+
+  function lootGuard() {
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen die Beute bearbeiten.", "error");
+      if (!currentUser) openAuthModal();
+      return false;
+    }
+    if (!remote) {
+      notify(SAVE_FAIL, "error");
+      return false;
+    }
+    if (lootSaving) return false;
+    return true;
+  }
+
+  function lootSetStatus(id, message, isError) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+    el.className = isError ? "text-sm text-red-400" : "text-sm text-amber-200";
+  }
+
+  function lootSetBusy(busy) {
+    ["loot-instance-form", "loot-boss-form", "loot-item-form"].forEach(function (id) {
+      const form = document.getElementById(id);
+      if (!form) return;
+      form.querySelectorAll("button[type='submit']").forEach(function (button) {
+        button.disabled = busy;
+      });
+    });
+  }
+
+  function lootCommit(request, statusId, modalId) {
+    lootSaving = true;
+    lootSetBusy(true);
+    request.then(function (result) {
+      if (result && result.error) {
+        const message = lootFailMessage(result.error);
+        lootSetStatus(statusId, message, true);
+        notify(message, "error");
+        return;
+      }
+      closeModal(modalId);
+      notify("Gespeichert.", "info");
+      loadLoot();
+    }).catch(function (err) {
+      const message = lootFailMessage(err);
+      lootSetStatus(statusId, message, true);
+      notify(message, "error");
+    }).then(function () {
+      lootSaving = false;
+      lootSetBusy(false);
+    });
+  }
+
+  function lootRemove(table, id) {
+    lootSaving = true;
+    lootSetBusy(true);
+    remote.from(table).delete().eq("id", id).then(function (result) {
+      if (result && result.error) {
+        notify(lootFailMessage(result.error), "error");
+        return;
+      }
+      notify("Gelöscht.", "info");
+      loadLoot();
+    }).catch(function (err) {
+      notify(lootFailMessage(err), "error");
+    }).then(function () {
+      lootSaving = false;
+      lootSetBusy(false);
+    });
+  }
+
+  function lootSlugify(name) {
+    return String(name || "")
+      .toLowerCase()
+      .replace(/ä/g, "ae")
+      .replace(/ö/g, "oe")
+      .replace(/ü/g, "ue")
+      .replace(/ß/g, "ss")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  function lootReadSort(id) {
+    const field = document.getElementById(id);
+    const raw = field ? field.value.trim() : "";
+    if (!raw) return { value: 0 };
+    if (!/^-?\d+$/.test(raw)) return { error: "Die Reihenfolge muss eine ganze Zahl sein." };
+    const n = Number(raw);
+    if (n < -100000 || n > 1000000) return { error: "Die Reihenfolge liegt außerhalb des erlaubten Bereichs." };
+    return { value: n };
+  }
+
+  function lootReadOptionalInt(id, min, max, label) {
+    const field = document.getElementById(id);
+    const raw = field ? field.value.trim() : "";
+    if (!raw) return { value: null };
+    if (!/^-?\d+$/.test(raw)) return { error: label + " muss eine ganze Zahl sein." };
+    const n = Number(raw);
+    if (n < min || n > max) return { error: label + " muss zwischen " + min + " und " + max + " liegen." };
+    return { value: n };
+  }
+
+  function lootBlank(value) {
+    const text = String(value == null ? "" : value).trim();
+    return text || null;
+  }
+
+  function handleLootAction(action, el) {
+    if (action === "loot-select-instance") {
+      lootSelectedId = el.dataset.id || "";
+      renderLoot();
+      const detail = document.getElementById("loot-detail");
+      if (detail && window.matchMedia("(max-width: 767px)").matches) {
+        detail.scrollIntoView({ behavior: motion(), block: "start" });
+      }
+      return;
+    }
+    if (action === "loot-toggle") {
+      const key = el.dataset.id || "";
+      lootOpen[key] = !lootOpen[key];
+      renderLoot();
+      return;
+    }
+    if (action === "loot-add-instance") {
+      openLootInstanceModal(null);
+      return;
+    }
+    if (action === "loot-edit-instance") {
+      const inst = lootFind(el.dataset.id);
+      if (!inst) return;
+      openLootInstanceModal(inst);
+      return;
+    }
+    if (action === "loot-delete-instance") {
+      deleteLootInstance(el.dataset.id);
+      return;
+    }
+    if (action === "loot-add-boss") {
+      openLootBossModal(null);
+      return;
+    }
+    if (action === "loot-edit-boss") {
+      const boss = lootBossById(el.dataset.id);
+      if (!boss) return;
+      openLootBossModal(boss);
+      return;
+    }
+    if (action === "loot-delete-boss") {
+      deleteLootBoss(el.dataset.id);
+      return;
+    }
+    if (action === "loot-add-item") {
+      openLootItemModal(null, el.dataset.bossId || "");
+      return;
+    }
+    if (action === "loot-edit-item") {
+      const item = lootItemById(el.dataset.id);
+      if (!item) return;
+      openLootItemModal(item, "");
+      return;
+    }
+    if (action === "loot-delete-item") {
+      deleteLootItem(el.dataset.id);
+      return;
+    }
+    if (action === "loot-stat-add") {
+      lootAddStatRow("", "");
+      const rows = document.querySelectorAll("#loot-item-stats [data-loot-stat-key]");
+      const last = rows[rows.length - 1];
+      if (last) last.focus();
+      return;
+    }
+    if (action === "loot-stat-remove") {
+      const row = el.closest("[data-loot-stat-row]");
+      if (row) row.remove();
+    }
+  }
+
+  function openLootInstanceModal(inst) {
+    if (inst === undefined) return;
+    if (inst && !inst.id) return;
+    if (!lootGuard()) return;
+    const form = document.getElementById("loot-instance-form");
+    if (!form) return;
+    form.reset();
+    document.getElementById("loot-instance-id").value = inst ? inst.id : "";
+    document.getElementById("loot-instance-modal-label").textContent = inst ? "Instanz bearbeiten" : "Instanz anlegen";
+    if (inst) {
+      document.getElementById("loot-instance-name").value = inst.name_de || "";
+      document.getElementById("loot-instance-slug").value = inst.slug || "";
+      document.getElementById("loot-instance-kind").value = inst.kind === "raid" ? "raid" : "dungeon";
+      document.getElementById("loot-instance-level").value = inst.level_range || "";
+      document.getElementById("loot-instance-location").value = inst.location || "";
+      document.getElementById("loot-instance-sort").value = inst.sort == null ? "" : String(inst.sort);
+      document.getElementById("loot-instance-new").checked = !!inst.is_new_in_forever;
+      document.getElementById("loot-instance-note").value = inst.note || "";
+    } else {
+      document.getElementById("loot-instance-sort").value = String(lootNextSort(lootInstances));
+    }
+    lootSetStatus("loot-instance-status", "");
+    openModal("loot-instance-modal");
+  }
+
+  function openLootBossModal(boss) {
+    if (!lootGuard()) return;
+    const inst = boss ? lootFind(boss.instance_id) : lootFind(lootSelectedId);
+    if (!inst) {
+      notify("Bitte zuerst eine Instanz wählen.", "error");
+      return;
+    }
+    const form = document.getElementById("loot-boss-form");
+    if (!form) return;
+    form.reset();
+    document.getElementById("loot-boss-id").value = boss ? boss.id : "";
+    document.getElementById("loot-boss-instance").value = inst.id;
+    document.getElementById("loot-boss-modal-label").textContent = boss ? "Boss bearbeiten" : "Boss anlegen";
+    if (boss) {
+      document.getElementById("loot-boss-name-de").value = boss.name_de || "";
+      document.getElementById("loot-boss-name-en").value = boss.name_en || "";
+      document.getElementById("loot-boss-sort").value = boss.sort == null ? "" : String(boss.sort);
+      document.getElementById("loot-boss-note").value = boss.note || "";
+    } else {
+      document.getElementById("loot-boss-sort").value = String(lootNextSort(inst.bosses));
+    }
+    lootSetStatus("loot-boss-status", "");
+    openModal("loot-boss-modal");
+  }
+
+  function lootEnsureOption(id, value, label) {
+    const select = document.getElementById(id);
+    if (!select || !value) return;
+    for (let i = 0; i < select.options.length; i += 1) {
+      if (select.options[i].value === value) return;
+    }
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label || value;
+    select.appendChild(option);
+  }
+
+  function lootFillBossSelect(inst, selectedId) {
+    const select = document.getElementById("loot-item-boss");
+    if (!select) return;
+    select.replaceChildren();
+    const trash = document.createElement("option");
+    trash.value = "";
+    trash.textContent = "Trash / Sonstige Beute";
+    select.appendChild(trash);
+    if (inst) {
+      inst.bosses.forEach(function (boss) {
+        const option = document.createElement("option");
+        option.value = boss.id;
+        option.textContent = boss.name_de || "Boss";
+        select.appendChild(option);
+      });
+    }
+    select.value = selectedId && lootIsId(selectedId) ? selectedId : "";
+  }
+
+  function lootNumberField(value) {
+    if (value == null || value === "") return "";
+    const n = Number(value);
+    return Number.isFinite(n) ? String(n) : "";
+  }
+
+  function lootItemSortSuggestion(inst, bossId) {
+    if (!inst) return 10;
+    if (!bossId) return lootNextSort(inst.trash);
+    const boss = inst.bosses.filter(function (entry) { return entry.id === bossId; })[0];
+    return lootNextSort(boss ? boss.items : []);
+  }
+
+  function lootClearStats() {
+    const list = document.getElementById("loot-item-stats");
+    if (list) list.replaceChildren();
+  }
+
+  function lootStatInputValue(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (value == null) return "";
+    return String(value);
+  }
+
+  function lootAddStatRow(key, value) {
+    const list = document.getElementById("loot-item-stats");
+    if (!list) return;
+    const row = document.createElement("div");
+    row.className = "flex flex-col gap-2 sm:flex-row sm:items-center";
+    row.setAttribute("data-loot-stat-row", "");
+    const keyInput = document.createElement("input");
+    keyInput.type = "text";
+    keyInput.className = LOOT_INPUT;
+    keyInput.placeholder = "z.B. Ausdauer oder Schaden";
+    keyInput.value = key || "";
+    keyInput.setAttribute("data-loot-stat-key", "");
+    keyInput.autocomplete = "off";
+    keyInput.maxLength = 80;
+    keyInput.setAttribute("aria-label", "Wertname");
+    const valueInput = document.createElement("input");
+    valueInput.type = "text";
+    valueInput.className = LOOT_INPUT;
+    valueInput.placeholder = "z.B. 5 oder 20-38";
+    valueInput.value = value == null ? "" : String(value);
+    valueInput.setAttribute("data-loot-stat-value", "");
+    valueInput.autocomplete = "off";
+    valueInput.maxLength = 80;
+    valueInput.setAttribute("aria-label", "Wert");
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.dataset.action = "loot-stat-remove";
+    remove.className = LOOT_BTN;
+    remove.textContent = "Entfernen";
+    remove.setAttribute("aria-label", "Wert entfernen");
+    row.appendChild(keyInput);
+    row.appendChild(valueInput);
+    row.appendChild(remove);
+    list.appendChild(row);
+  }
+
+  function openLootItemModal(item, bossId) {
+    if (item === undefined) return;
+    if (!lootGuard()) return;
+    const inst = item ? lootFind(item.instance_id) : lootFind(lootSelectedId);
+    if (!inst) {
+      notify("Bitte zuerst eine Instanz wählen.", "error");
+      return;
+    }
+    const form = document.getElementById("loot-item-form");
+    if (!form) return;
+    form.reset();
+    const chosenBoss = item ? (item.boss_id || "") : (bossId || "");
+    document.getElementById("loot-item-id").value = item ? item.id : "";
+    document.getElementById("loot-item-instance").value = inst.id;
+    document.getElementById("loot-item-modal-label").textContent = item ? "Gegenstand bearbeiten" : "Gegenstand anlegen";
+    lootFillBossSelect(inst, chosenBoss);
+    const quality = item && item.quality ? item.quality : "rare";
+    const slot = item && item.slot ? item.slot : "Sonstiges";
+    const armor = item && item.armor_type ? item.armor_type : "";
+    lootEnsureOption("loot-item-quality", quality, lootQualityLabel(quality) || quality);
+    lootEnsureOption("loot-item-slot", slot, slot);
+    if (armor) lootEnsureOption("loot-item-armor", armor, armor);
+    document.getElementById("loot-item-name-de").value = item ? item.name_de : "";
+    document.getElementById("loot-item-name-en").value = item ? item.name_en : "";
+    document.getElementById("loot-item-quality").value = quality;
+    document.getElementById("loot-item-slot").value = slot;
+    document.getElementById("loot-item-armor").value = armor;
+    document.getElementById("loot-item-weapon").value = item ? (item.weapon_type || "") : "";
+    document.getElementById("loot-item-level").value = item ? lootNumberField(item.required_level) : "";
+    document.getElementById("loot-item-dkp").value = item ? lootNumberField(item.dkp_cost) : "";
+    document.getElementById("loot-item-sort").value = item && item.sort != null
+      ? String(item.sort)
+      : String(lootItemSortSuggestion(inst, chosenBoss));
+    document.getElementById("loot-item-effect").value = item ? (item.effect_text || "") : "";
+    document.getElementById("loot-item-verified").checked = !!(item && item.verified_in_forever === true);
+    lootClearStats();
+    if (item && item.stats && typeof item.stats === "object" && !Array.isArray(item.stats)) {
+      Object.keys(item.stats).forEach(function (key) {
+        lootAddStatRow(key, lootStatInputValue(item.stats[key]));
+      });
+    }
+    lootSetStatus("loot-item-status", "");
+    openModal("loot-item-modal");
+  }
+
+  function saveLootInstance() {
+    if (!lootGuard()) return;
+    const id = document.getElementById("loot-instance-id").value.trim();
+    const name = document.getElementById("loot-instance-name").value.trim();
+    let slug = document.getElementById("loot-instance-slug").value.trim().toLowerCase();
+    const kind = document.getElementById("loot-instance-kind").value === "raid" ? "raid" : "dungeon";
+    const level = document.getElementById("loot-instance-level").value.trim();
+    const location = document.getElementById("loot-instance-location").value.trim();
+    const note = document.getElementById("loot-instance-note").value.trim();
+    const sort = lootReadSort("loot-instance-sort");
+    if (id && !lootIsId(id)) {
+      lootSetStatus("loot-instance-status", "Der Eintrag ist ungültig.", true);
+      return;
+    }
+    if (!name) {
+      lootSetStatus("loot-instance-status", "Bitte einen Namen eintragen.", true);
+      return;
+    }
+    if (!slug) slug = lootSlugify(name);
+    if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      lootSetStatus("loot-instance-status", "Der Kurzname darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.", true);
+      return;
+    }
+    if (sort.error) {
+      lootSetStatus("loot-instance-status", sort.error, true);
+      return;
+    }
+    const payload = {
+      name_de: name,
+      slug: slug,
+      kind: kind,
+      level_range: level || null,
+      location: location || null,
+      sort: sort.value,
+      is_new_in_forever: !!document.getElementById("loot-instance-new").checked,
+      note: note || null,
+    };
+    lootSetStatus("loot-instance-status", "");
+    const request = id
+      ? remote.from("loot_instances").update(payload).eq("id", id)
+      : remote.from("loot_instances").insert(payload);
+    lootCommit(request, "loot-instance-status", "loot-instance-modal");
+  }
+
+  function saveLootBoss() {
+    if (!lootGuard()) return;
+    const id = document.getElementById("loot-boss-id").value.trim();
+    const instanceId = document.getElementById("loot-boss-instance").value.trim();
+    const name = document.getElementById("loot-boss-name-de").value.trim();
+    const nameEn = document.getElementById("loot-boss-name-en").value.trim();
+    const note = document.getElementById("loot-boss-note").value.trim();
+    const sort = lootReadSort("loot-boss-sort");
+    if (id && !lootIsId(id)) {
+      lootSetStatus("loot-boss-status", "Der Eintrag ist ungültig.", true);
+      return;
+    }
+    if (!lootIsId(instanceId)) {
+      lootSetStatus("loot-boss-status", "Bitte zuerst eine Instanz wählen.", true);
+      return;
+    }
+    if (!name) {
+      lootSetStatus("loot-boss-status", "Bitte einen Namen eintragen.", true);
+      return;
+    }
+    if (sort.error) {
+      lootSetStatus("loot-boss-status", sort.error, true);
+      return;
+    }
+    const payload = {
+      instance_id: instanceId,
+      name_de: name,
+      name_en: nameEn || null,
+      sort: sort.value,
+      note: note || null,
+    };
+    lootSetStatus("loot-boss-status", "");
+    const request = id
+      ? remote.from("loot_bosses").update(payload).eq("id", id)
+      : remote.from("loot_bosses").insert(payload);
+    lootCommit(request, "loot-boss-status", "loot-boss-modal");
+  }
+
+  function lootReadStats() {
+    const rows = document.querySelectorAll("#loot-item-stats [data-loot-stat-row]");
+    const stats = {};
+    const seen = {};
+    for (let i = 0; i < rows.length; i += 1) {
+      const keyInput = rows[i].querySelector("[data-loot-stat-key]");
+      const valueInput = rows[i].querySelector("[data-loot-stat-value]");
+      const key = keyInput ? keyInput.value.trim() : "";
+      const raw = valueInput ? valueInput.value.trim() : "";
+      if (!key && !raw) continue;
+      if (!key) return { error: "Jeder Wert braucht einen Namen." };
+      if (!raw) return { error: "„" + key + "“ braucht eine Zahl oder einen Text." };
+      const folded = key.toLowerCase();
+      if (seen[folded]) return { error: "„" + key + "“ ist doppelt." };
+      seen[folded] = true;
+      stats[key] = lootParseStatValue(raw);
+    }
+    return { stats: stats };
+  }
+
+  function lootParseStatValue(raw) {
+    if (/^[+-]?\d+$/.test(raw)) return Number(raw);
+    if (/^[+-]?\d+[.,]\d+$/.test(raw)) return Number(raw.replace(",", "."));
+    return raw;
+  }
+
+  function saveLootItem() {
+    if (!lootGuard()) return;
+    const id = document.getElementById("loot-item-id").value.trim();
+    const instanceId = document.getElementById("loot-item-instance").value.trim();
+    const bossId = document.getElementById("loot-item-boss").value.trim();
+    const name = document.getElementById("loot-item-name-de").value.trim();
+    const nameEn = document.getElementById("loot-item-name-en").value.trim();
+    const quality = document.getElementById("loot-item-quality").value;
+    const slot = document.getElementById("loot-item-slot").value;
+    const armor = document.getElementById("loot-item-armor").value;
+    const weapon = document.getElementById("loot-item-weapon").value.trim();
+    const effect = document.getElementById("loot-item-effect").value.trim();
+    const sort = lootReadSort("loot-item-sort");
+    const level = lootReadOptionalInt("loot-item-level", 1, 60, "Die benötigte Stufe");
+    const dkp = lootReadOptionalInt("loot-item-dkp", 0, 500, "DKP");
+    const stats = lootReadStats();
+    if (id && !lootIsId(id)) {
+      lootSetStatus("loot-item-status", "Der Eintrag ist ungültig.", true);
+      return;
+    }
+    if (!lootIsId(instanceId)) {
+      lootSetStatus("loot-item-status", "Bitte zuerst eine Instanz wählen.", true);
+      return;
+    }
+    if (bossId && !lootIsId(bossId)) {
+      lootSetStatus("loot-item-status", "Bitte einen Boss wählen.", true);
+      return;
+    }
+    if (!name) {
+      lootSetStatus("loot-item-status", "Bitte einen Namen eintragen.", true);
+      return;
+    }
+    if (!lootQualityLabel(quality)) {
+      lootSetStatus("loot-item-status", "Bitte eine Qualität wählen.", true);
+      return;
+    }
+    if (LOOT_SLOTS.indexOf(slot) === -1) {
+      lootSetStatus("loot-item-status", "Bitte einen Platz wählen.", true);
+      return;
+    }
+    if (armor && LOOT_ARMOR.indexOf(armor) === -1) {
+      lootSetStatus("loot-item-status", "Bitte eine Rüstungsart wählen.", true);
+      return;
+    }
+    if (sort.error) {
+      lootSetStatus("loot-item-status", sort.error, true);
+      return;
+    }
+    if (level.error) {
+      lootSetStatus("loot-item-status", level.error, true);
+      return;
+    }
+    if (dkp.error) {
+      lootSetStatus("loot-item-status", dkp.error, true);
+      return;
+    }
+    if (stats.error) {
+      lootSetStatus("loot-item-status", stats.error, true);
+      return;
+    }
+    const payload = {
+      instance_id: instanceId,
+      boss_id: bossId || null,
+      name_de: name,
+      name_en: lootBlank(nameEn),
+      quality: quality,
+      slot: slot,
+      armor_type: armor || null,
+      weapon_type: lootBlank(weapon),
+      required_level: level.value,
+      stats: stats.stats,
+      effect_text: lootBlank(effect),
+      dkp_cost: dkp.value,
+      verified_in_forever: !!document.getElementById("loot-item-verified").checked,
+      sort: sort.value,
+    };
+    lootSetStatus("loot-item-status", "");
+    const request = id
+      ? remote.from("loot_items").update(payload).eq("id", id)
+      : remote.from("loot_items").insert(payload);
+    lootCommit(request, "loot-item-status", "loot-item-modal");
+  }
+
+  function deleteLootInstance(id) {
+    const inst = lootFind(id);
+    if (!inst || !lootGuard()) return;
+    if (!window.confirm("Instanz „" + (inst.name_de || "") + "“ wirklich löschen?")) return;
+    lootRemove("loot_instances", id);
+  }
+
+  function deleteLootBoss(id) {
+    const boss = lootBossById(id);
+    if (!boss || !lootGuard()) return;
+    if (!window.confirm("Boss „" + (boss.name_de || "") + "“ wirklich löschen?")) return;
+    lootRemove("loot_bosses", id);
+  }
+
+  function deleteLootItem(id) {
+    const item = lootItemById(id);
+    if (!item || !lootGuard()) return;
+    if (!window.confirm("Gegenstand „" + (item.name_de || "") + "“ wirklich löschen?")) return;
+    lootRemove("loot_items", id);
   }
 })();
