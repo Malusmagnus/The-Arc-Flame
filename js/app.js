@@ -5186,12 +5186,14 @@
   }
 
   function loadMyServerPoll() {
-    if (!remote || !currentUser || typeof remote.rpc !== "function") return Promise.resolve();
+    if (!remote || typeof remote.rpc !== "function") return Promise.resolve();
+    const userId = currentUser ? currentUser.id : "";
     return remote.rpc("my_server_poll").then(function (result) {
-      if (!currentUser || !result || result.error) return;
+      const nowId = currentUser ? currentUser.id : "";
+      if (nowId !== userId || !result || result.error) return;
       const rows = Array.isArray(result.data) ? result.data : [];
       const own = rows.length ? normalizeServerPollVote(rows[0]) : null;
-      if (own) applyServerPollOwn(own);
+      if (currentUser && own) applyServerPollOwn(own);
       else {
         serverPollOwn = null;
         setServerPollSubmitLabel(false);
