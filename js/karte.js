@@ -82,7 +82,7 @@
       mark: "desert",
       instances: [{ name: "Uldaman", min: 41, max: 51 }],
     }),
-    zone("burning", "Brennende Steppe", ["Brennende", "Steppe"], 50, 58, "umkämpft", [16, 618, 200, 100], 16, {
+    zone("burning", "Brennende Steppe", ["Brennende", "Steppe"], 50, 60, "umkämpft", [16, 618, 200, 100], 16, {
       mark: "lava",
       instances: SCHWARZFELS,
       instanceNote: "Im Schwarzfels. Der Berg hat auch einen Zugang von der Sengenden Schlucht.",
@@ -112,6 +112,12 @@
       mark: "forest",
       instances: [{ name: "Zul'Gurub", min: 60, max: 60, raid: true }],
     }),
+    zone("riverglades", "Riverglades", ["Riverglades"], 35, 45, "umkämpft", [224, 608, 112, 128], 24, {
+      labelSize: 14,
+      neu: true,
+      mark: "forest",
+      points: oct([224, 608, 112, 128]),
+    }),
   ];
 
   const KAL = [
@@ -122,7 +128,7 @@
       mark: "forest",
       note: "Neutraler Treffpunkt für Druiden. In jedem Level.",
     }),
-    zone("winterspring", "Winterquell", ["Winterquell"], 53, 60, "umkämpft", [372, 14, 242, 112], 6, {
+    zone("winterspring", "Winterquell", ["Winterquell"], 55, 60, "umkämpft", [372, 14, 242, 112], 6, {
       mark: "snow",
     }),
     zone("darkshore", "Dunkelküste", ["Dunkelküste"], 10, 20, "Allianz", [18, 128, 168, 114], 8, {
@@ -145,18 +151,18 @@
     }),
     zone("barrens", "Brachland", ["Brachland"], 10, 25, "Horde", null, 1, {
       mark: "desert",
-      points: [[190, 384], [446, 368], [456, 470], [448, 560], [430, 628], [314, 636], [306, 516], [188, 508]],
+      points: [[190, 384], [446, 368], [456, 470], [448, 560], [430, 628], [378, 636], [368, 516], [188, 508]],
       instances: [
         { name: "Höhlen des Wehklagens", min: 17, max: 24 },
         { name: "Kral der Klingenhauer", min: 29, max: 38 },
         { name: "Hügel der Klingenhauer", min: 37, max: 46 },
       ],
     }),
-    zone("desolace", "Desolace", ["Desolace"], 30, 40, "umkämpft", [18, 516, 126, 120], 13, {
+    zone("desolace", "Desolace", ["Desolace"], 30, 40, "umkämpft", [18, 516, 104, 120], 13, {
       mark: "desert",
       instances: [{ name: "Maraudon", min: 46, max: 55 }],
     }),
-    zone("mulgore", "Mulgore", ["Mulgore"], 1, 10, "Horde", [158, 526, 136, 110], 10, {
+    zone("mulgore", "Mulgore", ["Mulgore"], 1, 10, "Horde", [246, 526, 114, 110], 10, {
       mark: "mountain",
     }),
     zone("dustwallow", "Düstermarschen", ["Düster-", "marschen"], 35, 45, "umkämpft", [474, 414, 146, 138], 12, {
@@ -184,6 +190,30 @@
     zone("ungoro", "Krater von Un'Goro", ["Un'Goro"], 48, 55, "umkämpft", [188, 756, 236, 118], 17, {
       mark: "forest",
     }),
+    zone("hyjal", "Berg Hyjal", ["Berg Hyjal"], 60, 60, "umkämpft", [206, -102, 390, 100], 21, {
+      neu: true,
+      mark: "mountain",
+      note: "Endgame-Gebiet im Norden von Kalimdor.",
+      points: oct([206, -102, 390, 100]),
+    }),
+    zone("shendralas", "Shen'dralas", ["Shen'dralas"], null, null, "umkämpft", [128, 534, 112, 112], 23, {
+      labelSize: 13,
+      neu: true,
+      mark: "mountain",
+      points: oct([128, 534, 112, 112]),
+    }),
+  ];
+
+  const OFFMAP = [
+    {
+      id: "zephras",
+      name: "Zephras Isle",
+      min: 1,
+      max: 12,
+      neu: true,
+      text: "Startgebiet der Skyborne. Horde und Allianz starten hier. Die Insel liegt in der Elementarebene, nicht auf diesen Karten.",
+      lage: "Lage auf der Karte folgt",
+    },
   ];
 
   const MAPS = {
@@ -197,16 +227,37 @@
     { id: "orange", label: "Orange: Level 40–55" },
     { id: "red", label: "Rot: Level 50–60" },
     { id: "all", label: "Lila: alle Level" },
+    { id: "unknown", label: "Grau: Level folgt" },
   ];
 
   const pinned = { ek: "", kal: "" };
 
   function bandOf(item) {
+    if (item.min == null || item.max == null) return "unknown";
     if (item.min <= 1 && item.max >= 60) return "all";
     if (item.max <= 20) return "green";
     if (item.max <= 40) return "yellow";
     if (item.min >= 50) return "red";
     return "orange";
+  }
+
+  function oct(box) {
+    const x = box[0];
+    const y = box[1];
+    const w = box[2];
+    const h = box[3];
+    const ix = Math.max(10, Math.round(w * 0.16));
+    const iy = Math.max(10, Math.round(h * 0.18));
+    return [
+      [x + ix, y],
+      [x + w - ix, y],
+      [x + w, y + iy],
+      [x + w, y + h - iy],
+      [x + w - ix, y + h],
+      [x + ix, y + h],
+      [x, y + h - iy],
+      [x, y + iy],
+    ];
   }
 
   function frac(value) {
@@ -237,6 +288,20 @@
 
   function rangeText(min, max) {
     return min === max ? String(min) : min + "–" + max;
+  }
+
+  function levelText(item) {
+    if (item.min == null || item.max == null) return "Level folgt";
+    return "Level " + rangeText(item.min, item.max);
+  }
+
+  function rangeCell(item) {
+    if (item.min == null || item.max == null) return "Level folgt";
+    return rangeText(item.min, item.max);
+  }
+
+  function neuBadge() {
+    return '<span class="karte-neu-badge">NEU in Forever</span>';
   }
 
   function esc(value) {
@@ -315,8 +380,8 @@
 
   function infoHtml(item) {
     const parts = [
-      '<h3 class="karte-info-title">' + esc(item.name) + "</h3>",
-      '<p class="karte-info-level">Level ' + rangeText(item.min, item.max) + "</p>",
+      '<h3 class="karte-info-title">' + esc(item.name) + (item.neu ? neuBadge() : "") + "</h3>",
+      '<p class="karte-info-level">' + esc(levelText(item)) + "</p>",
       "<p>" + esc(factionLine(item)) + "</p>",
     ];
     if (item.note) parts.push("<p>" + esc(item.note) + "</p>");
@@ -366,6 +431,7 @@
       orange: ["#f08a32", "#c25412"],
       red: ["#e15a4e", "#9c2a28"],
       all: ["#b3a0e6", "#5c4a9a"],
+      unknown: ["#b7c0cc", "#5c6774"],
     };
     let html = '<defs><linearGradient id="sea-' + key + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1b425c"/><stop offset="100%" stop-color="#0c141c"/></linearGradient>';
     Object.keys(stops).forEach(function (band) {
@@ -408,7 +474,7 @@
     const x = Math.round(c[0]);
     const y = Math.round(c[1]);
     const lines = item.lines;
-    const size = lines.length > 1 ? 17 : 20;
+    const size = item.labelSize || (lines.length > 1 ? 17 : 20);
     const dark = item.band === "yellow" ? " is-dark" : "";
     const gap = size + 3;
     const start = y - ((lines.length - 1) * gap) / 2;
@@ -416,6 +482,14 @@
       return '<tspan x="' + x + '" y="' + (start + index * gap) + '">' + esc(line) + "</tspan>";
     }).join("");
     return '<text class="karte-label' + dark + '" font-size="' + size + '">' + tspans + "</text>";
+  }
+
+  function badgeSvg(item) {
+    if (!item.neu) return "";
+    const box = bbox(item.pts);
+    const x = Math.round(box.x + box.w / 2);
+    const y = Math.round(box.y + 15);
+    return '<g class="karte-badge" transform="translate(' + x + " " + y + ')" aria-hidden="true"><rect x="-42" y="-7" width="84" height="14" rx="3"></rect><text y="3.5">NEU in Forever</text></g>';
   }
 
   function renderMap(key) {
@@ -427,13 +501,14 @@
     const marks = [];
     data.zones.forEach(function (item) {
       const d = pathFrom(item.pts);
-      const aria = item.name + ", Level " + rangeText(item.min, item.max) + ", " + item.faction;
+      const aria = item.name + ", " + levelText(item) + ", " + item.faction + (item.neu ? ", NEU in Forever" : "");
       coasts.push('<path class="karte-coast" d="' + d + '"></path>');
       fills.push(
-        '<path class="karte-zone" data-zone="' + item.id + '" data-band="' + item.band + '" d="' + d + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(aria) + '" fill="url(#fill-' + key + "-" + item.band + ')"><title>' + esc(item.name + ", Level " + rangeText(item.min, item.max)) + "</title></path>"
+        '<path class="karte-zone" data-zone="' + item.id + '" data-band="' + item.band + '" d="' + d + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(aria) + '" fill="url(#fill-' + key + "-" + item.band + ')"><title>' + esc(item.name + ", " + levelText(item)) + "</title></path>"
       );
       marks.push(markSvg(item));
       labels.push(labelSvg(item));
+      labels.push(badgeSvg(item));
     });
     const svg =
       '<svg viewBox="' + [vb.x, vb.y, vb.w, vb.h].join(" ") + '" role="group" aria-label="Karte von ' + esc(data.name) + '">' +
@@ -450,7 +525,11 @@
 
   function sortedZones(zones) {
     return zones.slice().sort(function (a, b) {
-      return a.min - b.min || a.max - b.max || a.name.localeCompare(b.name, "de");
+      const amin = a.min == null ? 999 : a.min;
+      const amax = a.max == null ? 999 : a.max;
+      const bmin = b.min == null ? 999 : b.min;
+      const bmax = b.max == null ? 999 : b.max;
+      return amin - bmin || amax - bmax || a.name.localeCompare(b.name, "de");
     });
   }
 
@@ -462,8 +541,8 @@
         : "keine";
       return (
         '<tr class="karte-row" data-zone="' + item.id + '">' +
-        '<th scope="row"><button type="button" class="karte-name" data-zone="' + item.id + '">' + esc(item.name) + "</button></th>" +
-        "<td>" + rangeText(item.min, item.max) + "</td>" +
+        '<th scope="row"><button type="button" class="karte-name" data-zone="' + item.id + '">' + esc(item.name) + (item.neu ? neuBadge() : "") + "</button></th>" +
+        "<td>" + esc(rangeCell(item)) + "</td>" +
         "<td>" + esc(item.faction) + "</td>" +
         "<td>" + instances + "</td>" +
         "</tr>"
@@ -539,10 +618,31 @@
     return panel ? panel.getAttribute("data-continent") : "";
   }
 
+  function renderNeue() {
+    const slots = document.querySelectorAll("[data-karte-neue]");
+    if (!slots.length || !OFFMAP.length) return;
+    const cards = OFFMAP.map(function (item) {
+      return (
+        '<article class="karte-neue-item">' +
+        '<h4 class="karte-neue-title">' + esc(item.name) + neuBadge() + "</h4>" +
+        '<p class="karte-info-level">' + esc(levelText(item)) + "</p>" +
+        "<p>" + esc(item.text) + "</p>" +
+        '<p class="karte-neue-lage">' + esc(item.lage) + "</p>" +
+        "</article>"
+      );
+    }).join("");
+    const html = '<h3 class="karte-neue-heading">Neue Forever-Gebiete</h3>' + cards;
+    slots.forEach(function (slot) {
+      slot.innerHTML = html;
+      slot.hidden = false;
+    });
+  }
+
   function boot() {
     const root = document.getElementById("forever-karte");
     if (!root) return;
     renderLegend();
+    renderNeue();
     Object.keys(MAPS).forEach(function (key) {
       renderMap(key);
       renderList(key);

@@ -420,7 +420,7 @@
           <h2 id="forever-karte-title" class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
             <i class="fa-solid fa-map text-amber-400" aria-hidden="true"></i> Karte
           </h2>
-          <p class="mt-2 max-w-3xl text-sm text-slate-300">Level-Bereiche wie in Classic. Wenn Forever etwas ändert, passen wir es an.</p>
+          <p class="mt-2 max-w-3xl text-sm text-slate-300">Level-Bereiche für WoW Forever (Stand Beta). Quelle: <a class="karte-source" href="https://mobalytics.gg/wow-forever/guides/zone-map-level-ranges" target="_blank" rel="noopener">Mobalytics</a>.</p>
           <p class="mt-2 max-w-3xl text-sm text-slate-400">Eigene Zeichnung. Die Gebiete liegen ungefähr so wie auf dem Kontinent. Norden ist oben. Tippe auf ein Gebiet.</p>
         </div>
 
@@ -436,6 +436,7 @@
             <div id="karte-map-ek" class="karte-map"></div>
             <div id="karte-info-ek" class="karte-info" aria-live="polite"></div>
           </div>
+          <div data-karte-neue class="karte-neue" hidden></div>
           <div id="karte-list-ek"></div>
         </div>
 
@@ -444,6 +445,7 @@
             <div id="karte-map-kal" class="karte-map"></div>
             <div id="karte-info-kal" class="karte-info" aria-live="polite"></div>
           </div>
+          <div data-karte-neue class="karte-neue" hidden></div>
           <div id="karte-list-kal"></div>
         </div>
 
@@ -454,13 +456,15 @@
             <article class="karte-step">
               <h4 class="karte-step-title"><span class="karte-swatch" data-band="green" aria-hidden="true"></span> Level 1–10</h4>
               <p>Starte in Durotar, Mulgore oder Tirisfal.</p>
-              <p>Queste in der Startzone bis Level 10.</p>
+              <p>Skyborne starten auf Zephras Isle (Level 1–12).</p>
+              <p>Queste in der Startzone bis Level 10. Auf Zephras Isle bis Level 12.</p>
               <p class="karte-tip">Tipp: Lern in der Stadt einen Beruf.</p>
             </article>
             <article class="karte-step">
               <h4 class="karte-step-title"><span class="karte-swatch" data-band="green" aria-hidden="true"></span> Level 10–20</h4>
               <p>Aus Durotar oder Mulgore geht es ins Brachland.</p>
               <p>Aus Tirisfal geht es in den Silberwald.</p>
+              <p>Nach Zephras Isle geht es ins Brachland oder in den Silberwald.</p>
               <p>Dungeons: Flammenschlund (13–18). Höhlen des Wehklagens (17–24).</p>
               <p class="karte-tip">Tipp: Frag im Gilden-Chat nach einer Gruppe.</p>
             </article>
@@ -475,12 +479,13 @@
             <article class="karte-step">
               <h4 class="karte-step-title"><span class="karte-swatch" data-band="yellow" aria-hidden="true"></span> Level 30–40</h4>
               <p>Tausend Nadeln, Desolace, Schlingendorntal, Alteracgebirge, Arathihochland.</p>
+              <p>Ab Level 35 auch Riverglades (bis Level 45).</p>
               <p>Dungeons: Gnomeregan (29–38). Scharlachrotes Kloster (30–45). Hügel der Klingenhauer (37–46).</p>
               <p class="karte-tip">Tipp: In Beutebucht gibt es viele Quests. Nimm sie mit.</p>
             </article>
             <article class="karte-step">
               <h4 class="karte-step-title"><span class="karte-swatch" data-band="orange" aria-hidden="true"></span> Level 40–50</h4>
-              <p>Düstermarschen, Tanaris, Feralas, Hinterland, Ödland, Sümpfe des Elends.</p>
+              <p>Riverglades, Düstermarschen, Tanaris, Feralas, Hinterland, Ödland, Sümpfe des Elends.</p>
               <p>Dungeons: Uldaman (41–51). Zul'Farrak (44–54). Maraudon (46–55).</p>
               <p class="karte-tip">Tipp: Ab Level 40 kannst du dein Reittier kaufen.</p>
             </article>
@@ -495,6 +500,7 @@
             </article>
             <article class="karte-step karte-step-wide">
               <h4 class="karte-step-title"><span class="karte-swatch" data-band="raid" aria-hidden="true"></span> Level 60</h4>
+              <p>Berg Hyjal ist das Endgame-Gebiet.</p>
               <p>Jetzt kommen die Raids mit der Gilde.</p>
               <p>Geschmolzener Kern. Onyxias Hort. Pechschwingenhort. Zul'Gurub.</p>
               <p>Ruinen von Ahn'Qiraj. Tempel von Ahn'Qiraj. Naxxramas.</p>
