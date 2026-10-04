@@ -70,30 +70,45 @@ section:focus,
   outline: none;
 }
 
+:root {
+  --section-scroll-offset: 22rem;
+}
+
 html {
-  scroll-padding-top: 18.5rem;
+  scroll-padding-top: 0;
 }
 
-@media (min-width: 1280px) {
-  html {
-    scroll-padding-top: 12rem;
-  }
+/* Headings clear the sticky section bar. The offset is updated from the
+   header height so a wrapped second row still leaves the title visible. */
+#inhalt section,
+#inhalt .raid-card,
+#dkp-history,
+#dkp-import,
+#loot-detail,
+#raid-plan-form {
+  scroll-margin-top: var(--section-scroll-offset);
 }
 
-/* Section links stay in the horizontal bar under the header at every width.
-   The old side rail is not used. */
+/* The icon rail is not used at any width. */
 #quick-nav {
-  display: none;
+  display: none !important;
 }
 
 #mobile-nav {
   display: block;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: #0a0608;
 }
 
-@media (min-width: 1440px) {
+@media (min-width: 1024px) {
   #mobile-nav-links {
     max-width: none;
-    justify-content: safe center;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 0.15rem;
+    overflow-x: auto;
     padding-left: 0.75rem;
     padding-right: 0.75rem;
   }
@@ -236,18 +251,17 @@ body.modal-open {
 }
 
 #site-header {
-  background-color: rgba(10, 6, 8, 0.9);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: #0a0608;
   border-bottom-color: rgba(244, 195, 67, 0.22);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
 #mobile-nav {
   border-top: 1px solid rgba(244, 195, 67, 0.08);
-}
-
-#quick-nav {
-  background: rgba(12, 8, 10, 0.92);
-  border-color: rgba(244, 195, 67, 0.22);
+  background-color: #0a0608;
 }
 
 #site-footer {

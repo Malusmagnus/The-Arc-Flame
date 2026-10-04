@@ -43,6 +43,8 @@
 
   const NAV_LINK =
     "inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white";
+  const NAV_LINK_ON =
+    "inline-flex shrink-0 items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-semibold text-white";
   const QUICK_LINK =
     "inline-flex items-center justify-center rounded-lg p-2.5 text-slate-400 transition hover:bg-slate-800 hover:text-white";
   const TAB_BASE =
@@ -832,9 +834,62 @@
   }
 
   function updateQuickNav() {
-    const items = navItems();
-    fillNav(document.getElementById("quick-nav"), items, true);
-    fillNav(document.getElementById("mobile-nav-links"), items, false);
+    fillNav(document.getElementById("mobile-nav-links"), navItems(), false);
+    syncSectionNav();
+  }
+
+  function syncSectionNav() {
+    const header = document.getElementById("site-header");
+    if (header) {
+      const height = Math.ceil(header.getBoundingClientRect().height) + 12;
+      document.documentElement.style.setProperty("--section-scroll-offset", height + "px");
+    }
+    if (!syncSectionNav.bound) {
+      syncSectionNav.bound = true;
+      window.addEventListener("scroll", queueActiveSection, { passive: true });
+      window.addEventListener("resize", syncSectionNav);
+      if ("ResizeObserver" in window && header) {
+        const observer = new ResizeObserver(function () { syncSectionNav(); });
+        observer.observe(header);
+      }
+    }
+    markActiveSection();
+  }
+
+  function queueActiveSection() {
+    if (queueActiveSection.queued) return;
+    queueActiveSection.queued = true;
+    window.requestAnimationFrame(function () {
+      queueActiveSection.queued = false;
+      markActiveSection();
+    });
+  }
+
+  function sectionIsShown(el) {
+    if (!el || el.hidden) return false;
+    if (el.closest("[hidden]")) return false;
+    return el.getClientRects().length > 0;
+  }
+
+  function markActiveSection() {
+    const links = document.querySelectorAll("#mobile-nav-links a");
+    if (!links.length) return;
+    const header = document.getElementById("site-header");
+    const line = (header ? header.getBoundingClientRect().bottom : 0) + 48;
+    let current = null;
+    links.forEach(function (link) {
+      const href = link.getAttribute("href") || "";
+      const id = href.charAt(0) === "#" ? href.slice(1) : href;
+      const el = document.getElementById(id);
+      if (!sectionIsShown(el)) return;
+      if (el.getBoundingClientRect().top <= line) current = link;
+    });
+    links.forEach(function (link) {
+      const on = link === current;
+      if (link.getAttribute("aria-current") === (on ? "true" : "false") && link.className === (on ? NAV_LINK_ON : NAV_LINK)) return;
+      link.className = on ? NAV_LINK_ON : NAV_LINK;
+      link.setAttribute("aria-current", on ? "true" : "false");
+    });
   }
 
   function fillNav(container, items, iconsOnly) {
