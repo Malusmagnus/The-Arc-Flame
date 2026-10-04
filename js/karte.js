@@ -22,15 +22,6 @@
     dark: "#6a624f",
   };
 
-  const TINT = {
-    green: "#2f9a4e",
-    yellow: "#d6a61a",
-    orange: "#e06a1c",
-    red: "#c43832",
-    all: "#7d68c4",
-    unknown: "#7d8794",
-  };
-
   function zone(id, name, lines, min, max, faction, extra) {
     const item = {
       id: id,
@@ -277,7 +268,7 @@
       instances: SCHWARZFELS,
       instanceNote: "Im Schwarzfels. Der Berg hat auch einen Zugang von der Sengenden Schlucht.",
     }),
-    zone("riverglades", "Riverglades", ["Riverglades"], 35, 45, "umkämpft", {
+    zone("riverglades", "Flusslande", ["Flusslande"], 35, 45, "umkämpft", {
       mark: "forest", land: "#8aaa68", neu: true,
       points: ring("riverglades", [
         BAD_RIV.slice().reverse(),
@@ -320,6 +311,7 @@
     }),
     zone("deadwind", "Gebirgspass der Totenwinde", ["Totenwinde"], 55, 60, "umkämpft", {
       mark: "dark",
+      labelAt: [612, 1096],
       points: ring("deadwind", [
         RED_DEAD.slice().reverse(),
         RIV_DEAD.slice().reverse(),
@@ -329,6 +321,7 @@
     }),
     zone("blasted", "Verwüstete Lande", ["Verwüstete", "Lande"], 45, 55, "umkämpft", {
       mark: "desert", land: "#b7a48c",
+      labelAt: [792, 1204],
       points: ring("blasted", [
         SWP_BLA,
         [[842, 982], [868, 1104], [856, 1184], [802, 1262], [724, 1304], [638, 1264], [600, 1202]],
@@ -406,7 +399,7 @@
       labelAt: [132, 128],
       points: [[62, 46], [104, 16], [158, 14], [204, 42], [226, 92], [210, 140], [164, 170], [104, 176], [52, 146], [32, 96]],
     }),
-    zone("hyjal", "Berg Hyjal", ["Berg Hyjal"], 60, 60, "umkämpft", {
+    zone("hyjal", "Hyjal", ["Hyjal"], 60, 60, "umkämpft", {
       mark: "mountain", land: "#8aa06a", neu: true,
       note: "Endgame-Gebiet im Norden von Kalimdor.",
       points: ring("hyjal", [
@@ -643,17 +636,12 @@
     ],
   };
 
-  const OFFMAP = [
-    {
-      id: "zephras",
-      name: "Zephras Isle",
-      min: 1,
-      max: 12,
-      neu: true,
-      text: "Startgebiet der Skyborne. Horde und Allianz starten hier. Die Insel liegt in der Elementarebene, nicht auf diesen Karten.",
-      lage: "Lage auf der Karte folgt",
-    },
-  ];
+  const ZEPHRAS = zone("zephras", "Die Insel Zephras", ["Die Insel", "Zephras"], 1, 12, "beide", {
+    neu: true,
+    note: "Startgebiet der Skyborne. Horde und Allianz starten hier.",
+    labelSize: 18,
+    points: [[18, 48], [46, 16], [98, 8], [146, 22], [172, 58], [164, 98], [112, 122], [54, 116], [16, 84]],
+  });
 
   const MAPS = {
     ek: { name: "Östliche Königreiche", zones: EK },
@@ -661,11 +649,11 @@
   };
 
   const BANDS = [
-    { id: "green", label: "Grün: Level 1–20" },
-    { id: "yellow", label: "Gelb: Level 20–40" },
-    { id: "orange", label: "Orange: Level 40–55" },
-    { id: "red", label: "Rot: Level 50–60" },
-    { id: "all", label: "Lila: alle Level" },
+    { id: "green", label: "Türkis: Level 1–20" },
+    { id: "yellow", label: "Blau: Level 20–40" },
+    { id: "orange", label: "Violett: Level 40–55" },
+    { id: "red", label: "Lila: Level 50–60" },
+    { id: "all", label: "Hellblau: alle Level" },
     { id: "unknown", label: "Grau: Level folgt" },
   ];
 
@@ -814,6 +802,7 @@
     if (item.faction === "Horde") return "Fraktion: Horde.";
     if (item.faction === "Allianz") return "Fraktion: Allianz.";
     if (item.faction === "Neutral") return "Fraktion: Neutral.";
+    if (item.faction === "beide") return "Fraktion: Horde und Allianz.";
     return "Fraktion: umkämpft.";
   }
 
@@ -829,7 +818,10 @@
   }
 
   function findZone(key, id) {
-    const zones = MAPS[key].zones;
+    if (id === "zephras") return ZEPHRAS;
+    const data = MAPS[key];
+    if (!data) return null;
+    const zones = data.zones;
     for (let i = 0; i < zones.length; i++) {
       if (zones[i].id === id) return zones[i];
     }
@@ -927,98 +919,217 @@
     const longest = names.reduce(function (max, line) {
       return Math.max(max, line.length);
     }, 1);
-    let size = item.labelSize || 14;
-    if (box.w < 160 || box.h < 110) size = Math.min(size, 12);
-    if (box.h < 90) size = Math.min(size, 11);
-    const maxByW = Math.floor((box.w * 0.9) / (longest * 0.58));
-    size = Math.max(9, Math.min(size, maxByW));
+    let size = item.labelSize || 24;
+    if (box.w < 180 || box.h < 120) size = Math.min(size, 16);
+    if (box.h < 90) size = Math.min(size, 13);
+    const maxByW = Math.floor((box.w * 0.86) / (longest * 0.62));
+    size = Math.max(8, Math.min(size, maxByW));
     const x = Math.round(spot[0]);
     let y = Math.round(spot[1]);
     const levelSize = Math.max(8, size - 2);
-    const neuSize = Math.max(7, Math.min(8, Math.floor((box.w * 0.9) / 8)));
-    const block = names.length * (size + 1) + levelSize + (item.neu ? neuSize + 2 : 0);
-    y = Math.round(y - block / 2 + size * 0.7);
+    const block = names.length * (size + 1) + levelSize + (item.neu ? 16 : 0);
+    y = Math.round(y - block / 2 + size * 0.75);
     let html = "";
     names.forEach(function (line, index) {
-      html += '<text class="karte-label" x="' + x + '" y="' + (y + index * (size + 1)) + '" font-size="' + size + '">' + esc(line) + "</text>";
+      html += '<text class="karte-label" x="' + x + '" y="' + (y + index * (size + 1)) + '" font-size="' + size + '">' + esc(line.toUpperCase()) + "</text>";
     });
     const levelY = y + names.length * (size + 1) + 1;
-    html += '<text class="karte-level" x="' + x + '" y="' + levelY + '" font-size="' + levelSize + '">' + esc(rangeCell(item)) + "</text>";
+    html += '<text class="karte-level" x="' + x + '" y="' + levelY + '" font-size="' + levelSize + '">' + esc(rangeCell(item).toUpperCase()) + "</text>";
     if (item.neu) {
-      html += '<text class="karte-neu-line" x="' + x + '" y="' + (levelY + neuSize + 3) + '" font-size="' + neuSize + '">NEU in Forever</text>';
+      const by = levelY + 12;
+      html += '<g class="karte-neu-mark" transform="translate(' + x + " " + by + ')">' +
+        '<rect x="-22" y="-10" width="44" height="16" rx="3"></rect>' +
+        '<text y="3">NEU</text></g>';
     }
     return html;
   }
 
   function citySvg(city) {
-    const color = city.faction === "Horde" ? "#8d1c18" : "#1c4e86";
     const x = city.at[0];
     const y = city.at[1];
     const lx = city.lx || 0;
     const ly = city.ly == null ? 18 : city.ly;
     return (
       '<g class="karte-marker" transform="translate(' + x + " " + y + ')">' +
-      '<circle r="8" fill="#f7f0de" stroke="#2c2418" stroke-width="1.1"/>' +
-      '<path d="M-3.4 3.4 V-0.5 L0 -3.6 L3.4 -0.5 V3.4 Z" fill="' + color + '"/>' +
+      '<circle class="karte-city-dot" r="8"/>' +
+      '<path class="karte-city-tower" data-faction="' + city.faction + '" d="M-3.4 3.4 V-0.5 L0 -3.6 L3.4 -0.5 V3.4 Z"/>' +
       '<text class="karte-city-label" x="' + lx + '" y="' + ly + '">' + esc(city.name) + "</text>" +
       "</g>"
     );
   }
 
-  function pinSvg(pin) {
-    const fill = pin.raid ? "#8a2a22" : "#3a3228";
+  const PIN_ZONE = {
+    "Scharlachrotes Kloster": "tirisfal",
+    "Scholomance": "wpl",
+    "Stratholme": "epl",
+    "Naxxramas": "epl",
+    "Burg Schattenfang": "silberwald",
+    "Gnomeregan": "dunmorogh",
+    "Schwarzfels": "searing",
+    "Uldaman": "badlands",
+    "Tempel von Atal'Hakkar": "swamp",
+    "Das Verlies": "elwynn",
+    "Todesminen": "westfall",
+    "Zul'Gurub": "stv",
+    "Tiefschwarze Grotte": "ashenvale",
+    "Flammenschlund": "durotar",
+    "Höhlen des Wehklagens": "barrens",
+    "Kral der Klingenhauer": "barrens",
+    "Hügel der Klingenhauer": "barrens",
+    "Maraudon": "desolace",
+    "Onyxias Hort": "dustwallow",
+    "Düsterbruch": "feralas",
+    "Zul'Farrak": "tanaris",
+    "Ruinen von Ahn'Qiraj": "silithus",
+    "Tempel von Ahn'Qiraj": "silithus",
+  };
+
+  function pinSvg(pin, continent) {
+    const zone = PIN_ZONE[pin.name] || "";
     return (
-      '<g class="karte-marker" transform="translate(' + pin.at[0] + " " + pin.at[1] + ')">' +
-      '<path d="M0 -5.2 L4.4 0 L0 5.2 L-4.4 0 Z" fill="' + fill + '" stroke="#f4ead6" stroke-width="0.7"/>' +
-      '<text class="karte-pin-label" y="14">' + esc(pin.short) + "</text>" +
+      '<g class="karte-dungeon" data-zone="' + zone + '" data-continent="' + continent + '" transform="translate(' + pin.at[0] + " " + pin.at[1] + ')" tabindex="0" role="button" aria-label="' + esc(pin.name) + '">' +
+      '<path class="karte-dung-gem' + (pin.raid ? " is-raid" : "") + '" d="M0 -7 L6 0 L0 7 L-6 0 Z"/>' +
       "<title>" + esc(pin.name) + "</title>" +
       "</g>"
     );
   }
 
-  function renderMap(key) {
-    const data = MAPS[key];
-    const vb = viewBox(data.zones);
-    const loops = coastLoops(data.zones);
+  function shiftItem(item, dx, dy, continent) {
+    const copy = {
+      id: item.id,
+      name: item.name,
+      lines: item.lines,
+      min: item.min,
+      max: item.max,
+      faction: item.faction,
+      neu: item.neu,
+      note: item.note,
+      band: item.band,
+      labelSize: item.labelSize,
+      cont: continent,
+      pts: item.pts.map(function (pt) { return [pt[0] + dx, pt[1] + dy]; }),
+    };
+    if (item.labelAt) copy.labelAt = [item.labelAt[0] + dx, item.labelAt[1] + dy];
+    return copy;
+  }
+
+  function shiftAt(list, dx, dy) {
+    return (list || []).map(function (item) {
+      return {
+        name: item.name,
+        short: item.short,
+        faction: item.faction,
+        raid: item.raid,
+        lx: item.lx,
+        ly: item.ly,
+        at: [item.at[0] + dx, item.at[1] + dy],
+      };
+    });
+  }
+
+  function zoneSvg(item) {
+    const d = pathFrom(item.pts);
+    const aria = item.name + ", " + levelText(item) + ", " + item.faction + (item.neu ? ", NEU" : "");
+    return (
+      '<g class="karte-zone" data-zone="' + item.id + '" data-continent="' + item.cont + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(aria) + '">' +
+      '<path class="karte-glow" d="' + d + '"></path>' +
+      '<path class="karte-fill" data-band="' + item.band + '" d="' + d + '"><title>' + esc(item.name + ", " + levelText(item)) + "</title></path>" +
+      "</g>"
+    );
+  }
+
+  function continentParts(zones, dx, dy, continent) {
+    const moved = zones.map(function (item) { return shiftItem(item, dx, dy, continent); });
+    const loops = coastLoops(moved);
     const coast = loops.map(pathFrom).join("");
     const borders = [];
-    boundaries(data.zones).forEach(function (edge) {
+    boundaries(moved).forEach(function (edge) {
       if (edge.n === 2) borders.push("M" + edge.a[0] + " " + edge.a[1] + " L" + edge.b[0] + " " + edge.b[1]);
     });
-    const zones = data.zones.map(function (item) {
-      const d = pathFrom(item.pts);
-      const aria = item.name + ", " + levelText(item) + ", " + item.faction + (item.neu ? ", NEU in Forever" : "");
-      const land = item.land || TERRAIN[item.mark] || TERRAIN.grass;
-      return (
-        '<g class="karte-zone" data-zone="' + item.id + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + esc(aria) + '">' +
-        '<path class="karte-terrain" d="' + d + '" fill="' + land + '"></path>' +
-        '<path class="karte-tint" d="' + d + '" fill="' + TINT[item.band] + '"><title>' + esc(item.name + ", " + levelText(item)) + "</title></path>" +
-        "</g>"
-      );
-    }).join("");
-    const labels = data.zones.map(labelSvg).join("");
-    const cities = (CITIES[key] || []).map(citySvg).join("");
-    const pins = (PINS[key] || []).map(pinSvg).join("");
+    return {
+      zones: moved,
+      coast: coast,
+      borders: borders.join(" "),
+    };
+  }
+
+  const world = { full: null, kal: null, ek: null, cam: null, svg: null };
+
+  function frameOf(box, pad) {
+    return { x: box.x - pad, y: box.y - pad, w: box.w + pad * 2, h: box.h + pad * 2 };
+  }
+
+  function applyCam(box) {
+    world.cam = box;
+    if (world.svg) world.svg.setAttribute("viewBox", [box.x, box.y, box.w, box.h].join(" "));
+    document.querySelectorAll("[data-focus]").forEach(function (btn) {
+      const on = (btn.getAttribute("data-focus") === "kal" && box === world.kal) || (btn.getAttribute("data-focus") === "ek" && box === world.ek);
+      btn.classList.toggle("is-on", on);
+    });
+  }
+
+  function zoomBy(factor) {
+    const box = world.cam || world.full;
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    const w = Math.max(world.full.w * 0.28, Math.min(world.full.w * 1.05, box.w * factor));
+    const h = box.h * (w / box.w);
+    applyCam({ x: cx - w / 2, y: cy - h / 2, w: w, h: h });
+  }
+
+  function renderWorld() {
+    const kalBox = bbox([].concat.apply([], KAL.map(function (item) { return item.pts; })));
+    const ekBox = bbox([].concat.apply([], EK.map(function (item) { return item.pts; })));
+    const left = 150;
+    const gap = 420;
+    const top = 70;
+    const kalDx = left - kalBox.x;
+    const kalDy = top - kalBox.y;
+    const ekDx = left + kalBox.w + gap - ekBox.x;
+    const ekDy = top - ekBox.y;
+    const kal = continentParts(KAL, kalDx, kalDy, "kal");
+    const ek = continentParts(EK, ekDx, ekDy, "ek");
+    const zBox = bbox(ZEPHRAS.pts);
+    const zx = left + kalBox.w + gap / 2 - zBox.w / 2 - zBox.x;
+    const zy = top + 8 - zBox.y;
+    const isle = shiftItem(ZEPHRAS, zx, zy, "kal");
+    const right = ekDx + ekBox.x + ekBox.w;
+    const bottom = Math.max(kalDy + kalBox.y + kalBox.h, ekDy + ekBox.y + ekBox.h);
+    const full = { x: 0, y: -40, w: right + 150, h: bottom + 360 };
+    world.full = full;
+    world.kal = frameOf({ x: kalDx + kalBox.x, y: kalDy + kalBox.y, w: kalBox.w, h: kalBox.h }, 50);
+    world.ek = frameOf({ x: ekDx + ekBox.x, y: ekDy + ekBox.y, w: ekBox.w, h: ekBox.h }, 50);
+    const cities = shiftAt(CITIES.kal, kalDx, kalDy).map(citySvg).join("") + shiftAt(CITIES.ek, ekDx, ekDy).map(citySvg).join("");
+    const pins = shiftAt(PINS.kal, kalDx, kalDy).map(function (pin) { return pinSvg(pin, "kal"); }).join("") +
+      shiftAt(PINS.ek, ekDx, ekDy).map(function (pin) { return pinSvg(pin, "ek"); }).join("");
+    const zones = kal.zones.concat(ek.zones, [isle]);
+    const midX = Math.round(left + kalBox.w + gap / 2);
+    const midY = Math.round(top + Math.max(kalBox.h, ekBox.h) * 0.48);
+    const sea =
+      '<text class="karte-sea" x="78" y="' + midY + '" transform="rotate(-90 78 ' + midY + ')">' + esc("Das Verhüllte Meer") + "</text>" +
+      '<text class="karte-sea" x="' + midX + '" y="' + midY + '">' + esc("Das Große Meer") + "</text>" +
+      '<text class="karte-sea" x="' + Math.round(right + 78) + '" y="' + midY + '" transform="rotate(90 ' + Math.round(right + 78) + " " + midY + ')">' + esc("Das Verbotene Meer") + "</text>" +
+      '<text class="karte-sea" x="' + midX + '" y="' + Math.round(bottom + 78) + '">' + esc("Die Südlichen Meere") + "</text>";
     const svg =
-      '<svg viewBox="' + [vb.x, vb.y, vb.w, vb.h].join(" ") + '" role="group" aria-label="Karte von ' + esc(data.name) + '">' +
-      defs(key, coast) +
-      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" fill="url(#sea-' + key + ')"></rect>' +
-      waves(vb) +
-      '<g filter="url(#shade-' + key + ')">' +
-      '<path class="karte-shoal" d="' + coast + '"></path>' +
-      zones +
-      "</g>" +
-      '<g clip-path="url(#clip-' + key + ')" pointer-events="none">' +
-      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" fill="url(#age-' + key + ')"></rect>' +
-      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" filter="url(#hill-' + key + ')"></rect>' +
-      '<rect x="' + vb.x + '" y="' + vb.y + '" width="' + vb.w + '" height="' + vb.h + '" filter="url(#grain-' + key + ')"></rect>' +
-      "</g>" +
-      '<path class="karte-border" d="' + borders.join(" ") + '"></path>' +
-      '<path class="karte-coast" d="' + coast + '"></path>' +
-      '<g class="karte-deco">' + cities + pins + "</g>" +
-      labels +
+      '<svg viewBox="' + [full.x, full.y, full.w, full.h].join(" ") + '" role="group" aria-label="Weltkarte von Kalimdor und den Östlichen Königreichen">' +
+      "<defs>" +
+      '<pattern id="karte-grid" width="56" height="56" patternUnits="userSpaceOnUse">' +
+      '<path class="karte-grid-line" d="M56 0 H0 V56"></path>' +
+      "</pattern>" +
+      "</defs>" +
+      '<rect class="karte-ocean" x="' + full.x + '" y="' + full.y + '" width="' + full.w + '" height="' + full.h + '"></rect>' +
+      '<rect class="karte-grid" x="' + full.x + '" y="' + full.y + '" width="' + full.w + '" height="' + full.h + '"></rect>' +
+      zones.map(zoneSvg).join("") +
+      '<path class="karte-coast" d="' + kal.coast + ek.coast + pathFrom(isle.pts) + '"></path>' +
+      '<path class="karte-border" d="' + kal.borders + " " + ek.borders + '"></path>' +
+      sea +
+      '<g class="karte-deco">' + cities + "</g>" +
+      zones.map(labelSvg).join("") +
+      pins +
       "</svg>";
-    document.getElementById("karte-map-" + key).innerHTML = '<div class="karte-stage">' + svg + "</div>";
+    document.getElementById("karte-map").innerHTML = '<div class="karte-stage">' + svg + "</div>";
+    world.svg = document.querySelector("#karte-map svg");
+    applyCam(full);
   }
 
   function sortedZones(zones) {
@@ -1033,7 +1144,9 @@
 
   function renderList(key) {
     const data = MAPS[key];
-    const rows = sortedZones(data.zones).map(function (item) {
+    const zones = data.zones.slice();
+    if (key === "kal") zones.push(ZEPHRAS);
+    const rows = sortedZones(zones).map(function (item) {
       const instances = item.instances.length
         ? item.instances.map(function (inst) { return esc(instanceShort(inst)); }).join("<br>")
         : "keine";
@@ -1069,13 +1182,13 @@
 
   function showInfo(key, id) {
     const item = findZone(key, id);
-    const box = document.getElementById("karte-info-" + key);
+    const box = document.getElementById("karte-info");
     if (!box) return;
     box.innerHTML = item ? infoHtml(item) : hintHtml();
   }
 
-  function markSelected(key, id) {
-    const map = document.getElementById("karte-map-" + key);
+  function markSelected(id) {
+    const map = document.getElementById("karte-map");
     if (map) {
       map.querySelectorAll(".karte-zone").forEach(function (el) {
         const on = el.getAttribute("data-zone") === id;
@@ -1083,120 +1196,98 @@
         el.setAttribute("aria-pressed", on ? "true" : "false");
       });
     }
-    const list = document.getElementById("karte-list-" + key);
-    if (list) {
+    ["ek", "kal"].forEach(function (key) {
+      const list = document.getElementById("karte-list-" + key);
+      if (!list) return;
       list.querySelectorAll(".karte-row").forEach(function (el) {
         el.classList.toggle("is-on", el.getAttribute("data-zone") === id);
       });
-    }
+    });
   }
 
   function pinZone(key, id, scroll) {
-    pinned[key] = id;
-    markSelected(key, id);
+    pinned.world = id;
+    markSelected(id);
     showInfo(key, id);
     if (!scroll) return;
     if (!window.matchMedia("(max-width: 1023px)").matches) return;
-    const info = document.getElementById("karte-info-" + key);
+    const info = document.getElementById("karte-info");
     if (info && info.scrollIntoView) info.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
-  function showContinent(key) {
-    ["ek", "kal"].forEach(function (id) {
-      const on = id === key;
-      const panel = document.getElementById("karte-panel-" + id);
-      const tab = document.getElementById("karte-tab-" + id);
-      if (panel) panel.hidden = !on;
-      if (tab) {
-        tab.setAttribute("aria-selected", on ? "true" : "false");
-        tab.tabIndex = on ? 0 : -1;
-      }
-    });
-  }
-
   function continentOf(node) {
-    const panel = node.closest("[data-continent]");
-    return panel ? panel.getAttribute("data-continent") : "";
+    const own = node.getAttribute && node.getAttribute("data-continent");
+    if (own && own !== "world") return own;
+    const host = node.closest("[data-continent]");
+    return host ? host.getAttribute("data-continent") : "";
   }
 
-  function renderNeue() {
-    const slots = document.querySelectorAll("[data-karte-neue]");
-    if (!slots.length || !OFFMAP.length) return;
-    const cards = OFFMAP.map(function (item) {
-      return (
-        '<article class="karte-neue-item">' +
-        '<h4 class="karte-neue-title">' + esc(item.name) + neuBadge() + "</h4>" +
-        '<p class="karte-info-level">' + esc(levelText(item)) + "</p>" +
-        "<p>" + esc(item.text) + "</p>" +
-        '<p class="karte-neue-lage">' + esc(item.lage) + "</p>" +
-        "</article>"
-      );
-    }).join("");
-    const html = '<h3 class="karte-neue-heading">Neue Forever-Gebiete</h3>' + cards;
-    slots.forEach(function (slot) {
-      slot.innerHTML = html;
-      slot.hidden = false;
-    });
+  function toggleFull() {
+    const frame = document.getElementById("karte-frame");
+    if (!frame) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      return;
+    }
+    if (frame.requestFullscreen) frame.requestFullscreen();
   }
 
   function boot() {
     const root = document.getElementById("forever-karte");
     if (!root) return;
     renderLegend();
-    renderNeue();
-    Object.keys(MAPS).forEach(function (key) {
-      renderMap(key);
-      renderList(key);
-      const info = document.getElementById("karte-info-" + key);
-      if (info) info.innerHTML = hintHtml();
-    });
+    renderWorld();
+    Object.keys(MAPS).forEach(renderList);
+    const info = document.getElementById("karte-info");
+    if (info) info.innerHTML = hintHtml();
 
     root.addEventListener("click", function (event) {
-      const tab = event.target.closest("[role='tab']");
-      if (tab && root.contains(tab)) {
-        showContinent(tab.id === "karte-tab-kal" ? "kal" : "ek");
+      const focus = event.target.closest("[data-focus]");
+      if (focus && root.contains(focus)) {
+        applyCam(focus.getAttribute("data-focus") === "ek" ? world.ek : world.kal);
+        return;
+      }
+      const zoom = event.target.closest("[data-zoom]");
+      if (zoom && root.contains(zoom)) {
+        const kind = zoom.getAttribute("data-zoom");
+        if (kind === "in") zoomBy(0.72);
+        else if (kind === "out") zoomBy(1.38);
+        else toggleFull();
         return;
       }
       const hit = event.target.closest("[data-zone]");
       if (!hit || !root.contains(hit)) return;
-      const key = continentOf(hit);
-      if (!key) return;
+      const key = continentOf(hit) === "ek" ? "ek" : "kal";
       pinZone(key, hit.getAttribute("data-zone"), true);
     });
 
     root.addEventListener("keydown", function (event) {
-      const tab = event.target.closest("[role='tab']");
-      if (tab && root.contains(tab) && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
-        event.preventDefault();
-        const next = tab.id === "karte-tab-ek" ? "kal" : "ek";
-        showContinent(next);
-        const nextTab = document.getElementById("karte-tab-" + next);
-        if (nextTab) nextTab.focus();
-        return;
-      }
-      if ((event.key === "Enter" || event.key === " ") && event.target.classList && event.target.classList.contains("karte-zone")) {
+      const zone = event.target.classList && (event.target.classList.contains("karte-zone") || event.target.classList.contains("karte-dungeon"));
+      if ((event.key === "Enter" || event.key === " ") && zone) {
         event.preventDefault();
         event.target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       }
     });
 
     root.addEventListener("mouseover", function (event) {
-      const hit = event.target.closest(".karte-zone");
+      const hit = event.target.closest(".karte-zone, .karte-dungeon");
       if (!hit || !root.contains(hit)) return;
-      const key = continentOf(hit);
-      if (!key || pinned[key]) return;
+      if (pinned.world) return;
+      const key = continentOf(hit) === "ek" ? "ek" : "kal";
       showInfo(key, hit.getAttribute("data-zone"));
     });
 
     root.addEventListener("mouseout", function (event) {
-      const panel = event.target.closest("[data-continent]");
-      if (!panel || !root.contains(panel)) return;
       const next = event.relatedTarget;
-      if (next && panel.contains(next)) return;
-      const key = panel.getAttribute("data-continent");
-      if (!key || pinned[key]) return;
-      const info = document.getElementById("karte-info-" + key);
-      if (info) info.innerHTML = hintHtml();
+      if (next && root.contains(next) && next.closest && next.closest(".karte-zone, .karte-dungeon, #karte-info")) return;
+      if (pinned.world) return;
+      const infoBox = document.getElementById("karte-info");
+      if (infoBox && event.target.closest && event.target.closest("#karte-map")) infoBox.innerHTML = hintHtml();
+    });
+
+    document.addEventListener("fullscreenchange", function () {
+      const btn = root.querySelector("[data-zoom='full'] i");
+      if (btn) btn.className = document.fullscreenElement ? "fa-solid fa-compress" : "fa-solid fa-expand";
     });
   }
 
