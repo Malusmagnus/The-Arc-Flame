@@ -80,12 +80,8 @@ html {
   }
 }
 
-@media (min-width: 1440px) {
-  html {
-    scroll-padding-top: 6.75rem;
-  }
-}
-
+/* Section links stay in the horizontal bar under the header at every width.
+   The old side rail is not used. */
 #quick-nav {
   display: none;
 }
@@ -95,12 +91,11 @@ html {
 }
 
 @media (min-width: 1440px) {
-  #quick-nav {
-    display: flex;
-  }
-
-  #mobile-nav {
-    display: none;
+  #mobile-nav-links {
+    max-width: none;
+    justify-content: safe center;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 }
 
