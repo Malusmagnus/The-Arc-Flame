@@ -898,8 +898,46 @@
         <h2 class="mt-1 flex items-center gap-3 text-3xl font-black text-white">
           <i class="fa-solid fa-clipboard-list text-amber-400" aria-hidden="true"></i> Forever-Umfrage
         </h2>
-        <p class="mt-1 max-w-3xl text-sm text-slate-400">Welche Klasse spielst du als Main, welche als Twink? Die Umfrage geht ohne Anmeldung. Mit Konto kannst du deine Antwort später ändern.</p>
       </div>
+      <article id="server-poll" class="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4" aria-labelledby="server-poll-title">
+        <div>
+          <h3 id="server-poll-title" class="text-2xl font-black text-white">Servertyp</h3>
+          <p id="server-poll-question" class="mt-1 text-base text-slate-200">Auf welchem Servertyp wollen wir zum Full Release spielen?</p>
+          <p class="mt-1 max-w-3xl text-sm text-slate-400">Jeder hat eine Stimme. Alle sehen das Ergebnis. Wer wofür gestimmt hat, sehen nur die Offiziere.</p>
+        </div>
+        <form id="server-poll-form" class="space-y-4">
+          <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;">
+            <label for="server-poll-website">Website</label>
+            <input type="text" id="server-poll-website" name="website" tabindex="-1" autocomplete="off">
+          </div>
+          <div id="server-poll-choices" role="radiogroup" aria-labelledby="server-poll-question" class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <button type="button" role="radio" data-action="server-poll-choice" data-choice="pve" aria-checked="false" tabindex="0" class="inline-flex h-full min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-3 py-4 text-center text-lg font-bold text-white transition hover:bg-slate-700">PvE</button>
+            <button type="button" role="radio" data-action="server-poll-choice" data-choice="pvp" aria-checked="false" tabindex="-1" class="inline-flex h-full min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-3 py-4 text-center text-lg font-bold text-white transition hover:bg-slate-700">PvP</button>
+            <button type="button" role="radio" data-action="server-poll-choice" data-choice="rp" aria-checked="false" tabindex="-1" class="inline-flex h-full min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-3 py-4 text-center text-lg font-bold text-white transition hover:bg-slate-700">RP</button>
+            <button type="button" role="radio" data-action="server-poll-choice" data-choice="egal" aria-checked="false" tabindex="-1" class="inline-flex h-full min-h-11 w-full items-center justify-center rounded-xl bg-slate-800 px-3 py-4 text-center text-lg font-bold text-white transition hover:bg-slate-700">Mir egal</button>
+          </div>
+          <div>
+            <label for="server-poll-name" class="mb-1 block text-xs font-semibold text-slate-400">Charaktername</label>
+            <input type="text" id="server-poll-name" name="char_name" autocomplete="off" placeholder="z.B. Charaktername" minlength="2" maxlength="40" required class="min-h-11 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-base text-slate-200 focus:border-amber-500">
+          </div>
+          <p id="server-poll-status" class="text-sm text-emerald-400" hidden role="status"></p>
+          <button type="submit" id="server-poll-submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 py-3 font-black text-white shadow-lg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
+            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+            <span id="server-poll-submit-label">Antwort senden</span>
+          </button>
+        </form>
+        <div class="space-y-4 border-t border-slate-800 pt-2">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <h4 class="text-xl font-black text-white">Auswertung</h4>
+            <p id="server-poll-total" class="text-sm font-semibold text-amber-400" aria-live="polite">0 Stimmen</p>
+          </div>
+          <div id="server-poll-bars" class="space-y-2" aria-live="polite"></div>
+          <p id="server-poll-results-status" class="text-sm text-red-400" hidden role="status"></p>
+          <div id="server-poll-votes" data-perm="officer" hidden></div>
+        </div>
+      </article>
+      <div class="space-y-6">
+        <p class="max-w-3xl text-sm text-slate-400">Welche Klasse spielst du als Main, welche als Twink? Die Umfrage geht ohne Anmeldung. Mit Konto kannst du deine Antwort später ändern.</p>
       <form id="forever-poll-form" class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div class="space-y-4">
           <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;">
@@ -999,6 +1037,7 @@
           </div>
         </div>
         <div id="forever-poll-list"></div>
+      </div>
       </div>
     </section>
 
