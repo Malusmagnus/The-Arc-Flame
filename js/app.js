@@ -153,6 +153,18 @@
   let serverPollVotesLoading = false;
   let serverPollVotesError = false;
   let serverPollChannel = null;
+  let applicationRows = [];
+  let applicationStatus = "pending";
+  let applicationFront = "all";
+  let applicationPendingCount = 0;
+  let applicationEpoch = 0;
+  let applicationBusyId = "";
+  let applicationState = "idle";
+  let applicationsWatching = false;
+  let applicationChannel = null;
+  let applicationChannelSerial = 0;
+  let applicationRefreshTimer = 0;
+  let applicationFollow = null;
   let feedbackCategory = "";
   let feedbackFrontTouched = false;
   let feedbackSending = false;
@@ -602,6 +614,18 @@
       goTo("freischaltungen");
       return;
     }
+    if (action === "applications-status") {
+      setApplicationStatusFilter(el.dataset.status);
+      return;
+    }
+    if (action === "applications-front") {
+      setApplicationFrontFilter(el.dataset.front);
+      return;
+    }
+    if (action === "accept-application" || action === "reject-application") {
+      decideApplication(el.dataset.id, action === "accept-application");
+      return;
+    }
     if (action === "approve-user" || action === "reject-user") {
       setProfileStatus(
         el.dataset.userId,
@@ -877,6 +901,11 @@
       const at = items.findIndex(function (item) { return item.href === "#bewerbung"; });
       items.splice(at < 0 ? items.length : at, 0, entry);
     }
+    if (isOfficer()) {
+      const entry = { href: "#bewerbungen", label: "Bewerbungen", icon: "fa-inbox", tone: "text-amber-400", applicationsBadge: true };
+      const at = items.findIndex(function (item) { return item.href === "#bewerbung"; });
+      items.splice(at < 0 ? items.length : at, 0, entry);
+    }
     return items.map(function (item) {
       if (item.href !== "#forever-dkp") return item;
       return {
@@ -961,6 +990,7 @@
       icon.setAttribute("aria-hidden", "true");
       link.appendChild(icon);
       if (!iconsOnly) link.appendChild(document.createTextNode(item.label));
+      if (item.applicationsBadge) link.appendChild(applicationNavBadge());
       container.appendChild(link);
     });
   }
@@ -1079,6 +1109,7 @@
     renderDiscordSlots();
     syncChatGate();
     syncApprovalSection();
+    syncApplications();
     renderChat();
   }
 
@@ -1128,6 +1159,528 @@
 
   function isOfficer() {
     return !!(currentUser && (currentUser.role === "officer" || currentUser.role === "admin"));
+  }
+
+  const APPLICATION_TAB_ON = "inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-extrabold text-slate-950";
+  const APPLICATION_TAB_OFF = "inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700";
+  const APPLICATION_ACCEPT_BTN = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto";
+  const APPLICATION_REJECT_BTN = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto";
+
+  function applicationNavBadge() {
+    const badge = document.createElement("span");
+    badge.dataset.applicationsBadge = "1";
+    badge.className = "inline-flex items-center rounded-full bg-red-600 px-2 py-1 text-xs font-bold text-white";
+    badge.textContent = String(applicationPendingCount);
+    badge.hidden = applicationPendingCount < 1;
+    if (applicationPendingCount > 0) badge.setAttribute("aria-label", applicationPendingCount + " offen");
+    return badge;
+  }
+
+  function paintApplicationBadge() {
+    const sectionBadge = document.getElementById("bewerbungen-count");
+    if (sectionBadge) {
+      sectionBadge.textContent = String(applicationPendingCount);
+      sectionBadge.hidden = applicationPendingCount < 1;
+    }
+    const badges = document.querySelectorAll("[data-applications-badge]");
+    if (!badges.length && isOfficer()) {
+      updateQuickNav();
+      return;
+    }
+    badges.forEach(function (badge) {
+      badge.textContent = String(applicationPendingCount);
+      badge.hidden = applicationPendingCount < 1;
+      if (applicationPendingCount > 0) badge.setAttribute("aria-label", applicationPendingCount + " offen");
+      else badge.removeAttribute("aria-label");
+    });
+  }
+
+  function setApplicationStatusLine(message, isError) {
+    const el = document.getElementById("bewerbungen-status");
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.hidden = true;
+      el.className = "text-sm text-amber-200";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+    el.className = isError ? "text-sm text-red-400" : "text-sm text-amber-200";
+  }
+
+  function applicationStatusParam() {
+    if (applicationStatus === "pending" || applicationStatus === "accepted" || applicationStatus === "rejected") {
+      return applicationStatus;
+    }
+    return null;
+  }
+
+  function syncApplications() {
+    if (!isOfficer() || !remote || typeof remote.rpc !== "function") {
+      stopApplications();
+      return;
+    }
+    if (applicationsWatching) return;
+    applicationsWatching = true;
+    loadApplications();
+    subscribeApplications();
+    if (location.hash === "#bewerbungen") goTo("bewerbungen", { updateHistory: false, behavior: "auto" });
+  }
+
+  function stopApplications() {
+    applicationEpoch += 1;
+    applicationRows = [];
+    applicationPendingCount = 0;
+    applicationBusyId = "";
+    applicationState = "idle";
+    applicationsWatching = false;
+    applicationFollow = null;
+    window.clearTimeout(applicationRefreshTimer);
+    paintApplicationBadge();
+    setApplicationStatusLine("");
+    const list = document.getElementById("bewerbungen-list");
+    if (list) list.replaceChildren();
+    unsubscribeApplications();
+  }
+
+  function subscribeApplications() {
+    if (!remote || !isOfficer() || applicationChannel || typeof remote.channel !== "function") return;
+    try {
+      applicationChannelSerial += 1;
+      applicationChannel = remote.channel("arc-applications-" + applicationChannelSerial)
+        .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, function () {
+          if (!isOfficer()) return;
+          window.clearTimeout(applicationRefreshTimer);
+          applicationRefreshTimer = window.setTimeout(function () {
+            loadApplications();
+            if (applicationFollow && applicationStatus !== "all" && applicationStatus !== "accepted") {
+              refreshApplicationFollow();
+            }
+          }, 250);
+        })
+        .subscribe();
+    } catch (err) {
+      applicationChannel = null;
+    }
+  }
+
+  function unsubscribeApplications() {
+    const channel = applicationChannel;
+    applicationChannel = null;
+    if (!channel || !remote || typeof remote.removeChannel !== "function") return;
+    Promise.resolve(remote.removeChannel(channel)).catch(function () {});
+  }
+
+  function loadApplications() {
+    if (!remote || !isOfficer() || typeof remote.rpc !== "function") return;
+    const epoch = applicationEpoch + 1;
+    applicationEpoch = epoch;
+    const status = applicationStatusParam();
+    if (applicationState !== "ready") {
+      applicationState = "loading";
+      paintApplicationStatus();
+    }
+    remote.rpc("list_applications", { p_status: status }).then(function (result) {
+      if (epoch !== applicationEpoch || !isOfficer()) return;
+      if (!result || result.error) {
+        applicationState = applicationRows.length ? "ready" : "error";
+        paintApplicationStatus();
+        renderApplications();
+        return;
+      }
+      applicationRows = (Array.isArray(result.data) ? result.data : []).map(normalizeApplication).filter(Boolean);
+      applicationState = "ready";
+      syncApplicationFollowFromRows();
+      paintApplicationStatus();
+      if (status === null || status === "pending") {
+        applicationPendingCount = status === "pending"
+          ? applicationRows.length
+          : applicationRows.filter(function (row) { return row.status === "pending"; }).length;
+        paintApplicationBadge();
+        renderApplications();
+        return;
+      }
+      renderApplications();
+      loadApplicationPendingCount(epoch);
+    }).catch(function () {
+      if (epoch !== applicationEpoch || !isOfficer()) return;
+      applicationState = applicationRows.length ? "ready" : "error";
+      paintApplicationStatus();
+      renderApplications();
+    });
+  }
+
+  function paintApplicationStatus() {
+    if (applicationState === "loading" && !applicationRows.length) {
+      setApplicationStatusLine("Bewerbungen werden geladen…", false);
+      return;
+    }
+    if (applicationState === "error") {
+      setApplicationStatusLine("Die Bewerbungen konnten nicht geladen werden.", true);
+      return;
+    }
+    if (applicationFollow && !applicationById(applicationFollow.id)) {
+      const text = applicationNotifyText(applicationFollow.notify_status) || "Bewerbung angenommen.";
+      setApplicationStatusLine((applicationFollow.name || "Bewerbung") + ": " + text, applicationFollow.notify_status === "failed");
+      return;
+    }
+    setApplicationStatusLine("");
+  }
+
+  function syncApplicationFollowFromRows() {
+    if (!applicationFollow) return;
+    const found = applicationById(applicationFollow.id);
+    if (found && found.notify_status) applicationFollow.notify_status = found.notify_status;
+  }
+
+  function refreshApplicationFollow() {
+    if (!applicationFollow || !remote || !isOfficer()) return;
+    if (applicationFollow.notify_status === "sent" || applicationFollow.notify_status === "partial" || applicationFollow.notify_status === "failed") return;
+    const id = applicationFollow.id;
+    remote.rpc("list_applications", { p_status: "accepted" }).then(function (result) {
+      if (!applicationFollow || applicationFollow.id !== id || !isOfficer()) return;
+      if (!result || result.error || !Array.isArray(result.data)) return;
+      const found = result.data.map(normalizeApplication).filter(Boolean).find(function (row) {
+        return row.id === id;
+      });
+      if (!found) return;
+      applicationFollow.notify_status = found.notify_status;
+      const index = applicationRows.findIndex(function (row) { return row.id === id; });
+      if (index >= 0) applicationRows[index] = found;
+      renderApplications();
+      paintApplicationStatus();
+    }).catch(function () {});
+  }
+
+  function loadApplicationPendingCount(epoch) {
+    if (!remote || !isOfficer()) return;
+    remote.rpc("list_applications", { p_status: "pending" }).then(function (result) {
+      if (epoch !== applicationEpoch || !isOfficer()) return;
+      if (!result || result.error || !Array.isArray(result.data)) return;
+      applicationPendingCount = result.data.length;
+      paintApplicationBadge();
+      renderApplicationFilters();
+    }).catch(function () {});
+  }
+
+  function normalizeApplication(row) {
+    if (!row || row.id == null) return null;
+    const id = String(row.id);
+    const front = row.front === "forever" || row.front === "retail" ? row.front : "";
+    const status = row.status === "accepted" || row.status === "rejected" || row.status === "pending" ? row.status : "";
+    if (!status) return null;
+    const notify = row.notify_status === "pending" || row.notify_status === "sent" || row.notify_status === "partial" || row.notify_status === "failed"
+      ? row.notify_status
+      : null;
+    return {
+      id: id,
+      created_at: row.created_at || "",
+      front: front,
+      name: String(row.name || "").trim(),
+      class_spec: String(row.class_spec || "").trim(),
+      realm: String(row.realm || "").trim(),
+      about: String(row.about || "").trim(),
+      experience: String(row.experience || "").trim(),
+      contact: String(row.contact || "").trim(),
+      status: status,
+      decided_by_name: String(row.decided_by_name || "").trim(),
+      decided_at: row.decided_at || "",
+      member_id: row.member_id || null,
+      notify_status: notify,
+    };
+  }
+
+  function setApplicationStatusFilter(next) {
+    if (!isOfficer()) return;
+    if (next !== "pending" && next !== "accepted" && next !== "rejected" && next !== "all") return;
+    if (next === applicationStatus) return;
+    applicationStatus = next;
+    loadApplications();
+  }
+
+  function setApplicationFrontFilter(next) {
+    if (!isOfficer()) return;
+    if (next !== "all" && next !== "retail" && next !== "forever") return;
+    applicationFront = next;
+    renderApplications();
+  }
+
+  function visibleApplications() {
+    return applicationRows.filter(function (row) {
+      if (applicationFront === "retail" || applicationFront === "forever") return row.front === applicationFront;
+      return true;
+    });
+  }
+
+  function renderApplicationFilters() {
+    const statusTabs = [
+      ["pending", "Offen"],
+      ["accepted", "Angenommen"],
+      ["rejected", "Abgelehnt"],
+      ["all", "Alle"],
+    ];
+    statusTabs.forEach(function (entry) {
+      const button = document.getElementById("applications-status-" + entry[0]);
+      if (!button) return;
+      const on = applicationStatus === entry[0];
+      button.className = on ? APPLICATION_TAB_ON : APPLICATION_TAB_OFF;
+      button.setAttribute("aria-selected", on ? "true" : "false");
+      button.textContent = entry[1];
+    });
+    ["all", "retail", "forever"].forEach(function (front) {
+      const button = document.getElementById("applications-front-" + front);
+      if (!button) return;
+      const on = applicationFront === front;
+      button.className = on ? APPLICATION_TAB_ON : APPLICATION_TAB_OFF;
+      button.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  function applicationStatusLabel(status) {
+    if (status === "accepted") return "Angenommen";
+    if (status === "rejected") return "Abgelehnt";
+    return "Offen";
+  }
+
+  function applicationStatusClass(status) {
+    if (status === "accepted") return "inline-flex items-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400";
+    if (status === "rejected") return "inline-flex items-center rounded-full bg-red-500/20 px-3 py-1 text-xs font-bold text-red-400";
+    return "inline-flex items-center rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-400";
+  }
+
+  function applicationFrontLabel(front) {
+    if (front === "forever") return "Forever";
+    if (front === "retail") return "Retail";
+    return "";
+  }
+
+  function applicationNotifyText(status) {
+    if (status === "pending") return "Nachricht wird gesendet…";
+    if (status === "sent") return "Discord-Nachricht und Begrüßung gesendet";
+    if (status === "partial") return "Begrüßung in #willkommen gepostet (keine Privatnachricht möglich)";
+    if (status === "failed") return "Discord-Nachricht fehlgeschlagen";
+    return "";
+  }
+
+  function applicationNotifyClass(status) {
+    if (status === "sent") return "text-sm text-emerald-400";
+    if (status === "failed") return "text-sm text-red-400";
+    return "text-sm text-amber-200";
+  }
+
+  function applicationField(label, value) {
+    const wrap = document.createElement("div");
+    wrap.className = "min-w-0";
+    const title = document.createElement("p");
+    title.className = "text-xs font-semibold text-slate-400";
+    title.textContent = label;
+    const body = document.createElement("p");
+    body.className = "mt-1 break-words text-sm text-slate-200";
+    const text = String(value || "").trim();
+    if (!text) {
+      body.textContent = "—";
+    } else {
+      text.split("\n").forEach(function (line, index) {
+        if (index) body.appendChild(document.createElement("br"));
+        body.appendChild(document.createTextNode(line));
+      });
+    }
+    wrap.append(title, body);
+    return wrap;
+  }
+
+  function applicationEmptyText() {
+    const game = applicationFront === "retail" ? " für Retail" : applicationFront === "forever" ? " für Forever" : "";
+    if (applicationStatus === "pending") return "Keine offenen Bewerbungen" + game + ".";
+    if (applicationStatus === "accepted") return "Keine angenommenen Bewerbungen" + game + ".";
+    if (applicationStatus === "rejected") return "Keine abgelehnten Bewerbungen" + game + ".";
+    return "Keine Bewerbungen" + game + ".";
+  }
+
+  function renderApplications() {
+    renderApplicationFilters();
+    const list = document.getElementById("bewerbungen-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!isOfficer()) return;
+    const rows = visibleApplications();
+    if (!rows.length) {
+      if (applicationState === "loading" || applicationState === "error") return;
+      const empty = document.createElement("p");
+      empty.className = "text-sm text-slate-400";
+      empty.textContent = applicationEmptyText();
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach(function (row) {
+      list.appendChild(applicationCard(row));
+    });
+  }
+
+  function applicationCard(row) {
+    const card = document.createElement("article");
+    card.className = "space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-4 shadow-sm";
+    card.dataset.applicationId = row.id;
+    const head = document.createElement("div");
+    head.className = "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between";
+    const identity = document.createElement("div");
+    identity.className = "min-w-0";
+    const name = document.createElement("h3");
+    name.className = "break-words text-lg font-black text-white";
+    name.textContent = row.name || "Unbekannt";
+    const when = document.createElement("p");
+    when.className = "text-xs text-slate-400";
+    const created = formatDkpStamp(row.created_at);
+    when.textContent = created ? "Eingegangen " + created : "";
+    identity.append(name, when);
+    const pill = document.createElement("span");
+    pill.className = applicationStatusClass(row.status);
+    pill.textContent = applicationStatusLabel(row.status);
+    head.append(identity, pill);
+    card.appendChild(head);
+
+    const game = document.createElement("p");
+    game.className = row.front === "retail" ? "text-xs font-bold text-red-400" : "text-xs font-bold text-amber-400";
+    game.textContent = applicationFrontLabel(row.front) || "—";
+    card.appendChild(game);
+
+    const grid = document.createElement("div");
+    grid.className = "grid grid-cols-1 gap-3 sm:grid-cols-2";
+    grid.append(
+      applicationField("Klasse/Spec", row.class_spec),
+      applicationField("Realm", row.realm),
+      applicationField("Kontakt", row.contact)
+    );
+    card.appendChild(grid);
+    card.appendChild(applicationField("Nachricht", row.about));
+    card.appendChild(applicationField("Erfahrung", row.experience));
+
+    if (row.status !== "pending") {
+      const decided = document.createElement("p");
+      decided.className = "text-sm text-slate-300";
+      decided.textContent = applicationDecisionText(row);
+      card.appendChild(decided);
+    }
+    const notifyText = row.status === "accepted" ? applicationNotifyText(row.notify_status) : "";
+    if (notifyText) {
+      const note = document.createElement("p");
+      note.className = applicationNotifyClass(row.notify_status);
+      note.textContent = notifyText;
+      card.appendChild(note);
+    }
+    if (row.status === "pending") {
+      const actions = document.createElement("div");
+      actions.className = "flex flex-col gap-2 sm:flex-row";
+      actions.append(
+        applicationDecisionButton("accept-application", row, "Annehmen", APPLICATION_ACCEPT_BTN, "fa-check"),
+        applicationDecisionButton("reject-application", row, "Ablehnen", APPLICATION_REJECT_BTN, "fa-xmark")
+      );
+      card.appendChild(actions);
+    }
+    return card;
+  }
+
+  function applicationDecisionText(row) {
+    const verb = row.status === "accepted" ? "Angenommen" : "Abgelehnt";
+    const when = formatDkpStamp(row.decided_at);
+    if (row.decided_by_name && when) return verb + " von " + row.decided_by_name + " am " + when;
+    if (row.decided_by_name) return verb + " von " + row.decided_by_name;
+    if (when) return verb + " am " + when;
+    return verb;
+  }
+
+  function applicationDecisionButton(action, row, label, className, iconName) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.action = action;
+    button.dataset.id = row.id;
+    button.className = className;
+    button.disabled = applicationBusyId === row.id;
+    const icon = document.createElement("i");
+    icon.className = "fa-solid " + iconName;
+    icon.setAttribute("aria-hidden", "true");
+    button.append(icon, document.createTextNode(label));
+    return button;
+  }
+
+  function applicationById(id) {
+    for (let i = 0; i < applicationRows.length; i += 1) {
+      if (applicationRows[i] && applicationRows[i].id === id) return applicationRows[i];
+    }
+    return null;
+  }
+
+  function applicationErrorText(error, fallback) {
+    const raw = String((error && (error.message || error.error_description)) || "").replace(/^\s*ERROR:\s*/i, "").trim();
+    if (!raw || /permission|jwt|pgrst|failed to fetch|network|schema cache/i.test(raw)) return fallback;
+    if (raw.length > 180) return fallback;
+    return raw;
+  }
+
+  function decideApplication(id, accept) {
+    if (applicationBusyId) return;
+    if (!isOfficer()) {
+      notify("Nur Offiziere dürfen Bewerbungen entscheiden.", "error");
+      return;
+    }
+    const row = applicationById(id);
+    if (!row || row.status !== "pending") return;
+    const name = row.name || "Diese Bewerbung";
+    const question = accept
+      ? name + " wirklich annehmen? Er kommt in die Mitgliederliste und bekommt eine Nachricht im Discord."
+      : name + " wirklich ablehnen?";
+    if (!window.confirm(question)) return;
+    if (!requireRemote()) return;
+    applicationBusyId = id;
+    renderApplications();
+    remote.rpc(accept ? "accept_application" : "reject_application", { p_id: id }).then(function (result) {
+      if (applicationBusyId === id) applicationBusyId = "";
+      if (!isOfficer()) return;
+      if (!result || result.error) {
+        renderApplications();
+        notify(applicationErrorText(result && result.error, accept
+          ? "Die Bewerbung konnte nicht angenommen werden."
+          : "Die Bewerbung konnte nicht abgelehnt werden."), "error");
+        return;
+      }
+      const payload = applicationRpcPayload(result.data);
+      if (accept) {
+        applicationFollow = {
+          id: String(id),
+          name: name,
+          notify_status: (payload && payload.notify_status) || "pending",
+        };
+        notify(applicationNotifyText(applicationFollow.notify_status) || "Bewerbung angenommen.", "info");
+        refreshMembersFromRemote();
+      } else {
+        applicationFollow = null;
+        notify("Bewerbung abgelehnt.", "info");
+      }
+      loadApplications();
+    }).catch(function (err) {
+      if (applicationBusyId === id) applicationBusyId = "";
+      renderApplications();
+      notify(applicationErrorText(err, accept
+        ? "Die Bewerbung konnte nicht angenommen werden."
+        : "Die Bewerbung konnte nicht abgelehnt werden."), "error");
+    });
+  }
+
+  function applicationRpcPayload(data) {
+    if (!data) return null;
+    if (Array.isArray(data)) return data[0] || null;
+    return data;
+  }
+
+  function refreshMembersFromRemote() {
+    if (!remote || !remoteReady) return;
+    fetchRows("members", "id, front, name, rank, sort_order", "sort_order", true).then(function (rows) {
+      replaceItems(retailMembers, rows.filter(function (row) { return row.front === "retail"; }).map(mapMember));
+      replaceItems(foreverMembers, rows.filter(function (row) { return row.front === "forever"; }).map(mapMember));
+      renderMembers("retail");
+      renderMembers("forever");
+    }).catch(function () { /* Die bisherige Mitgliederliste bleibt sichtbar. */ });
   }
 
   function isAdmin() {
