@@ -28,6 +28,7 @@
   const FOREVER_IDS = new Set([
     "content-forever",
     "forever-uebersicht",
+    "forever-turnier",
     "forever-planer",
     "forever-kader",
     "forever-mitglieder",
@@ -76,6 +77,7 @@
   const FOREVER_NAV = [
     { href: "#werte", label: "Über uns", icon: "fa-fire", tone: "text-amber-400" },
     { href: "#forever-uebersicht", label: "Übersicht", icon: "fa-hourglass-start", tone: "text-amber-400" },
+    { href: "#forever-turnier", label: "Turnier", icon: "fa-trophy", tone: "text-amber-400" },
     { href: "#forever-beute", label: "Beute", icon: "fa-gem", tone: "text-amber-400" },
     { href: "#forever-karte", label: "Karte", icon: "fa-map", tone: "text-amber-400" },
     { href: "#raidplanung", label: "Raids", icon: "fa-calendar-days", tone: "text-amber-400" },
@@ -111,6 +113,11 @@
   let rosterRefreshTimer = 0;
   let raidRefreshTimer;
   let serverPollRefreshTimer = 0;
+  let tournamentRows = [];
+  let tournamentEpoch = 0;
+  let tournamentSending = false;
+  let tournamentChannel = null;
+  let tournamentRefreshTimer = 0;
 
   const retailMembers = clone(DEFAULTS.retailMembers || []);
   const foreverMembers = clone(DEFAULTS.foreverMembers || []);
@@ -195,6 +202,8 @@
   let raidNamesReady = false;
 
   const FOREVER_POLL_CLASSES = ["Krieger", "Paladin", "Jäger", "Schurke", "Priester", "Schamane", "Magier", "Hexenmeister", "Druide"];
+  const TOURNAMENT_CLASSES = FOREVER_POLL_CLASSES.slice();
+  const TOURNAMENT_FACTIONS = ["horde", "alliance"];
   const FOREVER_POLL_TWINK = FOREVER_POLL_CLASSES.concat(["Noch unklar"]);
   const FOREVER_POLL_ROLES = ["Tank", "Heiler", "Schaden"];
   const FOREVER_POLL_RACES = ["Skyborne", "Orc", "Untoter", "Tauren", "Troll"];
@@ -294,6 +303,7 @@
     renderLeadership();
     loadGuildInfoView();
     renderForeverPoll();
+    renderTournamentList();
     renderServerPoll();
     initLootFilters();
     renderLoot();
@@ -653,6 +663,11 @@
       deleteForeverPoll(el.dataset.id);
       return;
     }
+    if (action === "cancel-tournament") {
+      event.preventDefault();
+      cancelTournamentSignup(el.dataset.id);
+      return;
+    }
     if (action === "delete-server-poll") {
       event.preventDefault();
       deleteServerPoll(el.dataset.id);
@@ -793,6 +808,9 @@
     } else if (form.id === "forever-poll-form") {
       event.preventDefault();
       submitForeverPoll(form);
+    } else if (form.id === "tournament-form") {
+      event.preventDefault();
+      submitTournamentSignup(form);
     } else if (form.id === "server-poll-form") {
       event.preventDefault();
       submitServerPoll(form);
@@ -4633,6 +4651,7 @@
     renderLeadership();
     renderGallery();
     renderForeverPoll();
+    renderTournamentList();
     renderServerPoll();
     renderDkp();
     renderRaids();
@@ -6162,6 +6181,7 @@
     }
     loadGallery();
     loadForeverPoll();
+    loadTournamentSignups();
     loadServerPollResults();
     loadLoot();
     subscribeLoot();
@@ -6174,6 +6194,9 @@
             if (approvalEnforced) replaceItems(chatMessages, []);
             clearForeverPollOwn();
             clearServerPollSession();
+            tournamentRows = [];
+            renderTournamentList();
+            loadTournamentSignups();
             clearDkpData();
             raidSignups = [];
             raidNamesReady = false;
@@ -6191,6 +6214,7 @@
             if (event !== "TOKEN_REFRESHED") {
               loadMyForeverPoll();
               loadMyServerPoll();
+              loadTournamentSignups();
               if (isOfficer()) loadServerPollVotes();
             }
             if (remoteReady && event === "SIGNED_IN") loadRaids();
@@ -6221,6 +6245,7 @@
       syncDkpAccess();
       loadMyForeverPoll();
       loadMyServerPoll();
+      loadTournamentSignups();
       if (isOfficer()) loadServerPollVotes();
       loadRaids();
       subscribeLive();
@@ -6414,6 +6439,7 @@
   function subscribeLive() {
     if (!remote) return;
     subscribeServerPoll();
+    subscribeTournament();
     const front = chatFront();
     if (liveChannel && liveChannelFront === front) return;
     const previous = liveChannel;
@@ -6458,6 +6484,209 @@
     } catch (err) {
       serverPollChannel = null;
     }
+  }
+
+  function subscribeTournament() {
+    if (!remote || tournamentChannel || typeof remote.channel !== "function") return;
+    try {
+      tournamentChannel = remote.channel("arc-tournament")
+        .on("postgres_changes", { event: "*", schema: "public", table: "tournament_signups" }, function () {
+          window.clearTimeout(tournamentRefreshTimer);
+          tournamentRefreshTimer = window.setTimeout(loadTournamentSignups, 250);
+        })
+        .subscribe();
+    } catch (err) {
+      tournamentChannel = null;
+    }
+  }
+
+  function tournamentFactionLabel(value) {
+    const faction = String(value || "").toLowerCase();
+    if (faction === "horde") return "Horde";
+    if (faction === "alliance" || faction === "allianz") return "Allianz";
+    return "";
+  }
+
+  function normalizeTournamentRow(row) {
+    if (!row || row.id == null) return null;
+    const id = String(row.id);
+    if (!isDkpUuid(id)) return null;
+    const className = String(row["class"] || "").trim();
+    const faction = String(row.faction || "").toLowerCase();
+    return {
+      id: id,
+      created_at: String(row.created_at || ""),
+      character_name: String(row.character_name || "").trim(),
+      className: className,
+      faction: faction,
+      discord_name: String(row.discord_name || "").trim(),
+      is_mine: row.is_mine === true,
+    };
+  }
+
+  function showTournamentStatus(message, kind) {
+    const el = document.getElementById("tournament-status");
+    if (!el) return;
+    if (!message) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+    el.className = "text-sm " + (kind === "error" ? "text-red-400" : "text-emerald-400");
+  }
+
+  function tournamentErrorText(error, fallback) {
+    const msg = String((error && error.message) || "").replace(/^ERROR:\s*/i, "").trim();
+    if (!msg || /failed to fetch|network|jwt|schema cache|permission denied|PGRST/i.test(msg)) return fallback;
+    return msg;
+  }
+
+  function renderTournamentList() {
+    const list = document.getElementById("tournament-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!tournamentRows.length) {
+      const note = document.createElement("p");
+      note.className = "text-sm text-slate-400";
+      note.textContent = "Die Teilnehmerliste sehen Gildenmitglieder und Angemeldete.";
+      list.appendChild(note);
+      return;
+    }
+    const count = document.createElement("p");
+    count.className = "text-sm font-semibold text-amber-400";
+    count.textContent = tournamentRows.length === 1 ? "1 Teilnehmer" : tournamentRows.length + " Teilnehmer";
+    const items = document.createElement("ul");
+    items.className = "grid grid-cols-1 gap-3 sm:grid-cols-2";
+    items.setAttribute("aria-label", "Teilnehmer");
+    tournamentRows.forEach(function (row) {
+      const item = document.createElement("li");
+      item.className = "rounded-xl border border-slate-800 bg-slate-950/60 p-4";
+      const head = document.createElement("div");
+      head.className = "flex items-start justify-between gap-3";
+      const text = document.createElement("div");
+      text.className = "min-w-0";
+      const name = document.createElement("p");
+      name.className = "break-words font-bold text-white";
+      name.textContent = row.character_name || "Unbekannt";
+      const meta = document.createElement("p");
+      meta.className = "mt-1 text-sm text-slate-300";
+      const faction = tournamentFactionLabel(row.faction);
+      meta.textContent = [row.className, faction].filter(Boolean).join(" · ");
+      const discord = document.createElement("p");
+      discord.className = "mt-1 break-words text-sm text-slate-400";
+      discord.textContent = row.discord_name ? "Discord: " + row.discord_name : "";
+      text.append(name, meta);
+      if (row.discord_name) text.appendChild(discord);
+      head.appendChild(text);
+      if (isOfficer() || row.is_mine) {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.dataset.action = "cancel-tournament";
+        cancel.dataset.id = row.id;
+        cancel.className = "inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-xs font-bold text-red-400 hover:text-white";
+        cancel.textContent = "Abmelden";
+        cancel.setAttribute("aria-label", "Abmelden: " + (row.character_name || "Teilnehmer"));
+        head.appendChild(cancel);
+      }
+      item.appendChild(head);
+      items.appendChild(item);
+    });
+    list.append(count, items);
+  }
+
+  function loadTournamentSignups() {
+    if (!remote || typeof remote.rpc !== "function") return Promise.resolve();
+    const epoch = tournamentEpoch + 1;
+    tournamentEpoch = epoch;
+    return remote.rpc("list_tournament_signups").then(function (result) {
+      if (epoch !== tournamentEpoch) return;
+      if (!result || result.error) return;
+      const rows = Array.isArray(result.data) ? result.data : [];
+      tournamentRows = rows.map(normalizeTournamentRow).filter(Boolean);
+      tournamentRows.sort(function (a, b) {
+        if (a.created_at < b.created_at) return -1;
+        if (a.created_at > b.created_at) return 1;
+        return a.character_name.localeCompare(b.character_name, "de");
+      });
+      renderTournamentList();
+    }).catch(function () { /* Die letzte Liste bleibt stehen. */ });
+  }
+
+  function submitTournamentSignup(form) {
+    if (tournamentSending) return;
+    if (!remote || typeof remote.rpc !== "function") {
+      showTournamentStatus("Die Anmeldung ist gerade nicht erreichbar.", "error");
+      return;
+    }
+    const name = fieldValue("tournament-name").trim();
+    const className = pollChoice(fieldValue("tournament-class"), TOURNAMENT_CLASSES);
+    const faction = pollChoice(fieldValue("tournament-faction"), TOURNAMENT_FACTIONS);
+    const discord = fieldValue("tournament-discord").trim();
+    if (name.length < 2 || name.length > 24) {
+      showTournamentStatus("Bitte einen Charakternamen mit 2 bis 24 Zeichen eingeben.", "error");
+      return;
+    }
+    if (!className) {
+      showTournamentStatus("Bitte eine Klasse aus der Liste wählen.", "error");
+      return;
+    }
+    if (!faction) {
+      showTournamentStatus("Bitte Horde oder Allianz wählen.", "error");
+      return;
+    }
+    if (discord.length < 2 || discord.length > 40) {
+      showTournamentStatus("Bitte einen Discord-Namen mit 2 bis 40 Zeichen eingeben.", "error");
+      return;
+    }
+    const button = document.getElementById("tournament-submit");
+    tournamentSending = true;
+    if (button) button.disabled = true;
+    remote.rpc("submit_tournament_signup", {
+      p_character_name: name,
+      p_class: className,
+      p_faction: faction,
+      p_discord_name: discord,
+    }).then(function (result) {
+      if (!result || result.error) {
+        showTournamentStatus(tournamentErrorText(result && result.error, "Die Anmeldung konnte nicht gespeichert werden."), "error");
+        return;
+      }
+      if (form) form.reset();
+      showTournamentStatus("Danke. Du bist angemeldet.", "info");
+      return loadTournamentSignups();
+    }).catch(function () {
+      showTournamentStatus("Die Anmeldung konnte nicht gespeichert werden.", "error");
+    }).then(function () {
+      tournamentSending = false;
+      if (button) button.disabled = false;
+    });
+  }
+
+  function cancelTournamentSignup(id) {
+    if (!isDkpUuid(id)) return;
+    const row = tournamentRows.filter(function (item) { return item.id === id; })[0];
+    if (!isOfficer() && !(row && row.is_mine)) {
+      showTournamentStatus("Diese Anmeldung kannst du nicht zurücknehmen.", "error");
+      return;
+    }
+    if (!remote || typeof remote.rpc !== "function") {
+      showTournamentStatus("Abmelden ist gerade nicht möglich.", "error");
+      return;
+    }
+    const who = row && row.character_name ? row.character_name : "diesen Teilnehmer";
+    if (!window.confirm("„" + who + "“ wirklich abmelden?")) return;
+    remote.rpc("cancel_tournament_signup", { p_id: id }).then(function (result) {
+      if (!result || result.error) {
+        showTournamentStatus(tournamentErrorText(result && result.error, "Die Anmeldung konnte nicht gelöscht werden."), "error");
+        return null;
+      }
+      showTournamentStatus("Anmeldung gelöscht.", "info");
+      return loadTournamentSignups();
+    }).catch(function () {
+      showTournamentStatus("Die Anmeldung konnte nicht gelöscht werden.", "error");
+    });
   }
 
   function isDkpUuid(value) {
