@@ -283,3 +283,187 @@ input:focus, select:focus { outline: 2px solid var(--gold); outline-offset: 1px;
 @media (max-width: 639px) {
   input, select { font-size: 16px; }
 }
+
+.wrap-wide { width: min(76rem, calc(100% - 2rem)); }
+
+.baum { margin-top: 1.25rem; }
+
+.baum-banner {
+  margin: 1rem 0 0;
+  color: var(--amber);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.admin-bar p { margin: 0; color: var(--soft); font-size: 0.95rem; }
+
+.btn-admin, .btn-ghost, .mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-admin {
+  border: 0;
+  padding: 0.7rem 1.1rem;
+  color: #1a1008;
+  background: linear-gradient(100deg, #f4c343, #f59e0b);
+}
+
+.btn-ghost, .mini {
+  border: 1px solid var(--line);
+  background: rgba(16, 10, 14, 0.45);
+  color: var(--text);
+  padding: 0.55rem 0.85rem;
+}
+
+.btn-admin:disabled, .btn-ghost:disabled, .mini:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn-admin:focus-visible, .btn-ghost:focus-visible, .mini:focus-visible, .cancel:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.mini-good { color: #6ee7b7; }
+.mini-bad { color: #fca5a5; }
+
+.person-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.pill {
+  display: inline-block;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pill-pending { color: #fde68a; background: rgba(245, 158, 11, 0.2); }
+.pill-approved { color: #6ee7b7; background: rgba(16, 185, 129, 0.16); }
+.pill-rejected { color: #fca5a5; background: rgba(248, 113, 113, 0.16); }
+
+.champion {
+  margin-top: 1rem;
+  border: 1px solid rgba(244, 195, 67, 0.45);
+  border-radius: 0.85rem;
+  padding: 0.9rem 1rem;
+  background: rgba(244, 195, 67, 0.12);
+}
+
+.champion p { margin: 0; }
+.champion .card-label { color: var(--amber); }
+
+.group-list, .ko-wrap { margin-top: 1.25rem; }
+
+.group-card {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: rgba(12, 8, 10, 0.35);
+  padding: 1rem;
+  margin-top: 0.85rem;
+}
+
+.group-list > h3, .ko-wrap > h3,
+.group-card h3, .ko-col h3 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", Georgia, serif;
+  font-size: 1.15rem;
+  color: var(--amber);
+}
+
+.standings {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+
+.standings th, .standings td {
+  padding: 0.45rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.standings th {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.num { text-align: right; white-space: nowrap; }
+
+.tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  color: var(--amber);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pair-list { display: grid; gap: 0.65rem; margin-top: 0.85rem; }
+
+.pair, .match {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.slot:last-child { border-bottom: 0; }
+.slot.is-winner { background: rgba(244, 195, 67, 0.16); }
+.slot.is-bye { color: var(--muted); font-style: italic; }
+
+.slot-name { margin: 0; font-weight: 800; overflow-wrap: anywhere; }
+.slot-meta { margin: 0.15rem 0 0; color: var(--soft); font-size: 0.85rem; overflow-wrap: anywhere; }
+
+.ko-scroll { overflow-x: auto; padding-bottom: 0.4rem; }
+
+.ko {
+  display: flex;
+  align-items: stretch;
+  gap: 0.85rem;
+  min-width: min-content;
+  margin-top: 0.75rem;
+}
+
+.ko-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 0.75rem;
+  flex: 1 0 13.5rem;
+  min-width: 13.5rem;
+}
+
+.swipe { margin: 0.75rem 0 0; color: #94a3b8; font-size: 0.85rem; }
