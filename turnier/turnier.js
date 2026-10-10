@@ -5,6 +5,8 @@
   var FACTIONS = ["horde", "alliance"];
   var SIGNUP_FROM = "2026-10-11";
   var GUEST_LIST = "Die Teilnehmerliste sehen Gildenmitglieder und Angemeldete.";
+  var SUPABASE_URL = "https://asbhzoskbbifiuluijwl.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzYmh6b3NrYmJpZml1bHVpandsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0MTYyMTIsImV4cCI6MjEwNTk5MjIxMn0.bmOULxoOVViR7WWiXWeawcufNKMOH3rNZsWbSHBwUU0";
 
   var rows = [];
   var epoch = 0;
@@ -12,14 +14,10 @@
   var officer = false;
   var remote = null;
 
-  function config() {
-    return window.ARC_CONFIG || {};
-  }
-
   function createRemote() {
     var lib = window.supabase;
-    var url = typeof config().supabaseUrl === "string" ? config().supabaseUrl.trim() : "";
-    var key = typeof config().supabaseAnonKey === "string" ? config().supabaseAnonKey.trim() : "";
+    var url = SUPABASE_URL.trim();
+    var key = SUPABASE_ANON_KEY.trim();
     if (!lib || typeof lib.createClient !== "function") return null;
     if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || key.length < 20) return null;
     try {
@@ -80,7 +78,7 @@
     }
     el.hidden = false;
     el.textContent = message;
-    el.className = "text-sm " + (kind === "error" ? "text-red-400" : "text-emerald-400");
+    el.className = "status " + (kind === "error" ? "is-error" : "is-ok");
   }
 
   function errorText(error, fallback) {
@@ -120,34 +118,33 @@
     list.replaceChildren();
     if (!rows.length) {
       var note = document.createElement("p");
-      note.className = "text-sm text-slate-400";
+      note.className = "muted";
       note.textContent = GUEST_LIST;
       list.appendChild(note);
       return;
     }
     var count = document.createElement("p");
-    count.className = "text-sm font-semibold text-amber-400";
+    count.className = "count";
     count.textContent = rows.length === 1 ? "1 Teilnehmer" : rows.length + " Teilnehmer";
     var items = document.createElement("ul");
-    items.className = "grid grid-cols-1 gap-3 sm:grid-cols-2";
+    items.className = "people";
     items.setAttribute("aria-label", "Teilnehmer");
     rows.forEach(function (row) {
       var item = document.createElement("li");
-      item.className = "rounded-xl border border-slate-800 bg-slate-950/60 p-4";
+      item.className = "person";
       var head = document.createElement("div");
-      head.className = "flex items-start justify-between gap-3";
+      head.className = "person-head";
       var text = document.createElement("div");
-      text.className = "min-w-0";
       var name = document.createElement("p");
-      name.className = "break-words font-bold text-white";
+      name.className = "person-name";
       name.textContent = row.character_name || "Unbekannt";
       var meta = document.createElement("p");
-      meta.className = "mt-1 text-sm text-slate-300";
+      meta.className = "person-meta";
       meta.textContent = [row.className, factionLabel(row.faction)].filter(Boolean).join(" · ");
       text.append(name, meta);
       if (row.discord_name) {
         var discord = document.createElement("p");
-        discord.className = "mt-1 break-words text-sm text-slate-400";
+        discord.className = "person-meta";
         discord.textContent = "Discord: " + row.discord_name;
         text.appendChild(discord);
       }
@@ -155,7 +152,7 @@
       if (officer || row.is_mine) {
         var cancel = document.createElement("button");
         cancel.type = "button";
-        cancel.className = "inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-xs font-bold text-red-400 hover:text-white";
+        cancel.className = "cancel";
         cancel.textContent = "Abmelden";
         cancel.setAttribute("aria-label", "Abmelden: " + (row.character_name || "Teilnehmer"));
         cancel.addEventListener("click", function () {
@@ -180,7 +177,7 @@
         if (list && !rows.length) {
           list.replaceChildren();
           var note = document.createElement("p");
-          note.className = "text-sm text-red-400";
+          note.className = "error";
           note.textContent = "Die Teilnehmerliste konnte nicht geladen werden.";
           list.appendChild(note);
         }
@@ -199,7 +196,7 @@
       if (!list || rows.length) return;
       list.replaceChildren();
       var note = document.createElement("p");
-      note.className = "text-sm text-red-400";
+      note.className = "error";
       note.textContent = "Die Teilnehmerliste konnte nicht geladen werden.";
       list.appendChild(note);
     });
@@ -223,7 +220,7 @@
   function submitSignup(form) {
     if (sending) return;
     if (!signupOpen()) {
-      showStatus("Anmeldung ab Sonntag, 11.10.2026.", "error");
+      showStatus("Anmeldung zum Turnier der Kraft ab Sonntag, 11.10.2026.", "error");
       syncSignupGate();
       return;
     }
@@ -316,7 +313,7 @@
       if (list) {
         list.replaceChildren();
         var note = document.createElement("p");
-        note.className = "text-sm text-red-400";
+        note.className = "error";
         note.textContent = "Die Teilnehmerliste konnte nicht geladen werden.";
         list.appendChild(note);
       }
