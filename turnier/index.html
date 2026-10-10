@@ -99,7 +99,7 @@
           <button type="submit" id="tournament-submit" class="btn submit" disabled>Zum Turnier der Kraft anmelden</button>
         </form>
 
-        <div class="list-block">
+        <div class="list-block" id="teilnehmer">
           <h2>Teilnehmer</h2>
           <div id="tournament-list" aria-live="polite">
             <p class="muted">Liste wird geladen…</p>
@@ -113,9 +113,22 @@
         </p>
       </section>
     </div>
+
+    <div class="wrap wrap-wide">
+      <section class="panel baum" id="turnierbaum" aria-labelledby="baum-title">
+        <h2 id="baum-title">Turnierbaum</h2>
+        <p class="lead">Bis 32 freigegebene Teilnehmer gibt es eine direkte K.-o.-Runde. Ab 33 Teilnehmern gibt es zuerst Gruppen zu viert. Die ersten zwei jeder Gruppe kommen weiter.</p>
+        <p id="baum-note" class="note">Turnierbaum sichtbar für angemeldete Teilnehmer.</p>
+        <p id="baum-status" class="status is-ok" hidden role="status"></p>
+        <div id="baum-admin"></div>
+        <div id="baum-groups"></div>
+        <div id="baum-ko"></div>
+      </section>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="bracket.js"></script>
   <script src="turnier.js"></script>
 </body>
 </html>
