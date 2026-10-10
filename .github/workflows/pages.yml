@@ -31,7 +31,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp -a index.html .nojekyll robots.txt sitemap.xml css js assets _site/
+          cp -a index.html .nojekyll robots.txt sitemap.xml css js assets turnier _site/
           cp -a README.md _site/README.md
 
       - name: Upload Pages artifact
