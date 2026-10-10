@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turnier der Kraft – 1-gegen-1 Duell-Turnier in WoW Forever</title>
+  <meta name="description" content="Turnier der Kraft: das 1-gegen-1 Duell-Turnier in WoW Forever am Samstag, 17.10.2026 in der Arena der Gurubashi (Schlingendorntal). Horde und Allianz, K.-o.-System, um Spaß und Ehre.">
+  <meta name="theme-color" content="#10080c">
+  <link rel="canonical" href="https://thearcflame.github.io/turnier/">
+  <link rel="stylesheet" href="turnier.css">
+</head>
+<body>
+  <a class="skip-link" href="#inhalt">Zum Inhalt springen</a>
+
+  <header class="header">
+    <div class="wrap header-bar">
+      <a class="brand" href="https://thearcflame.github.io/">
+        <span class="brand-title">The Arc Flame</span>
+        <span class="brand-sub">Turnier der Kraft</span>
+      </a>
+      <a class="btn btn-discord" href="https://discord.gg/8xCcp5ePzj">Discord</a>
+    </div>
+  </header>
+
+  <main id="inhalt" class="main">
+    <div class="wrap">
+      <section class="panel" aria-labelledby="turnier-title">
+        <span class="kicker">WoW Forever</span>
+        <h1 id="turnier-title">Turnier der Kraft – 1-gegen-1 Duell-Turnier in WoW Forever</h1>
+        <p class="lead">Arena der Gurubashi (Schlingendorntal). Horde und Allianz, K.-o.-System, um Spaß und Ehre.</p>
+        <hr class="rule">
+
+        <ul class="facts" aria-label="Turnierdaten">
+          <li class="card">
+            <p class="card-label">Datum</p>
+            <p class="card-value">Samstag, 17.10.2026</p>
+          </li>
+          <li class="card">
+            <p class="card-label">Ort</p>
+            <p class="card-value">Arena der Gurubashi (Schlingendorntal)</p>
+          </li>
+          <li class="card">
+            <p class="card-label">Fraktionen</p>
+            <p class="card-value">Horde und Allianz</p>
+          </li>
+          <li class="card">
+            <p class="card-label">Modus</p>
+            <p class="card-value">K.-o.-System</p>
+          </li>
+          <li class="card">
+            <p class="card-label">Uhrzeit und Server</p>
+            <p class="card-value">werden noch bekanntgegeben</p>
+          </li>
+          <li class="card card-hot">
+            <p class="card-label">Anmeldung</p>
+            <p class="card-value">ab Sonntag, 11.10.2026</p>
+          </li>
+        </ul>
+
+        <p id="signup-note" class="note" role="status">Anmeldung zum Turnier der Kraft ab Sonntag, 11.10.2026.</p>
+
+        <form id="tournament-form" novalidate>
+          <fieldset id="tournament-fields" disabled>
+            <div class="fields">
+              <div>
+                <label for="tournament-name">Charaktername</label>
+                <input type="text" id="tournament-name" name="character_name" autocomplete="off" placeholder="z.B. Charaktername" minlength="2" maxlength="24" required>
+              </div>
+              <div>
+                <label for="tournament-class">Klasse</label>
+                <select id="tournament-class" name="class" required>
+                  <option value="">Bitte wählen</option>
+                  <option value="Krieger">Krieger</option>
+                  <option value="Paladin">Paladin</option>
+                  <option value="Jäger">Jäger</option>
+                  <option value="Schurke">Schurke</option>
+                  <option value="Priester">Priester</option>
+                  <option value="Schamane">Schamane</option>
+                  <option value="Magier">Magier</option>
+                  <option value="Hexenmeister">Hexenmeister</option>
+                  <option value="Druide">Druide</option>
+                </select>
+              </div>
+              <div>
+                <label for="tournament-faction">Fraktion</label>
+                <select id="tournament-faction" name="faction" required>
+                  <option value="">Bitte wählen</option>
+                  <option value="horde">Horde</option>
+                  <option value="alliance">Allianz</option>
+                </select>
+              </div>
+              <div>
+                <label for="tournament-discord">Discord-Name</label>
+                <input type="text" id="tournament-discord" name="discord_name" autocomplete="off" placeholder="z.B. Name" minlength="2" maxlength="40" required>
+              </div>
+            </div>
+          </fieldset>
+          <p id="tournament-status" class="status is-ok" hidden role="status"></p>
+          <button type="submit" id="tournament-submit" class="btn submit" disabled>Zum Turnier der Kraft anmelden</button>
+        </form>
+
+        <div class="list-block">
+          <h2>Teilnehmer</h2>
+          <div id="tournament-list" aria-live="polite">
+            <p class="muted">Liste wird geladen…</p>
+          </div>
+        </div>
+
+        <p class="links">
+          <a href="https://discord.gg/8xCcp5ePzj">Discord</a>
+          ·
+          <a href="https://thearcflame.github.io/">Gilde</a>
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="turnier.js"></script>
+</body>
+</html>
